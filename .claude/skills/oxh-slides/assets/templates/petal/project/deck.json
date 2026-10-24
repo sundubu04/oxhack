@@ -1,0 +1,54 @@
+{
+ "v": 4,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-23T13:04:50Z"
+ },
+ "lists": "css",
+ "title": "Petal template",
+ "cover": "cover",
+ "order": [
+  "cover",
+  "palette",
+  "type",
+  "considerations",
+  "agenda",
+  "divider",
+  "wins",
+  "meters",
+  "bars",
+  "board",
+  "timeline",
+  "people",
+  "retro",
+  "shoutout",
+  "decisions",
+  "checklist",
+  "close"
+ ],
+ "sections": {
+  "s1": {
+   "description": "The look: palette and type",
+   "start": "cover"
+  },
+  "s2": {
+   "description": "Running a meeting: agenda, wins, numbers",
+   "start": "agenda"
+  },
+  "s3": {
+   "description": "Plans and people",
+   "start": "board"
+  },
+  "s4": {
+   "description": "Retro, decisions and the close",
+   "start": "retro"
+  }
+ },
+ "faces": {
+  "figtree": {
+   "family": "Figtree",
+   "href": "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+  }
+ },
+ "designSystems": []
+}

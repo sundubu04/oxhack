@@ -1,0 +1,58 @@
+{
+ "v": 4,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-23T13:07:20Z"
+ },
+ "lists": "css",
+ "title": "Console template",
+ "cover": "cover",
+ "order": [
+  "cover",
+  "palette",
+  "type",
+  "considerations",
+  "agenda",
+  "statement",
+  "context",
+  "layers",
+  "sequence",
+  "lifecycle",
+  "code",
+  "terminal",
+  "product",
+  "metrics",
+  "tradeoffs",
+  "roadmap",
+  "close"
+ ],
+ "sections": {
+  "s1": {
+   "description": "The look, and which diagram to use when",
+   "start": "cover"
+  },
+  "s2": {
+   "description": "The system: context, layers and one reading end to end",
+   "start": "agenda"
+  },
+  "s3": {
+   "description": "The code, the terminal and the product",
+   "start": "code"
+  },
+  "s4": {
+   "description": "Numbers, trade-offs and what comes next",
+   "start": "metrics"
+  }
+ },
+ "faces": {
+  "geist": {
+   "family": "Geist",
+   "href": "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap"
+  },
+  "geist-mono": {
+   "family": "Geist Mono",
+   "href": "https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap"
+  }
+ },
+ "designSystems": []
+}

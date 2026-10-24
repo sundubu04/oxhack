@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)", "Bash(git status)", "Bash(git diff *)", "Bash(git diff)", "Bash(git log *)", "Bash(git log)",
+      "Bash(git show *)", "Bash(git branch *)", "Bash(git branch)",
+      "Bash(gh pr view *)", "Bash(gh pr list *)", "Bash(gh pr diff *)", "Bash(gh pr checks *)",
+      "Bash(gh issue view *)", "Bash(gh issue list *)", "Bash(gh run view *)", "Bash(gh run list *)", "Bash(gh repo view *)",
+      "Bash(python3 .claude/skills/*)", "Bash(python3 .claude/hooks/clock.py*)",
+      "Bash(node .claude/skills/*)", "Bash(sh .claude/skills/*)"
+    ],
+    "ask": [
+      "Bash(git *push *--force*)", "Bash(git *push *-f *)", "Bash(git *push *-f)", "Bash(git *push * +*)",
+      "Bash(git *commit *--no-verify*)", "Bash(gh repo edit *--visibility*)", "Bash(rm .freeze)", "Bash(rm -f .freeze)"
+    ],
+    "deny": [
+      "Read(.env*)", "Read(**/.env*)", "Read(*.pem)", "Read(*.key)", "Read(*.p12)", "Read(*.pfx)",
+      "Read(id_rsa*)", "Read(id_ecdsa*)", "Read(id_ed25519*)", "Read(*credentials)", "Read(*credentials.json)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/clock.py\" --line"
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/clock.py\"" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Edit|Write|NotebookEdit", "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/freeze.py\"" }] }
+    ]
+  }
+}

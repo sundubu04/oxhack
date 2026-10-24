@@ -1,0 +1,5 @@
+# Copy to hack/private-words.txt (gitignored) and add the words that must not appear in the public
+# repo, one per line, matched as whole words in any case: client names, people who didn't agree to
+# be named, internal project names. The public check (oxh-wrapup) lists every tracked line with one.
+darling-agentic
+darling-hub

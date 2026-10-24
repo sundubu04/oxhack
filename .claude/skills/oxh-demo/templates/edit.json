@@ -1,0 +1,14 @@
+{
+  "takes": { "a": "../recordings/take1" },
+  "fps": 30,
+  "size": [1920, 1080],
+  "theme": { "bg": "#fcfbfb", "ink": "#1f1a1d", "muted": "#5f575b" },
+  "order": [
+    { "card": "The user's problem, in one sentence", "sub": "Who they are", "dur": 3 },
+    { "clip": "a", "from": "home", "to": "ask", "speed": 1.5 },
+    { "clip": "a", "from": "ask", "to": "working", "speed": 1, "hold": 1 },
+    { "clip": "a", "from": "working", "to": "result", "speed": 3 },
+    { "clip": "a", "from": "result", "to": "end", "speed": 1, "caption": "What the judge should notice", "hold": 1.5 },
+    { "card": "The number that moved, and how it was measured", "dur": 3 }
+  ]
+}

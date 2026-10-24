@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keys.txt
+
+# Data, models, recordings and private material stay out of git (CLAUDE.md)
+data/
+models/
+recordings/
+private/
+hack/private-words.txt
+
+# Build output
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+.next/
+.vite/
+demo/out/
+pitch/**/preview/
+
+# Local
+.DS_Store
+*.log
+.claude/settings.local.json
+.claude/worktrees/

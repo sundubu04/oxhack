@@ -1,0 +1,62 @@
+{
+ "v": 4,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-23T13:14:05Z"
+ },
+ "lists": "css",
+ "title": "Grid template",
+ "cover": "cover",
+ "order": [
+  "cover",
+  "palette",
+  "type",
+  "considerations",
+  "findings",
+  "numeral",
+  "bars",
+  "line",
+  "slope",
+  "stacked",
+  "waterfall",
+  "heatmap",
+  "scatter",
+  "multiples",
+  "table",
+  "method",
+  "close"
+ ],
+ "sections": {
+  "s1": {
+   "description": "The look: palette and type",
+   "start": "cover"
+  },
+  "s2": {
+   "description": "Findings and the numbers behind them",
+   "start": "findings"
+  },
+  "s3": {
+   "description": "Distributions, flows and positions",
+   "start": "stacked"
+  },
+  "s4": {
+   "description": "Appendix: comparisons, table and method",
+   "start": "multiples"
+  }
+ },
+ "faces": {
+  "schibsted-grotesk": {
+   "family": "Schibsted Grotesk",
+   "href": "https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700&display=swap"
+  },
+  "inter": {
+   "family": "Inter",
+   "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+  },
+  "noto-sans-kr": {
+   "family": "Noto Sans KR",
+   "href": "https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600&display=swap"
+  }
+ },
+ "designSystems": []
+}

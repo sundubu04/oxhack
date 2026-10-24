@@ -1,0 +1,9 @@
+{
+  "name": "oxhack-demo",
+  "private": true,
+  "type": "module",
+  "description": "Demo takes for the OxHack video; see .claude/skills/oxh-demo.",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

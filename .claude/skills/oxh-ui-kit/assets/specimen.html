@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pink UI kit</title>
+<link rel="stylesheet" href="kit.css">
+<style>
+/* The specimen's own frame and its static hover, focus and pressed copies; only this block is not the kit. */
+@layer dl.components {
+:where([data-dl-look]) .is-focus {
+    outline: 2px solid var(--dl-focus);
+    outline-offset: 2px;
+  }
+:where([data-dl-look]) a:where(:not([class])).is-hover, .dl-link.is-hover { text-decoration-thickness: 2px; }
+.dl-skip.is-focus { transform: none; }
+.dl-btn--primary.is-hover { background: var(--dl-primary-hover); }
+.dl-btn--primary.is-active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-primary-press); }
+.dl-btn--secondary.is-hover { background: var(--dl-surface-2); border-color: var(--dl-line-strong); }
+.dl-btn--secondary.is-active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-bubble); }
+.dl-btn--ghost.is-hover { background: var(--dl-hover); color: var(--dl-text); }
+.dl-btn--ghost.is-active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-press); }
+.dl-btn--danger.is-hover { background: var(--dl-stop-wash); border-color: var(--dl-stop); }
+.dl-btn--danger.is-active:not(:disabled, [aria-disabled="true"]) { background: color-mix(in srgb, var(--dl-stop) 18%, #ffffff); }
+.dl-btn--danger-solid.is-hover { background: var(--dl-stop-hover); }
+.dl-btn--danger-solid.is-active:not(:disabled, [aria-disabled="true"]) { background: #741a1e; }
+.dl-icon-btn.is-hover { background: var(--dl-hover); color: var(--dl-text); }
+.dl-icon-btn.is-active:not(:disabled) { background: var(--dl-press); color: var(--dl-text); }
+.dl-input.is-hover { border-color: var(--dl-text-3); }
+.dl-input.is-focus { outline-offset: -1px; border-color: var(--dl-focus); }
+.dl-check.is-hover:not(:disabled), .dl-radio.is-hover:not(:disabled) { border-color: var(--dl-text-2); }
+.dl-composer.is-hover { border-color: var(--dl-text-3); }
+.dl-composer.is-focus { border-color: var(--dl-focus); outline: 1px solid var(--dl-focus); }
+.dl-send.is-hover { background: var(--dl-primary-hover); }
+.dl-send.is-active:not(:disabled) { background: var(--dl-primary-press); }
+.dl-pick.is-hover { background: var(--dl-hover); color: var(--dl-text); }
+.dl-pick.is-active { background: var(--dl-press); color: var(--dl-text); }
+.dl-chip.is-hover { background: var(--dl-surface-2); border-color: var(--dl-line-strong); }
+.dl-chip.is-active:not(:disabled) { background: var(--dl-bubble); }
+.dl-row:is(.is-hover, [data-current]) + .dl-row::after, .dl-row:is(.is-hover, [data-current])::after { visibility: hidden; }
+.dl-row.is-hover { background: var(--dl-hover); }
+.dl-row__link.is-focus { outline: 0; }
+.dl-row:has(.dl-row__link.is-focus) { outline: 2px solid var(--dl-focus); outline-offset: -2px; }
+.dl-row:is(.is-hover, .is-focus, [data-current]) .dl-row__more { opacity: 1; }
+.dl-table tbody tr.is-hover { background: var(--dl-hover); }
+.dl-nav__item.is-hover { background: var(--dl-hover); color: var(--dl-text); }
+.dl-nav__item.is-active { background: var(--dl-press); }
+.dl-seg > :is(button, [role="radio"]).is-hover { background: var(--dl-hover); color: var(--dl-text); }
+.dl-seg > :is(button, [role="radio"]).is-active { background: var(--dl-press); }
+.dl-seg > :is([aria-pressed="true"], [aria-checked="true"]):is(.is-hover, .is-active) {
+    background: var(--dl-raised);
+    color: var(--dl-text);
+    box-shadow: var(--dl-shadow-raised);
+  }
+.dl-switch.is-hover:not(:disabled) { border-color: var(--dl-text-2); }
+.dl-switch.is-hover:not(:disabled)::after { background: var(--dl-text-2); }
+.dl-switch[aria-checked="true"].is-hover:not(:disabled) { border-color: var(--dl-control-on); }
+.dl-switch[aria-checked="true"].is-hover:not(:disabled)::after { background: #ffffff; }
+.dl-menu__item.is-focus { outline-offset: -2px; }
+.dl-menu__item:is(.is-hover, [data-highlighted], [data-cursor]) { background: var(--dl-hover); }
+.dl-menu__item.is-active { background: var(--dl-press); }
+.dl-tabs__item.is-hover { color: var(--dl-text); background: var(--dl-hover); }
+.dl-tabs__item.is-active { background: var(--dl-press); }
+.dl-tabs__item.is-focus { outline-offset: -2px; }
+}
+
+/* The page around the kit: header, contents, numbered sections, figures, browser windows. Only this block is not the kit. */
+html, body { margin: 0; background: #f7f7f8; color: #1d1d1f; }
+.sp-root { background: var(--dl-surface-2); padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sp { display: grid; gap: 56px; max-width: 1120px; margin: 0 auto; }
+.sp p { margin: 0; }
+.sp code { font-family: var(--dl-mono); font-size: var(--dl-fs-xs); background: var(--dl-bubble); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.sp a:not([class]) { color: var(--dl-pink-11); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.sp-head { display: grid; gap: 12px; }
+.sp-head h1 { margin: 0; font-size: var(--dl-fs-hero); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
+.sp-lede { max-width: 66ch; font-size: var(--dl-fs-prose); line-height: 1.6; color: var(--dl-text-2); }
+.sp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: var(--dl-fs-sm); color: var(--dl-text-3); }
+
+.sp-toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 24px; margin: 0; padding: 16px 20px; list-style: none; border: 1px solid var(--dl-line); border-radius: var(--dl-r-card); background: var(--dl-bg); counter-reset: toc; }
+.sp .sp-toc a { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; color: var(--dl-text-2); text-decoration: none; font-size: var(--dl-fs-ui); }
+.sp .sp-toc a:hover { color: var(--dl-text); }
+.sp-toc b { min-width: 20px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dl-text-3); }
+
+.sp-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; border: 1px solid var(--dl-line); border-radius: var(--dl-r-card); background: rgb(255 255 255 / .92); backdrop-filter: blur(12px); font-size: var(--dl-fs-sm); color: var(--dl-text-2); }
+.sp-bar > span { margin-left: auto; color: var(--dl-text-3); }
+
+.sp-sec { display: grid; gap: 16px; scroll-margin-top: 72px; }
+.sp-sec > h2 { display: flex; align-items: baseline; gap: 12px; margin: 0; font-size: var(--dl-fs-xl); font-weight: 600; line-height: 1.25; letter-spacing: -.015em; }
+.sp-sec > h2 > b { font-size: var(--dl-fs-sm); font-weight: 500; color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+.sp-sec > p, .sp-prose { max-width: 62ch; font-size: var(--dl-fs-prose); line-height: 1.6; color: var(--dl-text-2); }
+.sp-prose strong, .sp-sec > p strong { color: var(--dl-text); font-weight: 600; }
+.sp h3 { margin: 0; font-size: var(--dl-fs-ui); font-weight: 600; line-height: 1.3; }
+
+.sp-fig { display: grid; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--dl-line); border-radius: var(--dl-r-card); background: var(--dl-bg); }
+.sp-fig--flush { padding: 0; overflow: hidden; }
+.sp-fig--flush > .sp-cap { padding: 0 20px 20px; }
+.sp-cap { max-width: 66ch; font-size: var(--dl-fs-sm); line-height: 1.55; color: var(--dl-text-2); }
+.sp-cap strong { color: var(--dl-text); font-weight: 600; }
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.sp-grid--2 { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+.sp-col { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.sp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sp-label { font-size: var(--dl-fs-xs); font-weight: 600; color: var(--dl-text-2); }
+.sp-note { font-size: var(--dl-fs-xs); line-height: 1.5; color: var(--dl-text-3); }
+.sp-scroll { overflow-x: auto; min-width: 0; }
+
+/* A matrix of one component in each state: rows are variants, columns are states. */
+.sp-matrix { border-collapse: separate; border-spacing: 0; min-width: 640px; width: 100%; }
+.sp-matrix th { padding: 0 8px 10px; font-size: var(--dl-fs-xs); font-weight: 500; color: var(--dl-text-3); text-align: left; white-space: nowrap; }
+.sp-matrix td { padding: 8px; vertical-align: middle; }
+.sp-matrix tbody th { padding: 8px 16px 8px 0; color: var(--dl-text-2); font-weight: 500; }
+
+/* Tables of measurements and decisions. */
+.sp-table { width: 100%; border-collapse: collapse; font-size: var(--dl-fs-sm); line-height: 1.45; }
+.sp-table th { padding: 0 12px 8px 0; border-bottom: 1px solid var(--dl-line-ctl); font-size: var(--dl-fs-xs); font-weight: 500; color: var(--dl-text-3); text-align: left; vertical-align: bottom; }
+.sp-table td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--dl-line); vertical-align: top; color: var(--dl-text-2); }
+.sp-table td:first-child { color: var(--dl-text); font-weight: 500; }
+.sp-table .dl-num { text-align: right; }
+
+/* Colour swatches. */
+.sp-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.sp-swatches--12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+@media (max-width: 900px) { .sp-swatches--12 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .sp-swatches--12 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sp-sw { display: grid; gap: 6px; margin: 0; font-size: var(--dl-fs-xs); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+.sp-sw > span { display: grid; place-items: end start; height: 56px; padding: 6px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .06); font-size: var(--dl-fs-meta); font-weight: 600; }
+.sp-sw b { color: var(--dl-text); font-weight: 500; }
+
+/* The type ramp. */
+.sp-ramp { display: grid; }
+.sp-ramp > div { display: grid; grid-template-columns: 136px minmax(0, 1fr) minmax(0, 220px); gap: 16px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--dl-line); }
+.sp-ramp > div:last-child { border-bottom: 0; }
+.sp-ramp small { font-size: var(--dl-fs-xs); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+
+.sp-space { display: grid; gap: 6px; }
+.sp-space > div { display: grid; grid-template-columns: 40px auto minmax(0, 1fr); gap: 12px; align-items: center; font-size: var(--dl-fs-xs); color: var(--dl-text-3); }
+.sp-space i { display: block; height: 12px; border-radius: 3px; background: var(--dl-line-ctl); }
+
+.sp-shapes { display: flex; flex-wrap: wrap; gap: 16px; }
+.sp-shape { display: grid; gap: 8px; justify-items: start; font-size: var(--dl-fs-xs); color: var(--dl-text-3); }
+.sp-shape > i { display: block; width: 72px; height: 48px; border: 1px solid var(--dl-line-strong); background: var(--dl-bg); }
+
+/* Icon grid. */
+.sp-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 4px; }
+.sp-ico { display: grid; justify-items: center; gap: 6px; margin: 0; padding: 12px 4px 10px; border-radius: 10px; color: var(--dl-text); }
+.sp-ico:hover { background: var(--dl-hover); }
+.sp-ico figcaption { max-width: 100%; font-size: var(--dl-fs-meta); line-height: 1.35; color: var(--dl-text-3); text-align: center; overflow-wrap: anywhere; }
+
+/* A browser window round each console mock. */
+.sp-win { overflow: hidden; border: 1px solid var(--dl-line-ctl); border-radius: 12px; background: var(--dl-bg); }
+.sp-win__bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-bottom: 1px solid var(--dl-line); background: var(--dl-bubble); }
+.sp-win__dots { display: flex; gap: 6px; }
+.sp-win__dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--dl-line-ctl); }
+.sp-win__url { justify-self: center; display: block; width: min(440px, 100%); height: 26px; padding: 0 10px; border-radius: 8px; background: #ffffff; font-size: var(--dl-fs-xs); line-height: 26px; color: var(--dl-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sp-win__url .dl-icon { margin-right: 6px; vertical-align: -1px; }
+.sp-win__url b { color: var(--dl-text); font-weight: 400; }
+.sp-win__body { position: relative; height: 640px; overflow: hidden; }
+.sp-win__body > .dl-app { height: 100%; }
+.sp-win--phone { width: 390px; max-width: 100%; border-radius: 28px; }
+.sp-win--phone .sp-win__body { height: auto; padding-bottom: 24px; }
+.sp-win__body--auto { height: auto; }
+
+/* A dim layer for a dialog shown inside a mock, standing in for ::backdrop. */
+.sp-backdrop { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgb(29 29 31 / .32); }
+
+/* A picture of a page inside a mock: grey bars standing for the host page's text. */
+.sp-thumb { display: grid; gap: 4px; align-content: start; width: 72px; height: 48px; padding: 6px; border-radius: 6px; background: var(--dl-surface-2); box-shadow: inset 0 0 0 1px var(--dl-line); flex: none; }
+.sp-thumb i { display: block; height: 4px; border-radius: 2px; background: #dcdce0; }
+.sp-thumb i.p { background: var(--dl-pink-7); }
+
+.sp-diagram { overflow-x: auto; }
+.sp-diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+
+.sp-foot p { max-width: 72ch; }
+.sp-foot { display: grid; gap: 8px; padding-top: 24px; border-top: 1px solid var(--dl-line); font-size: var(--dl-fs-xs); line-height: 1.6; color: var(--dl-text-3); }
+
+@media (max-width: 720px) {
+  .sp { gap: 40px; }
+  .sp-fig { padding: 16px; }
+  .sp-ramp > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .sp-grid--2 { grid-template-columns: minmax(0, 1fr); }
+  .sp-win__body { height: auto; min-height: 560px; }
+  .sp-bar > span { display: none; }
+}
+
+/* Inside the console mocks. */
+.sp-brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 12px; font-size: var(--dl-fs-ui); }
+.sp-brand b { font-weight: 600; }
+.sp-fav { display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 4px; background: var(--c); color: #fff; font-size: var(--dl-fs-meta); font-weight: 600; line-height: 1; }
+.sp-me { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: auto; padding: 8px 2px 0 10px; border-top: 1px solid var(--dl-line); }
+.sp-me > span:nth-child(2) { display: grid; min-width: 0; font-size: var(--dl-fs-sm); line-height: 1.4; }
+.sp-me b { font-weight: 500; }
+.sp-me small { overflow: hidden; color: var(--dl-text-3); font-size: var(--dl-fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.dl-rail .dl-nav__item svg { color: var(--dl-text-3); }
+.dl-rail .dl-nav__item[aria-current="page"] svg { color: currentColor; }
+.sp-scrollbox { position: relative; display: grid; gap: 20px; align-content: start; overflow: hidden; }
+.sp-pagehead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.sp-pagehead p { margin: 4px 0 0; }
+.sp-rowmain { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.sp-rowmain > div { min-width: 0; }
+.sp-menu-at { position: absolute; top: calc(100% + 4px); right: 44px; z-index: 3; }
+.sp-toast-at { position: absolute; left: 0; right: 0; bottom: 24px; display: flex; justify-content: center; }
+.sp-back { justify-self: start; margin: -8px 0 -12px -8px; }
+.sp-detail { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; align-items: start; }
+.sp-mail { position: absolute; inset: 0; display: grid; grid-template-columns: 38% 1fr; background: #ffffff; }
+.sp-mail__side { display: grid; gap: 4px; align-content: start; padding: 14px 10px; background: #f6f8fc; font-size: var(--dl-fs-xs); color: #3c4043; }
+.sp-mail__side span { display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 999px; }
+.sp-mail__side span:first-of-type { background: #e3e6eb; color: #1f1f1f; font-weight: 600; }
+.sp-mail__side b { font-weight: 600; color: #1f1f1f; outline: 2px solid var(--dl-pink-8); outline-offset: 2px; border-radius: 3px; }
+.sp-mail__compose { display: block; width: 70%; height: 22px; margin-bottom: 6px; border-radius: 8px; background: #c2e7ff; }
+.sp-mail__list { display: grid; gap: 10px; align-content: start; padding: 16px 14px; }
+.sp-mail__list i { display: block; height: 7px; border-radius: 4px; background: #e8eaed; }
+.sp-mail__list i:nth-child(odd) { width: 86%; }
+.sp-settings { display: grid; }
+.sp-set { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--dl-line); }
+.sp-set:last-child { border-bottom: 0; }
+.sp-set .dl-muted { margin: 4px 0 0; font-size: var(--dl-fs-sm); }
+.sp-first { display: grid; gap: 24px; align-content: center; max-width: 440px; height: 100%; margin: 0 auto; padding: 32px 24px; }
+.sp-first .sp-brand { padding: 0; }
+.sp-howto { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.sp-howto li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; }
+.sp-howto b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--dl-bubble); font-size: var(--dl-fs-xs); font-weight: 600; color: var(--dl-text-2); }
+.sp-phonefig { justify-items: center; padding-top: 20px; background: var(--dl-surface-2); }
+.sp-phonefig > .sp-cap { justify-self: stretch; background: var(--dl-bg); padding-top: 16px; }
+.sp-phonebar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; height: 56px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--dl-line); font-size: var(--dl-fs-lg); }
+.sp-phonebar b { font-weight: 600; }
+.sp-phone { display: grid; gap: 12px; align-content: start; padding: 16px 8px; }
+.sp-phone .dl-row--plain { min-height: 52px; }
+.sp-seg-full { display: flex; justify-self: stretch; margin: 0 8px; }
+.sp-seg-full > button { flex: 1; }
+.sp-sizes { display: grid; gap: 12px; }
+.sp-sizes > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 28px; }
+.sp-sizes small { font-size: var(--dl-fs-xs); color: var(--dl-text-2); }
+.sp-depth { display: grid; gap: 2px; align-content: end; flex: 1; min-width: 88px; height: 88px; padding: 12px; border-radius: var(--dl-r-card); background: var(--dl-bg); font-size: var(--dl-fs-sm); font-weight: 500; }
+.sp-depth small { font-size: var(--dl-fs-xs); font-weight: 400; color: var(--dl-text-3); }
+.sp-motion { display: grid; grid-template-columns: 96px 80px minmax(0, 1fr); gap: 12px; align-items: baseline; font-size: var(--dl-fs-sm); }
+.sp-grow { flex: 1; }
+.sp-dialogstage .dl-dialog, .sp-backdrop .dl-dialog { width: 100%; max-width: 440px; }
+.sp-dialogstage { display: grid; place-items: center; padding: 40px 16px; border-radius: 10px; background: rgb(29 29 31 / .32); }
+
+@media (max-width: 900px) {
+  .sp-detail, .sp-set { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sp-menu-at, .sp-toast-at { display: none; }
+}
+
+/* The hub screenshot with numbered pins. */
+.sp-shotwrap { position: relative; border-bottom: 1px solid var(--dl-line); }
+.sp-shot { display: block; width: 100%; height: auto; }
+.sp-pin { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--dl-ink); box-shadow: 0 0 0 2px #fff; color: #fff; font-size: var(--dl-fs-meta); font-style: normal; font-weight: 600; }
+.sp-callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 24px; margin: 0; padding: 0 20px; list-style: none; }
+.sp-callouts li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; font-size: var(--dl-fs-sm); line-height: 1.5; color: var(--dl-text-2); }
+.sp-callouts b { font-weight: 600; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--dl-ink); color: #fff; font-size: var(--dl-fs-meta); }
+.sp-callouts strong { color: var(--dl-text); font-weight: 600; }
+
+/* Lists, the shipping flow and the open choices. */
+.sp-list { display: grid; gap: 8px; margin: 0; padding-left: 18px; font-size: var(--dl-fs-sm); line-height: 1.5; color: var(--dl-text-2); }
+.sp-list strong { color: var(--dl-text); font-weight: 600; }
+.sp-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; }
+.sp-flow > i { display: grid; place-items: center; color: var(--dl-text-3); font-style: normal; }
+.sp-node { display: grid; gap: 4px; flex: 1 1 220px; min-width: 0; padding: 12px 16px; border-radius: var(--dl-r-ctl); background: var(--dl-surface-2); font-size: var(--dl-fs-sm); }
+.sp-node b { font-weight: 600; }
+.sp-node code { justify-self: start; }
+.sp-node span { color: var(--dl-text-2); font-size: var(--dl-fs-xs); line-height: 1.45; }
+.sp-decide { padding: 16px; border-radius: var(--dl-r-card); background: var(--dl-bg); border: 1px solid var(--dl-line); font-size: var(--dl-fs-sm); line-height: 1.55; color: var(--dl-text-2); }
+.sp-decide b, .sp-decide strong { color: var(--dl-text); font-weight: 600; }
+@media (max-width: 720px) { .sp-flow > i { transform: rotate(90deg); width: 100%; } }
+
+.sp-staterow { display: grid; grid-template-columns: 120px 96px minmax(0, 1fr); align-items: center; gap: 12px; }
+.sp-failed { display: grid; grid-template-columns: 96px auto minmax(0, 1fr); align-items: start; gap: 16px; padding: 12px 0; border-top: 1px solid var(--dl-line); }
+.sp-failed .sp-label { padding-top: 8px; }
+.sp-failed .sp-note { padding-top: 8px; max-width: 44ch; }
+@media (max-width: 720px) { .sp-failed { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+
+.sp-ext { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 16px; border-radius: 10px; background: var(--dl-surface-2); }
+.sp-ext .dl-notice { animation: none; }
+.sp-failed .dl-btn { justify-self: start; }
+
+</style>
+</head>
+<body>
+<div class="sp-root" data-dl-look="pink">
+<div class="sp">
+  <header class="sp-head">
+    <h1>Pink UI kit</h1>
+    <p class="sp-lede">Every piece of the kit in every state, drawn by the kit's own stylesheet, inlined. Neutral greys and the system font, one pink for the thing that matters on a screen. The same files are the <code>oxh-ui-kit</code> skill in this repo.</p>
+    <div class="sp-meta"><span>Light only</span><span>Sample data throughout</span></div>
+  </header>
+
+  <ol class="sp-toc" aria-label="Contents">
+    <li><a href="#s02"><b>02</b>Colour</a></li>
+    <li><a href="#s03"><b>03</b>Type, space, shape and motion</a></li>
+    <li><a href="#s04"><b>04</b>Symbols</a></li>
+    <li><a href="#s05"><b>05</b>Controls, in every state</a></li>
+    <li><a href="#s06"><b>06</b>Feedback, waiting and overlays</a></li>
+    <li><a href="#s07"><b>07</b>Showing data</a></li>
+  </ol>
+
+  <div class="sp-bar" role="group" aria-label="Page settings">
+    <span class="sp-label" style="margin:0">Density</span>
+    <div class="dl-seg" role="group" aria-label="Density" id="density"><button type="button" aria-pressed="true" data-v="">Comfortable</button><button type="button" aria-pressed="false" data-v="compact">Compact</button></div>
+    <span>Every piece below is the stylesheet itself. Sample data throughout.</span>
+  </div>
+
+
+
+<section class="sp-sec" id="s02">
+  <h2><b>02</b>Colour</h2>
+  <p>Greys do almost all the work. The pink is one hue in twelve steps, built in OKLCH around flow-er's flower; four state colours each come with a word, a shape and a wash. Everything is a <code>--dl-*</code> token, so a screen never writes a colour of its own.</p>
+
+  <figure class="sp-fig" style="margin:0">
+    <h3>The pink, twelve steps</h3>
+    <div class="sp-swatches sp-swatches--12">
+      <figure class="sp-sw"><span style="background:var(--dl-pink-1)"></span><b>1</b>#fffcfd · page</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-2)"></span><b>2</b>#fdf7f9 · subtle</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-3)"></span><b>3</b>#faeef2 · light fill</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-4)"></span><b>4</b>#f6e4ea · strong fill</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-5)"></span><b>5</b>#f1d8e1 · text selection</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-6)"></span><b>6</b>#ebcad6 · line</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-7)"></span><b>7</b>#e2b5c5 · ring on ink</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-8)"></span><b>8</b>#d77f9c · the petal</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-9);color:#fff">Aa</span><b>9</b>#a34a69 · solid</figure>
+      <figure class="sp-sw"><span style="background:var(--dl-pink-10);color:#fff">Aa</span><b>10</b>#984562 · hover</figure>
+      <figure class="sp-sw"><span style="background:#fff;color:var(--dl-pink-11)">Aa</span><b>11</b>#863854 · link text</figure>
+      <figure class="sp-sw"><span style="background:#fff;color:var(--dl-pink-12)">Aa</span><b>12</b>#4d1e2f · deep text</figure>
+    </div>
+    <p class="sp-cap"><strong>One to two are backgrounds, three to five fills, six to eight edges, nine and ten solids, eleven and twelve text</strong>, the way Radix lays out a colour scale. Each step is darker than the one before, with the big drop between eight and nine where fills end and solids begin. Nine is flow-er's flower core darkened until white on it reads at 5.6:1, and it is the brand colour on the brand disc and the edge tab; eight is the flower's petal. The kit itself uses five, seven, nine, ten and eleven; the rest are there for screens that need them.</p>
+  </figure>
+
+  <div class="sp-grid">
+    <figure class="sp-fig" style="margin:0">
+      <h3>Greys</h3>
+      <div class="sp-swatches">
+        <figure class="sp-sw"><span style="background:#fff"></span><b>bg</b>#ffffff</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-surface-2)"></span><b>surface-2</b>#f7f7f8</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-bubble)"></span><b>bubble</b>#f2f2f3</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-line-strong)"></span><b>line-strong</b>#808084</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-text-3)"></span><b>text-3</b>#636368</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-text-2)"></span><b>text-2</b>#4d4d52</figure>
+        <figure class="sp-sw"><span style="background:var(--dl-text)"></span><b>text, ink</b>#1d1d1f</figure>
+      </div>
+      <p class="sp-cap">Hairlines are black at 8% and 13%, so they work on white and on the grey rail alike. The strong line is the only grey edge that marks a control on its own: fields and the off switch.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>State</h3>
+      <div class="sp-col" style="gap:10px">
+        <div class="sp-staterow"><span class="dl-status" data-tone="ok">Kept</span><span class="dl-tag" data-tone="ok">Kept</span><span class="sp-note">#11704f on #e2eeea · 5.1:1</span></div>
+        <div class="sp-staterow"><span class="dl-status" data-tone="info">Preview</span><span class="dl-tag" data-tone="info">Preview</span><span class="sp-note">#0a62b8 on #e2ecf6 · 5.1:1</span></div>
+        <div class="sp-staterow"><span class="dl-status" data-tone="warn">Needs you</span><span class="dl-tag" data-tone="warn">Needs you</span><span class="sp-note">#7f5c00 on #f0ebe0 · 5.2:1</span></div>
+        <div class="sp-staterow"><span class="dl-status" data-tone="stop">Failed</span><span class="dl-tag" data-tone="stop">Failed</span><span class="sp-note">#a4262c on #f4e5e6 · 6.0:1</span></div>
+        <div class="sp-staterow"><span class="dl-status">Off</span><span class="dl-tag">Draft</span><span class="sp-note">no tone: grey</span></div>
+      </div>
+      <p class="sp-cap">The washes are solid colours, not see-through, so a tag reads the same on a white row, a grey rail or a selected row. Green, amber, red and blue all sit apart from the pink.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Where the pink goes</h3>
+      <div class="sp-col" style="gap:12px">
+        <div class="sp-row"><button class="dl-btn dl-btn--primary dl-btn--sm" type="button">Keep</button><span class="sp-note">the one main action</span></div>
+        <div class="sp-row"><span class="dl-nav__item" aria-current="page" style="width:180px"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span class="dl-nav__label">Changes</span></span><span class="sp-note">the current item</span></div>
+        <div class="sp-row"><a class="dl-link" href="#s02">Open site</a><span class="sp-note">a link</span></div>
+        <div class="sp-row"><button class="dl-btn dl-btn--secondary dl-btn--sm is-focus" type="button" tabindex="-1">Show me</button><span class="sp-note">the focus ring</span></div>
+        <div class="sp-row"><span class="dl-stat" data-tone="accent"><span class="dl-stat__n">12</span></span><span class="sp-note">the number that answers the card</span></div>
+      </div>
+      <p class="sp-cap"><strong>And nowhere else.</strong> Hover is grey, people's avatars are grey, a switch that is on is ink, and icons are the text's colour. On a screen the pink should appear three times or so.</p>
+    </figure>
+  </div>
+
+  <figure class="sp-fig" style="margin:0">
+    <h3>Contrast, measured</h3>
+    <div class="sp-scroll" tabindex="0" role="region" aria-label="Scrolls sideways">
+      <table class="sp-table" style="min-width:560px">
+        <thead><tr><th>Pair</th><th class="dl-num">Ratio</th><th class="dl-num">Needs</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>White on the pink (primary, send)</td><td class="dl-num">5.61</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>White on the pink, hovered and pressed</td><td class="dl-num">6.24 · 8.21</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Link pink on white, and on the selected fill</td><td class="dl-num">7.76 · 6.56</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Quiet text on the selected fill over the rail, the lowest pair</td><td class="dl-num">4.74</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>State words on their washes</td><td class="dl-num">5.09–5.95</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Toast text on ink</td><td class="dl-num">15.46</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Field edge and off-switch outline, on white and on the selected rail</td><td class="dl-num">3.93 · 3.12</td><td class="dl-num">3</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Focus ring on white, on the selected rail, inside the toast</td><td class="dl-num">5.61 · 4.45 · 9.34</td><td class="dl-num">3</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>Grey timeline block on its track</td><td class="dl-num">3.67</td><td class="dl-num">3</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+          <tr><td>White on the red that confirms a loss</td><td class="dl-num">7.26</td><td class="dl-num">4.5</td><td><span class="dl-status" data-tone="ok">Passes</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sp-cap">WCAG 2.2: 4.5:1 for text, 3:1 for the edges and marks that identify a control or its state. Each pair is measured against what it actually sits on, including the pink selected fill over the grey rail, which is the lowest background in the kit.</p>
+  </figure>
+</section>
+
+<section class="sp-sec" id="s03">
+  <h2><b>03</b>Type, space, shape and motion</h2>
+  <p>The system font, because a console is a tool people open every day and the platform's own face is the one they read fastest: SF Pro on a Mac, Segoe UI on Windows, Roboto on Android. Eight sizes, three weights, one spacing scale, five radii and three durations; anything else is a value the kit didn't choose.</p>
+
+  <figure class="sp-fig" style="margin:0">
+    <div class="sp-ramp">
+      <div><small>28 · 600 · 1.15</small><span style="font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.15" class="dl-num">12 asks kept</span><small>One hero number per screen</small></div>
+      <div><small>21 · 600 · 1.25</small><span class="dl-h1">Changes</span><small>Page title</small></div>
+      <div><small>17 · 600 · 1.3</small><span class="dl-title">Where it runs</span><small>Section and dialog title</small></div>
+      <div><small>15 · 400 · 1.55</small><span style="font-size:15px;line-height:1.55">Each label in the sidebar now shows its unread count.</span><small>Prose: Darling's answers, help</small></div>
+      <div><small>14 · 400 / 500 · 1.45</small><span>Unread count beside each label</span><small>The interface: rows, buttons, fields</small></div>
+      <div><small>13 · 400 · 1.45</small><span style="font-size:13px">Keys and values, captions, dense tables</span><small>Secondary blocks</small></div>
+      <div><small>12 · 400 / 600 · 1.35</small><span style="font-size:12px;color:var(--dl-text-2)">Inbox · kept 20 Oct · 3 versions</span><small>A row's second line, labels, status words</small></div>
+      <div><small>11 · 400 · 1.35</small><span style="font-size:11px;color:var(--dl-text-3)" class="dl-num">09:00 · 0:41 · 3</span><small>Counts, ticks, times. The floor.</small></div>
+    </div>
+    <p class="sp-cap"><strong>Four sizes in a card at most; weights 400, 500 and 600, never bold 700.</strong> A title and its body differ by 1.15 times or more. Numbers that change are tabular. Monospace is for ids and code, never for times or counts. Compact density takes the interface to 13 and prose to 14 and leaves the rest.</p>
+  </figure>
+
+  <div class="sp-grid sp-grid--2">
+    <figure class="sp-fig" style="margin:0">
+      <h3>Space</h3>
+      <div class="sp-space">
+        <div><span>4</span><i style="width:4px"></i><span>icon to its count, a tag's inside</span></div>
+        <div><span>8</span><i style="width:8px"></i><span>between buttons, a field's label to its input</span></div>
+        <div><span>12</span><i style="width:12px"></i><span>row padding, between fields</span></div>
+        <div><span>16</span><i style="width:16px"></i><span>card padding, between sections of a card</span></div>
+        <div><span>24</span><i style="width:24px"></i><span>between groups on a page</span></div>
+        <div><span>32</span><i style="width:32px"></i><span>page gutter, above a page's sections</span></div>
+      </div>
+      <p class="sp-cap">Tight inside a group and wider between groups, so the space itself does the grouping a box would.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Shape</h3>
+      <div class="sp-shapes">
+        <div class="sp-shape"><i style="border-radius:4px;width:48px;height:24px"></i>4 · tag, kbd</div>
+        <div class="sp-shape"><i style="border-radius:10px;width:72px;height:34px"></i>10 · control, row</div>
+        <div class="sp-shape"><i style="border-radius:14px"></i>14 · card, menu, dialog</div>
+        <div class="sp-shape"><i style="border-radius:16px"></i>16 · bubble, composer</div>
+        <div class="sp-shape"><i style="border-radius:999px;width:72px;height:28px"></i>pill · chip, toast, switch</div>
+      </div>
+      <p class="sp-cap">A box inside a box takes the outer radius less the padding between them, so corners stay parallel: a menu of 14 with 4 px of padding holds rows of 10.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Edges and depth</h3>
+      <div class="sp-row" style="gap:16px;align-items:stretch">
+        <div class="sp-depth" style="box-shadow:inset 0 0 0 1px var(--dl-line)">Flat<small>card, row group</small></div>
+        <div class="sp-depth" style="box-shadow:var(--dl-shadow-float)">Float<small>menu, toast, tooltip</small></div>
+        <div class="sp-depth" style="box-shadow:var(--dl-shadow-panel)">Over<small>dialog, panel</small></div>
+      </div>
+      <p class="sp-cap">Three levels. A box gets one edge, a hairline or a shadow, never both at full strength; a page has one level of boxes and never a box in a box.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Motion</h3>
+      <div class="sp-col" style="gap:8px">
+        <div class="sp-motion"><code>--dl-tint</code><span>0.16 s ease</span><span class="sp-note">colour: hover, pressed, a switch's track</span></div>
+        <div class="sp-motion"><code>--dl-enter</code><span>0.2 s ease</span><span class="sp-note">something appearing: a toast, a dialog, a 6 px rise</span></div>
+        <div class="sp-motion"><code>--dl-travel</code><span>0.34 s out</span><span class="sp-note">something moving: a progress bar, a panel sliding in</span></div>
+      </div>
+      <p class="sp-cap">Three durations on transform, opacity and colour only; never width, height or <code>transition: all</code>, no bounce. Reduced motion cuts them all to an instant.</p>
+    </figure>
+  </div>
+</section>
+
+<section class="sp-sec" id="s04">
+  <h2><b>04</b>Symbols</h2>
+  <p>Icons come from <a href="https://lucide.dev">Lucide</a>, not from hand-drawn paths: one 24 px grid, a 2 px round stroke, corners and terminals drawn by the same people, and a name for every glyph so two screens never draw "settings" two ways. At 16 px the stroke renders at 1.33 px, the weight of 14 px text. State is never an icon alone: it is a shaped mark and a word.</p>
+
+  <figure class="sp-fig" style="margin:0">
+    <div class="sp-icons"><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg></span><figcaption title="archive">archive</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><figcaption title="arrow-left">arrow-left</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span><figcaption title="arrow-right">arrow-right</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span><figcaption title="arrow-up">arrow-up</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span><figcaption title="arrow-up-down">arrow-up-down</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span><figcaption title="bell">bell</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg></span><figcaption title="bookmark">bookmark</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span><figcaption title="calendar">calendar</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><figcaption title="check">check</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><figcaption title="chevron-down">chevron-down</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span><figcaption title="chevron-left">chevron-left</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span><figcaption title="chevron-right">chevron-right</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></span><figcaption title="chevron-up">chevron-up</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></span><figcaption title="chevrons-up-down">chevrons-up-down</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span><figcaption title="circle-alert">circle-alert</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></svg></span><figcaption title="circle-check">circle-check</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span><figcaption title="circle-question-mark">circle-question-mark</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><figcaption title="circle-x">circle-x</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><figcaption title="clock">clock</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg></span><figcaption title="command">command</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><figcaption title="copy">copy</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg></span><figcaption title="crosshair">crosshair</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></span><figcaption title="download">download</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span><figcaption title="ellipsis">ellipsis</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></span><figcaption title="external-link">external-link</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span><figcaption title="eye">eye</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg></span><figcaption title="eye-off">eye-off</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span><figcaption title="file-text">file-text</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg></span><figcaption title="flag">flag</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span><figcaption title="funnel">funnel</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg></span><figcaption title="git-pull-request">git-pull-request</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span><figcaption title="globe">globe</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg></span><figcaption title="history">history</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><figcaption title="house">house</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span><figcaption title="image">image</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span><figcaption title="inbox">inbox</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><figcaption title="info">info</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></svg></span><figcaption title="keyboard">keyboard</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></span><figcaption title="layers">layers</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span><figcaption title="layout-grid">layout-grid</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><figcaption title="link">link</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg></span><figcaption title="list-checks">list-checks</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span><figcaption title="loader-circle">loader-circle</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><figcaption title="lock">lock</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg></span><figcaption title="log-out">log-out</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg></span><figcaption title="mail">mail</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><figcaption title="message-square">message-square</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></span><figcaption title="mic">mic</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></span><figcaption title="monitor">monitor</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></span><figcaption title="mouse-pointer-click">mouse-pointer-click</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></span><figcaption title="panel-left">panel-left</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></svg></span><figcaption title="pause">pause</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span><figcaption title="pencil">pencil</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></span><figcaption title="pin">pin</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg></span><figcaption title="play">play</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span><figcaption title="plus">plus</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></span><figcaption title="power">power</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span><figcaption title="refresh-cw">refresh-cw</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span><figcaption title="search">search</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></span><figcaption title="send">send</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></span><figcaption title="settings">settings</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span><figcaption title="shield">shield</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span><figcaption title="sliders-horizontal">sliders-horizontal</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span><figcaption title="smartphone">smartphone</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg></span><figcaption title="star">star</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><figcaption title="trash-2">trash-2</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><figcaption title="triangle-alert">triangle-alert</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></span><figcaption title="undo-2">undo-2</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg></span><figcaption title="upload">upload</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><figcaption title="user">user</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span><figcaption title="users">users</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg></span><figcaption title="video">video</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span><figcaption title="x">x</figcaption></figure><figure class="sp-ico"><span><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg></span><figcaption title="zap">zap</figcaption></figure></div>
+    <p class="sp-cap"><strong>The 74 icons a console needs, at 20 px.</strong> The kit ships these from Lucide 1.53 (ISC licence) as <code>assets/icons.json</code>; any other Lucide icon is added from the same version by its name. No icon here means "AI": no sparkles, no wand, no robot.</p>
+  </figure>
+
+  <div class="sp-grid sp-grid--2">
+    <figure class="sp-fig" style="margin:0">
+      <h3>Sizes and where they go</h3>
+      <div class="sp-sizes">
+        <div><span class="dl-meta" style="display:inline-flex;align-items:center;gap:4px"><svg class="dl-icon" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>0:41</span><small>12 · a meta line, a 28 px pick</small></div>
+        <div><span style="display:inline-flex;align-items:center;gap:8px"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>Settings</span><small>16 · buttons, rows, menus, nav</small></div>
+        <div><span style="display:inline-flex;align-items:center;gap:8px;font-size:17px;font-weight:600"><svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>Changes</span><small>20 · a phone bar, the icon grid</small></div>
+      </div>
+      <p class="sp-cap">Three sizes, each from the same 24 px drawing, so the stroke thins with the size the way text does. An icon sits on the text's centre line, 6 px from its label in a button and 10 px in the rail.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Beside words</h3>
+      <div class="sp-col" style="gap:8px">
+        <div class="sp-row"><button class="dl-btn dl-btn--secondary" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download</button><button class="dl-btn dl-btn--ghost" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>Show me</button><button class="dl-icon-btn" type="button" aria-label="Settings"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+        <div class="sp-row"><a class="dl-link" href="#s04">Open site <svg class="dl-icon" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a><span class="dl-meta"><svg class="dl-icon" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 0:41</span></div>
+      </div>
+      <p class="sp-cap">An icon goes before its word when it names the action and after it when it says where the action goes (out to another site). An icon button carries a label for screen readers and a tooltip for everyone.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Status marks</h3>
+      <div class="sp-col" style="gap:10px">
+        <span class="dl-status" data-tone="ok">On, kept, done</span>
+        <span class="dl-status" data-tone="info">Preview, not kept yet</span>
+        <span class="dl-status" data-tone="warn">Needs you</span>
+        <span class="dl-status" data-tone="stop">Failed or refused</span>
+        <span class="dl-status">Off</span>
+        <span class="dl-status" data-tone="ok" data-mark="square">Shipped to everyone</span>
+        <span class="dl-status" data-tone="info" data-mark="triangle">Shared</span>
+      </div>
+      <p class="sp-cap">Each tone has its own shape, so the mark still reads in greyscale and to the one in twelve men who can't tell the red from the green: a dot, a ring, a half, a diamond, a dash. The word beside it is the state; the mark only finds it fast.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Avatars</h3>
+      <div class="sp-row" style="gap:16px">
+        <span class="dl-avatar">HL</span><span class="dl-avatar dl-avatar--lg">MT</span>
+        <span class="dl-avatar dl-avatar--brand">D</span><span class="dl-avatar dl-avatar--brand dl-avatar--lg">D</span>
+      </div>
+      <p class="sp-cap">People are initials on a grey disc at 24 or 32 px; the app is the only pink disc, so its voice is found at a glance in a thread. Initials are 11 px at the small size and never smaller.</p>
+    </figure>
+  </div>
+
+  <figure class="sp-fig" style="margin:0">
+    <h3>What the kit does not draw</h3>
+    <table class="sp-table">
+      <thead><tr><th>Not this</th><th>Why</th><th>Instead</th></tr></thead>
+      <tbody>
+        <tr><td>Emoji as icons</td><td>They render in each platform's own colour and style, and screen readers read their names aloud</td><td>A Lucide icon, or nothing</td></tr>
+        <tr><td>An icon in a tinted square above a title</td><td>The most common mark of a generated page; it adds a colour and a box and says nothing the title doesn't</td><td>The title alone, or a 16 px icon inline with it</td></tr>
+        <tr><td>Sparkles, wands and robots for anything AI</td><td>They mark a feature as a gimmick and age fast</td><td>the app's pink disc where the app speaks; a verb on the button</td></tr>
+        <tr><td>Colour alone for state</td><td>Fails for colour-blind people and in greyscale</td><td>A status mark and a word</td></tr>
+        <tr><td>A coloured stripe down one side of a box</td><td>A second, louder way to say "selected" or "important" that competes with the content</td><td>The selected fill and weight; a status for importance</td></tr>
+      </tbody>
+    </table>
+  </figure>
+</section>
+
+<section class="sp-sec" id="s05">
+  <h2><b>05</b>Controls, in every state</h2>
+  <p>Rule 14 says every control has its states; here they are, side by side, drawn by the sheet's own rules. The hover, focus and pressed columns are the real <code>:hover</code>, <code>:focus-visible</code> and <code>:active</code> rules copied onto a class by the page's build, so this table cannot drift from the CSS. Move the pointer over the rest column to compare.</p>
+
+  <figure class="sp-fig" style="margin:0">
+    <h3>Buttons</h3>
+    <div class="sp-scroll" tabindex="0" role="region" aria-label="Scrolls sideways">
+      <table class="sp-matrix">
+        <thead><tr><th></th><th>Rest</th><th>Hover</th><th>Focus</th><th>Pressed</th><th>Disabled</th><th>Busy</th></tr></thead>
+        <tbody>
+          <tr><th>Primary</th>
+            <td><button class="dl-btn dl-btn--primary" type="button">Keep</button></td>
+            <td><button class="dl-btn dl-btn--primary is-hover" type="button" tabindex="-1">Keep</button></td>
+            <td><button class="dl-btn dl-btn--primary is-focus" type="button" tabindex="-1">Keep</button></td>
+            <td><button class="dl-btn dl-btn--primary is-active" type="button" tabindex="-1">Keep</button></td>
+            <td><button class="dl-btn dl-btn--primary" type="button" disabled>Keep</button></td>
+            <td><button class="dl-btn dl-btn--primary" type="button" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span>Keep</button></td></tr>
+          <tr><th>Secondary</th>
+            <td><button class="dl-btn dl-btn--secondary" type="button">Show me</button></td>
+            <td><button class="dl-btn dl-btn--secondary is-hover" type="button" tabindex="-1">Show me</button></td>
+            <td><button class="dl-btn dl-btn--secondary is-focus" type="button" tabindex="-1">Show me</button></td>
+            <td><button class="dl-btn dl-btn--secondary is-active" type="button" tabindex="-1">Show me</button></td>
+            <td><button class="dl-btn dl-btn--secondary" type="button" disabled>Show me</button></td>
+            <td><button class="dl-btn dl-btn--secondary" type="button" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span>Show me</button></td></tr>
+          <tr><th>Ghost</th>
+            <td><button class="dl-btn dl-btn--ghost" type="button">Undo</button></td>
+            <td><button class="dl-btn dl-btn--ghost is-hover" type="button" tabindex="-1">Undo</button></td>
+            <td><button class="dl-btn dl-btn--ghost is-focus" type="button" tabindex="-1">Undo</button></td>
+            <td><button class="dl-btn dl-btn--ghost is-active" type="button" tabindex="-1">Undo</button></td>
+            <td><button class="dl-btn dl-btn--ghost" type="button" disabled>Undo</button></td>
+            <td><button class="dl-btn dl-btn--ghost" type="button" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span>Undo</button></td></tr>
+          <tr><th>Danger</th>
+            <td><button class="dl-btn dl-btn--danger" type="button">Remove…</button></td>
+            <td><button class="dl-btn dl-btn--danger is-hover" type="button" tabindex="-1">Remove…</button></td>
+            <td><button class="dl-btn dl-btn--danger is-focus" type="button" tabindex="-1">Remove…</button></td>
+            <td><button class="dl-btn dl-btn--danger is-active" type="button" tabindex="-1">Remove…</button></td>
+            <td><button class="dl-btn dl-btn--danger" type="button" disabled>Remove…</button></td>
+            <td><button class="dl-btn dl-btn--danger" type="button" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span>Remove…</button></td></tr>
+          <tr><th>Confirm a loss</th>
+            <td><button class="dl-btn dl-btn--danger-solid" type="button">Remove</button></td>
+            <td><button class="dl-btn dl-btn--danger-solid is-hover" type="button" tabindex="-1">Remove</button></td>
+            <td><button class="dl-btn dl-btn--danger-solid is-focus" type="button" tabindex="-1">Remove</button></td>
+            <td><button class="dl-btn dl-btn--danger-solid is-active" type="button" tabindex="-1">Remove</button></td>
+            <td><button class="dl-btn dl-btn--danger-solid" type="button" disabled>Remove</button></td>
+            <td><button class="dl-btn dl-btn--danger-solid" type="button" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span>Remove</button></td></tr>
+          <tr><th>Icon</th>
+            <td><button class="dl-icon-btn" type="button" aria-label="More"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td>
+            <td><button class="dl-icon-btn is-hover" type="button" aria-label="More" tabindex="-1"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td>
+            <td><button class="dl-icon-btn is-focus" type="button" aria-label="More" tabindex="-1"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td>
+            <td><button class="dl-icon-btn is-active" type="button" aria-label="More" tabindex="-1" aria-expanded="true"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td>
+            <td><button class="dl-icon-btn" type="button" aria-label="More" disabled><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td>
+            <td><button class="dl-icon-btn" type="button" aria-label="More" aria-busy="true"><span class="dl-spinner" aria-hidden="true"></span></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="sp-failed"><span class="sp-label">Failed</span><div class="sp-col" style="gap:4px"><button class="dl-btn dl-btn--primary" type="button">Keep</button><p class="dl-error"><svg class="dl-icon" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Couldn't save it. The change is saved locally; try Keep again.</p></div><span class="sp-note">The button is back at rest and the reason sits under it, in words and with an icon, until the next press.</span></div>
+    <div class="sp-row"><button class="dl-btn dl-btn--primary dl-btn--sm" type="button">Small</button><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Small with icon</button><button class="dl-btn dl-btn--primary" type="button">Keep <kbd class="dl-kbd dl-kbd--on-solid">K</kbd></button><button class="dl-btn dl-btn--ghost" type="button">Undo <kbd class="dl-kbd">U</kbd></button></div>
+    <p class="sp-cap"><strong>One primary per card or screen; it is the pink.</strong> Secondary has the edge, ghost has none until hovered, danger is outlined red and turns solid only inside the dialog that confirms the loss. Disabled keeps the button's shape and drops its contrast, so a row of buttons doesn't change width. Busy keeps the label and adds a spinner, and the button stops taking presses; failed puts it back at rest with the reason under it. Focus is a 2 px pink ring 2 px out, on every control.</p>
+  </figure>
+
+  <div class="sp-grid">
+    <figure class="sp-fig" style="margin:0">
+      <h3>Text fields</h3>
+      <div class="sp-col">
+        <div class="dl-field"><label class="dl-label" for="f1">Site</label><input class="dl-input" id="f1" placeholder="mail.google.com"><p class="dl-hint">Without https:// is fine.</p></div>
+        <div class="dl-field"><label class="dl-label" for="f2">Focused</label><input class="dl-input is-focus" id="f2" value="mail.google.com" tabindex="-1"></div>
+        <div class="dl-field"><label class="dl-label" for="f3">Email</label><input class="dl-input" id="f3" value="hana.ward7.example" aria-invalid="true" aria-describedby="f3e"><p class="dl-error" id="f3e"><svg class="dl-icon" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>That address has no @ in it.</p></div>
+        <div class="dl-field"><label class="dl-label" for="f4">Disabled</label><input class="dl-input" id="f4" value="Set by your organisation" disabled></div>
+        <label class="dl-search"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input class="dl-input" type="search" placeholder="Search your words" aria-label="Search"><kbd class="dl-kbd">/</kbd></label>
+        <div class="dl-field"><label class="dl-label" for="f5">Side of the window</label><span class="dl-select"><select class="dl-input" id="f5"><option>Right</option><option>Left</option></select><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="dl-field"><label class="dl-label" for="f6">Note to the team</label><textarea class="dl-input dl-textarea" id="f6" rows="3">The unread counts help most on the rota label.</textarea></div>
+      </div>
+      <p class="sp-cap">Every field has a visible label above it; the placeholder is an example, never the label. An error is a sentence under the field that says what to do, with an icon so it isn't red alone.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Choices</h3>
+      <div class="sp-col">
+        <div class="sp-row" style="gap:16px">
+          <label class="dl-choice"><input class="dl-check" type="checkbox"><span>Off</span></label>
+          <label class="dl-choice"><input class="dl-check" type="checkbox" checked><span>On</span></label>
+          <label class="dl-choice"><input class="dl-check sp-mixed" type="checkbox" aria-checked="mixed"><span>Some</span></label>
+          <label class="dl-choice"><input class="dl-check is-focus" type="checkbox" checked tabindex="-1"><span>Focus</span></label>
+          <label class="dl-choice"><input class="dl-check" type="checkbox" disabled><span>Disabled</span></label>
+        </div>
+        <fieldset class="dl-fieldset"><legend class="dl-label">Open the panel from</legend>
+          <label class="dl-choice"><input class="dl-radio" type="radio" name="r1" checked><span>The tab on the page's edge</span></label>
+          <label class="dl-choice"><input class="dl-radio" type="radio" name="r1"><span>A keyboard shortcut only</span></label>
+          <label class="dl-choice"><input class="dl-radio" type="radio" name="r1" disabled><span>The toolbar button only</span></label>
+        </fieldset>
+        <div class="sp-row" style="gap:16px">
+          <label class="dl-choice"><button class="dl-switch" type="button" role="switch" aria-checked="false" aria-labelledby="sw1"></button><span id="sw1">Off</span></label>
+          <label class="dl-choice"><button class="dl-switch" type="button" role="switch" aria-checked="true" aria-labelledby="sw2"></button><span id="sw2">On</span></label>
+          <label class="dl-choice"><button class="dl-switch is-focus" type="button" role="switch" aria-checked="true" aria-labelledby="sw3" tabindex="-1"></button><span id="sw3">Focus</span></label>
+          <label class="dl-choice"><button class="dl-switch" type="button" role="switch" aria-checked="false" aria-labelledby="sw5" disabled></button><span id="sw5">Disabled, off</span></label>
+          <label class="dl-choice"><button class="dl-switch" type="button" role="switch" aria-checked="true" aria-labelledby="sw4" disabled></button><span id="sw4">Disabled, on</span></label>
+        </div>
+      </div>
+      <p class="sp-cap"><strong>A switch acts at once; a checkbox waits for Save.</strong> Radios pick one of a few that all fit on screen; past five, use a select. Labels sit to the right and are part of the target.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Views, filters and links</h3>
+      <div class="sp-col">
+        <div class="dl-seg" role="group" aria-label="Compare"><button type="button" aria-pressed="true">Before</button><button type="button" aria-pressed="false">After</button></div>
+        <div class="dl-seg" role="group" aria-label="Show"><button type="button" aria-pressed="true">All</button><button type="button" aria-pressed="false">On</button><button type="button" aria-pressed="false">Off</button></div>
+        <nav class="dl-tabs" aria-label="Change"><a class="dl-tabs__item" aria-current="page" href="#s05">Overview</a><a class="dl-tabs__item" href="#s05">Versions<span class="dl-tabs__count">3</span></a><a class="dl-tabs__item" href="#s05">What you asked</a></nav>
+        <div class="sp-row"><button class="dl-chip" type="button" aria-pressed="true">This site only</button><button class="dl-chip" type="button">Every site</button><button class="dl-chip is-hover" type="button" tabindex="-1">Ask me each time</button></div>
+        <p class="sp-prose" style="font-size:var(--dl-fs-ui)">A <a class="dl-link" href="#s05">link in a sentence</a> is pink and underlined, so it isn't colour alone. <kbd class="dl-kbd">⌘</kbd> <kbd class="dl-kbd">K</kbd> opens search.</p>
+        <div class="sp-row"><button class="dl-icon-btn is-hover" type="button" aria-label="Copy link" aria-describedby="tt1" tabindex="-1"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><span class="dl-tooltip" role="tooltip" id="tt1">Copy link</span></div>
+      </div>
+      <p class="sp-cap">The segmented control switches views of the same thing; tabs move between pages of one object and mark the current one with <code>aria-current</code>. A chip is an answer to a question; a tooltip names an icon button and appears on hover and on focus.</p>
+    </figure>
+  </div>
+</section>
+
+<section class="sp-sec" id="s06">
+  <h2><b>06</b>Feedback, waiting and overlays</h2>
+  <p>What a screen says when something happens, while it waits, and what opens on top of it. Each one says what happened and what to do next, in a sentence a person would say.</p>
+
+  <div class="sp-grid sp-grid--2">
+    <figure class="sp-fig" style="margin:0">
+      <h3>Banners</h3>
+      <div class="sp-col">
+        <div class="dl-banner" data-tone="info" role="status"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><p>This list is your Chrome profile's. Changes on another computer show there.</p></div>
+        <div class="dl-banner" data-tone="ok" role="status"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></svg><p>Kept. It comes back every time you open mail.google.com.</p></div>
+        <div class="dl-banner" data-tone="warn" role="status"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><p>Gmail changed its page; one change may look wrong until it is repaired.</p><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button">Check it</button></div>
+        <div class="dl-banner" data-tone="stop" role="alert"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg><p>The app couldn't reach the site. Your changes are safe; try again in a minute.</p><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button">Try again</button></div>
+      </div>
+      <p class="sp-cap">A banner sits at the top of what it is about and stays until the cause is gone. Tone sets the wash and the icon; the text stays the body colour so it reads.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Toast and menu</h3>
+      <div class="sp-col" style="gap:16px">
+        <div class="dl-toast" role="status"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Turned off on mail.google.com<button class="dl-btn dl-btn--ghost dl-btn--sm" type="button">Undo</button></div>
+        <div class="dl-menu" role="menu" aria-label="Change">
+          <button class="dl-menu__item" role="menuitem" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>Show me on the page</button>
+          <button class="dl-menu__item is-hover" role="menuitem" type="button" tabindex="-1"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>Edit in the panel<kbd class="dl-kbd dl-menu__hint">E</kbd></button>
+          <button class="dl-menu__item" role="menuitem" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy link</button>
+          <button class="dl-menu__item" role="menuitem" type="button" disabled><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>Share with the team</button>
+          <div class="dl-menu__sep" role="separator"></div>
+          <button class="dl-menu__item dl-menu__item--danger" role="menuitem" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove…</button>
+        </div>
+      </div>
+      <p class="sp-cap">A toast confirms what just happened and offers the way back; it is announced as a status and leaves after six seconds, or stays while the pointer is on it. A menu holds a row's other actions; the one that loses something comes last, after a line, and its ellipsis says a question follows.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Waiting</h3>
+      <div class="sp-col" style="gap:16px">
+        <section class="dl-steps" data-state="running" aria-label="Building a preview">
+          <div class="dl-steps__head"><span class="dl-kicker">Building a preview</span><span class="dl-meta">0:41</span></div>
+          <ol class="dl-steps__list">
+            <li class="dl-step" data-state="done">Read the page<span class="dl-step__time">4 s</span></li>
+            <li class="dl-step" data-state="now">Write the change<span class="dl-step__time">running</span></li>
+            <li class="dl-step" data-state="next">Check it on the page<span class="dl-step__time"></span></li>
+          </ol>
+          <div class="dl-steps__bar"><div class="dl-steps__fill" style="--dl-p:.45"></div></div>
+        </section>
+        <div class="sp-col" aria-hidden="true" style="gap:10px">
+          <div class="sp-row" style="flex-wrap:nowrap"><span class="dl-skeleton" style="width:72px;height:48px"></span><div class="sp-col" style="gap:6px;flex:1"><span class="dl-skeleton" style="width:70%"></span><span class="dl-skeleton" style="width:40%"></span></div></div>
+          <div class="sp-row" style="flex-wrap:nowrap"><span class="dl-skeleton" style="width:72px;height:48px"></span><div class="sp-col" style="gap:6px;flex:1"><span class="dl-skeleton" style="width:55%"></span><span class="dl-skeleton" style="width:35%"></span></div></div>
+        </div>
+      </div>
+      <p class="sp-cap">Work with named steps shows them, with the time so far and a bar that moves with real progress. A list that is loading shows its rows' shapes, still, so the page doesn't jump when they arrive. The spinner is the only thing that turns, and only while something runs.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <h3>Nothing here, and why</h3>
+      <div class="sp-col" style="gap:0">
+        <div class="dl-empty"><span class="dl-empty__title">No changes on this site yet</span><span>Open the panel on mail.google.com and ask for one.</span></div>
+        <hr class="dl-sep">
+        <div class="dl-empty"><span class="dl-empty__title">No change matches “rota”</span><span>Search looks in the words you asked with. <a class="dl-link" href="#s06">Clear the search</a></span></div>
+      </div>
+      <p class="sp-cap">An empty place says what would be here and the one step that fills it, in two lines and no picture.</p>
+    </figure>
+  </div>
+
+  <figure class="sp-fig" style="margin:0">
+    <h3>Dialog</h3>
+    <div class="sp-dialogstage">
+      <div class="dl-dialog" role="dialog" aria-modal="true" aria-labelledby="d2t" aria-describedby="d2d">
+        <h2 class="dl-dialog__title" id="d2t">Delete your account?</h2>
+        <p class="dl-dialog__body" id="d2d">Your seven changes stop on every site and everything you asked is deleted within 30 days. Download it first if you want a copy.</p>
+        <div class="dl-field"><label class="dl-label" for="d2i">Type <b>delete</b> to confirm</label><input class="dl-input" id="d2i" value="dele"></div>
+        <div class="dl-dialog__actions"><button class="dl-btn dl-btn--ghost" type="button"><svg class="dl-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download first</button><span class="sp-grow"></span><button class="dl-btn dl-btn--secondary" type="button">Cancel</button><button class="dl-btn dl-btn--danger-solid" type="button" disabled>Delete account</button></div>
+      </div>
+    </div>
+    <p class="sp-cap"><strong>A dialog asks one question and names what is lost.</strong> Its title is the question, its body the consequence, and its buttons are verbs ("Delete account", not "OK"); Cancel is always there and Escape always works. A loss that can't be undone asks for the word before the button wakes. In React it is a native <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>, so focus, Escape and the backdrop come from the browser.</p>
+  </figure>
+  <figure class="sp-fig" style="margin:0">
+    <h3>The extension's own pieces</h3>
+    <div class="sp-ext">
+      <div class="sp-col" style="gap:8px;justify-items:end"><button class="dl-tab" type="button" aria-label="Open the app, 3 changes kept on this site">D<span class="dl-tab__count">3</span></button><span class="sp-note">The edge tab</span></div>
+      <div class="dl-notice" data-state="running">
+        <span class="dl-notice__mark" aria-hidden="true">D</span>
+        <button class="dl-notice__body" type="button"><span class="dl-notice__title">Building a preview</span><span class="dl-notice__sub">“Put the unread count beside each label”</span></button>
+        <span class="dl-meta" aria-hidden="true">0:41</span>
+        <div class="dl-notice__bar"><div class="dl-notice__fill" style="--dl-p:.58"></div></div>
+      </div>
+      <div class="dl-notice" data-state="refused">
+        <span class="dl-notice__mark" aria-hidden="true">D</span>
+        <button class="dl-notice__body" type="button"><span class="dl-notice__title">Not built</span><span class="dl-notice__sub">Previews never touch billing or payments</span></button>
+        <span></span>
+      </div>
+    </div>
+    <p class="sp-cap">The panel's tab sits on the page's edge with the number of changes kept on that site; while the app builds with the chat closed, the notice takes the tab's place and its body reopens the panel. Both are in the sheet for the extension; the user console doesn't use them.</p>
+  </figure>
+</section>
+
+<section class="sp-sec" id="s07">
+  <h2><b>07</b>Showing data</h2>
+  <p>A console earns attention with the shape of its data, not with decoration: a number that answers the question, its trend beside it, progress as a bar, a day as a line with now on it, and rows that say why they are there.</p>
+
+  <div class="sp-grid">
+    <figure class="sp-fig" style="margin:0">
+      <div class="dl-card__head"><span class="dl-kicker">This week</span><span class="dl-meta">13–19 Oct</span></div>
+      <div class="dl-stats">
+        <div class="dl-stat dl-stat--hero" data-tone="accent"><b class="dl-stat__n">12</b><span class="dl-stat__l">asks kept</span></div>
+        <div class="dl-stat"><b class="dl-stat__n">69 s</b><span class="dl-stat__l">median build</span></div>
+      </div>
+      <svg class="dl-spark" data-tone="accent" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,26 16.7,24 33.3,25 50,18 66.7,20 83.3,12 100,8" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>
+      <p class="sp-cap">The pink marks the number that answers the card; the second number is ink. Units on every number, tabular figures so they don't shuffle as they change.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <div class="dl-card__head"><span class="dl-kicker">Your copy of OpenEMR</span><span class="dl-status" data-tone="ok">Running</span></div>
+      <dl class="dl-kv"><dt>Features</dt><dd>2 on, 1 off</dd><dt>Last change</dt><dd>21 Oct, 16:40</dd><dt>Storage</dt><dd>1.9 of 3 GB</dd></dl>
+      <div class="dl-meter" role="meter" aria-label="Storage used" aria-valuemin="0" aria-valuemax="3" aria-valuenow="1.9" aria-valuetext="1.9 of 3 GB" style="--dl-p:.63"></div>
+      <p class="sp-cap">Keys in the quiet grey, values in ink. A meter is for something with an end, labelled with its numbers in words for screen readers.</p>
+    </figure>
+
+    <figure class="sp-fig" style="margin:0">
+      <div class="dl-card__head"><span class="dl-kicker">Today, 09:00 to 19:00</span><span class="dl-meta">now 12:20</span></div>
+      <div>
+        <div class="dl-timeline" role="img" aria-label="3 blocks between 09:00 and 19:00">
+          <span class="dl-timeline__block" style="--a:.05;--b:.1"></span>
+          <span class="dl-timeline__block" data-free style="--a:.1;--b:.33"></span>
+          <span class="dl-timeline__block" style="--a:.4;--b:.5"></span>
+          <span class="dl-timeline__block" data-tone="info" style="--a:.7;--b:.8"></span>
+          <span class="dl-timeline__now" style="--now:.33"></span>
+        </div>
+        <div class="dl-timeline__ticks" aria-hidden="true"><span style="--t:0">09:00</span><span style="--t:.2">11:00</span><span style="--t:.4">13:00</span><span style="--t:.6">15:00</span><span style="--t:.8">17:00</span><span style="--t:1">19:00</span></div>
+      </div>
+      <p class="sp-cap">A day as a line: busy blocks in grey, free time outlined in green, one kind picked out in blue, and now as a red rule. Ticks fall on round hours in the viewer's time.</p>
+    </figure>
+  </div>
+
+  <figure class="sp-fig" style="margin:0">
+    <div class="dl-card__head"><span class="dl-kicker">Activity</span><div class="dl-seg" role="group" aria-label="Period"><button type="button" aria-pressed="true">Week</button><button type="button" aria-pressed="false">Month</button></div></div>
+    <div class="sp-scroll" tabindex="0" role="region" aria-label="Scrolls sideways">
+      <table class="dl-table" style="min-width:640px">
+        <thead><tr><th>Asked</th><th>Site</th><th>Result</th><th class="dl-num">Build</th><th class="dl-num">When</th></tr></thead>
+        <tbody>
+          <tr><td><span class="dl-quote">“Can you show how many unread there are next to each label”</span></td><td>mail.google.com</td><td><span class="dl-status" data-tone="ok">Kept</span></td><td class="dl-num">58 s</td><td class="dl-num">20 Oct, 16:40</td></tr>
+          <tr aria-selected="true"><td><span class="dl-quote">“Put the NEWS2 score next to every patient's name, coloured by band, and keep it there when the list refreshes”</span></td><td>demo.openemr.io</td><td><span class="dl-status" data-tone="ok">Kept</span></td><td class="dl-num">1 min 42 s</td><td class="dl-num">16 Oct, 09:05</td></tr>
+          <tr><td><span class="dl-quote">“Make the comments collapse under each story”</span></td><td>news.ycombinator.com</td><td><span class="dl-status">Undone</span></td><td class="dl-num">31 s</td><td class="dl-num">12 Oct, 21:14</td></tr>
+          <tr><td><span class="dl-quote">“Refund the co-pay from the patient card”</span></td><td>demo.openemr.io</td><td><span class="dl-status" data-tone="stop">Refused</span></td><td class="dl-num">–</td><td class="dl-num">11 Oct, 08:40</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sp-cap"><strong>A table when the columns are compared; rows when they are read one by one.</strong> The person's words lead each row, quoted, clipped to two lines and shown whole when the row is selected. Numbers are right-aligned and tabular. A refused ask stays in the list with its mark, so nothing disappears silently.</p>
+  </figure>
+</section>
+
+
+
+
+
+
+
+  <footer class="sp-foot">
+    <p>Adapted from Darling's UI kit. Read from: flow-er's sheets (MIT), Lucide 1.53 (ISC), Base UI 1.9 (MIT), impeccable 3.5 (Apache-2.0), axe-core (MPL-2.0), emilkowalski/skills (MIT), WCAG 2.2 and the WAI-ARIA Authoring Practices. Where this page and the skill's files disagree, the files are right.</p>
+  </footer>
+</div>
+</div>
+<script>
+  // The density switch sets the kit's data-dl-density on the page's root.
+  (function () {
+    var root = document.querySelector('.sp-root'), seg = document.getElementById('density');
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      if (b.dataset.v) root.setAttribute('data-dl-density', b.dataset.v); else root.removeAttribute('data-dl-density');
+    });
+  })();
+  document.querySelectorAll('.sp-mixed').forEach(function (x) { x.indeterminate = true; });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Stops a commit that would put a secret, personal data or a huge file in git.
+
+Runs for every commit once `git config core.hooksPath .githooks` is set (the session-start hook
+sets it). Checks only what is staged. Never skip it with --no-verify: fix the file or unstage it.
+"""
+import re
+import subprocess
+import sys
+
+MAX_MB = 20
+BLOCKED_DIRS = ("data/", "models/", "recordings/", "private/")
+BLOCKED_NAMES = re.compile(r"(^|/)(\.env(\..+)?|.*\.pem|.*\.key|.*\.p12|.*\.pfx|id_(rsa|ecdsa|ed25519).*|.*credentials.*\.json|keys\.txt)$")
+ALLOWED_NAMES = re.compile(r"(^|/)\.env\.example$")
+SECRETS = [
+    ("an Anthropic key", re.compile(rb"sk-ant-[A-Za-z0-9_-]{20,}")),
+    ("an OpenAI key", re.compile(rb"sk-(proj-)?[A-Za-z0-9_-]{32,}")),
+    ("a GitHub token", re.compile(rb"gh[pousr]_[A-Za-z0-9]{30,}")),
+    ("an AWS key", re.compile(rb"AKIA[0-9A-Z]{16}")),
+    ("a Google API key", re.compile(rb"AIza[0-9A-Za-z_-]{35}")),
+    ("a Slack token", re.compile(rb"xox[abprs]-[A-Za-z0-9-]{10,}")),
+    ("a private key", re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("a Hugging Face token", re.compile(rb"hf_[A-Za-z0-9]{30,}")),
+]
+
+
+def git(*args):
+    return subprocess.run(["git"] + list(args), capture_output=True).stdout
+
+
+def main():
+    staged = [p for p in git("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z").decode().split("\0") if p]
+    problems = []
+    for path in staged:
+        if path.startswith(BLOCKED_DIRS):
+            problems.append("%s: %s stays out of git (data, models, recordings and private files)." % (path, path.split("/")[0] + "/"))
+            continue
+        if BLOCKED_NAMES.search(path) and not ALLOWED_NAMES.search(path):
+            problems.append("%s: looks like a secrets file." % path)
+            continue
+        size = git("cat-file", "-s", ":" + path).strip()
+        if size and int(size) > MAX_MB * 1024 * 1024:
+            problems.append("%s: %d MB, over the %d MB limit. Keep big files out of git and link them instead." % (path, int(size) // (1024 * 1024), MAX_MB))
+            continue
+        blob = git("show", ":" + path)
+        if b"\0" in blob[:8000]:
+            continue  # binary
+        for label, pattern in SECRETS:
+            if pattern.search(blob):
+                problems.append("%s: contains what looks like %s." % (path, label))
+                break
+    if problems:
+        sys.stderr.write("Commit stopped by .githooks/pre-commit:\n  " + "\n  ".join(problems) +
+                         "\nUnstage with: git restore --staged <file>\n")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

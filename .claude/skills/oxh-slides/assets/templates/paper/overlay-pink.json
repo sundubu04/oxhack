@@ -1,0 +1,8 @@
+{
+ "name": "pink",
+ "about": "The UI kit's pink in place of rosewood; everything else is Paper.",
+ "colours": {
+  "#8E3A59": "#B23A6E",
+  "#EFE5E4": "#FBE6EE"
+ }
+}

@@ -1,0 +1,55 @@
+{
+ "v": 4,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-23T13:16:17Z"
+ },
+ "lists": "css",
+ "title": "Midnight template",
+ "cover": "cover",
+ "order": [
+  "cover",
+  "palette",
+  "type",
+  "considerations",
+  "story",
+  "problem",
+  "words",
+  "product",
+  "whynow",
+  "venn",
+  "traction",
+  "cost",
+  "market",
+  "vision",
+  "competition",
+  "whynot",
+  "team",
+  "close"
+ ],
+ "sections": {
+  "s1": {
+   "description": "Why farms water by guesswork, from one orchard",
+   "start": "cover"
+  },
+  "s2": {
+   "description": "What the product does, why now and where it sits",
+   "start": "product"
+  },
+  "s3": {
+   "description": "The first pilot, the cost of guessing and the market",
+   "start": "traction"
+  },
+  "s4": {
+   "description": "The vision, competition and the team",
+   "start": "vision"
+  }
+ },
+ "faces": {
+  "inter": {
+   "family": "Inter",
+   "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  }
+ },
+ "designSystems": []
+}

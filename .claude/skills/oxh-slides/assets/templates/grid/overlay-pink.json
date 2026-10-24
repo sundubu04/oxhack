@@ -1,0 +1,12 @@
+{
+ "name": "pink",
+ "about": "The UI kit's pink as the signal, with a pink heatmap ramp; everything else is Grid.",
+ "colours": {
+  "#B83219": "#B23A6E",
+  "#FBE7E2": "#FBE6EE",
+  "#F4C2B5": "#F7CFDC",
+  "#E48E78": "#EBA3C0",
+  "#CC5A3E": "#D4709A",
+  "#8E2410": "#8A2552"
+ }
+}
