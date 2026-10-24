@@ -168,7 +168,7 @@ function busy(on) {
 function setDrawing(d, { remember = false } = {}) {
   drawing = d;
   const t1 = performance.now();
-  const p = plan(d.strokes, g, { half: g.half });
+  const p = plan(d.strokes, g, { half: g.half, leadIn: g.leadIn });
   steps.set("path", "done", `${p.strokes.length} strokes`);
   const angles = toAngles(p.toolpath, g);
   steps.set("angles", "done", `${p.toolpath.length} points`);
@@ -360,7 +360,7 @@ function tickTime() {
   keptMinute = m;
   const svg = clockSVG(t), strokes = parseSVG(svg);
   drawing = { prompt: "The time now", strokes, picture: { svg }, meta: `Redraws every minute, ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`, sample: "clock" };
-  const p = plan(strokes, g, { half: g.half });
+  const p = plan(strokes, g, { half: g.half, leadIn: g.leadIn });
   const wipe = board.hasInk() ? erasePlan(g).toolpath : [];
   const tp = [...wipe, ...p.toolpath], angles = toAngles(tp, g), job = makeJob(tp, angles, g);
   const own = toAngles(p.toolpath, g);
@@ -471,7 +471,8 @@ const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["board.standoff", "Base below board", "mm"], ["drawing.size", "Drawing size", "mm"]]],
   ["Pen", [["pen.drawTilt", "Draw tilt", "°"], ["pen.liftTilt", "Lift tilt", "°"], ["pen.eraseTilt", "Erase tilt", "°"], ["pen.eraserWidth", "Eraser width", "mm"]]],
-  ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["servos.speed", "Servo speed", "°/s"], ["servos.resolution", "Servo step", "°"]]],
+  ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"]]],
+  ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
 const put = (o, path, v) => { const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k) => { a = a[k] ??= {}; }); a[ks.at(-1)] = v; };
@@ -483,8 +484,8 @@ function buildSetup() {
     `<div class="cw-group" role="group" aria-labelledby="g-servos"><h2 class="dl-kicker" id="g-servos">Servos</h2><div class="cw-fields">
       <div class="dl-field"><label class="dl-label" for="f-model">Model</label><input class="dl-input" id="f-model" data-path="servos.model" data-text></div>
       <div class="dl-field"><label class="dl-label" for="f-elbow">Elbow bends</label><span class="dl-select"><select class="dl-input" id="f-elbow" data-path="elbow" data-text><option value="up">Up</option><option value="down">Down</option></select>${icon("chevron-down")}</span></div>
-      <table class="dl-table cw-servos"><thead><tr><th>Joint</th><th>Min °</th><th>Max °</th><th>Zero offset °</th><th>Direction</th></tr></thead><tbody>${["base", "elbow", "tilt"].map((j) =>
-        `<tr><td>${j[0].toUpperCase() + j.slice(1)}</td>${["min", "max", "offset"].map((k) => `<td><input class="dl-input dl-num" type="number" step="any" data-path="servos.${j}.${k}" aria-label="${j} ${k === "offset" ? "zero offset" : k}"></td>`).join("")}<td><span class="dl-select"><select class="dl-input" data-path="servos.${j}.dir" aria-label="${j} direction"><option value="1">Normal</option><option value="-1">Reversed</option></select>${icon("chevron-down")}</span></td></tr>`).join("")}</tbody></table>
+      <table class="dl-table cw-servos"><colgroup><col><col><col><col><col><col class="cw-dir"></colgroup><thead><tr><th>Joint</th><th>Min °</th><th>Max °</th><th>Zero °</th><th>Ratio</th><th>Direction</th></tr></thead><tbody>${["base", "elbow", "tilt"].map((j) =>
+        `<tr><td>${j[0].toUpperCase() + j.slice(1)}</td>${["min", "max", "offset", "ratio"].map((k) => `<td><input class="dl-input dl-num" type="number" step="any" data-path="servos.${j}.${k}" aria-label="${j} ${{ offset: "zero offset", ratio: "gear ratio" }[k] || k}"></td>`).join("")}<td><span class="dl-select"><select class="dl-input" data-path="servos.${j}.dir" aria-label="${j} direction"><option value="1">Normal</option><option value="-1">Reversed</option></select>${icon("chevron-down")}</span></td></tr>`).join("")}</tbody></table>
     </div></div>`;
 }
 function fillSetup(c) {
@@ -504,7 +505,7 @@ function renderSetup() {
   const c = readSetup(), gg = geomFrom(c);
   setupBoard.setGeom(gg); setupSim.setGeom(gg); if (!setupSim.manual) setupSim.reset();
   clockStrokes ??= parseSVG(clockSVG(now()));
-  const p = plan(clockStrokes, gg, { half: gg.half }), an = toAngles(p.toolpath, gg), job = makeJob(p.toolpath, an, gg);
+  const p = plan(clockStrokes, gg, { half: gg.half, leadIn: gg.leadIn }), an = toAngles(p.toolpath, gg), job = makeJob(p.toolpath, an, gg);
   setupBoard.render({ toolpath: p.toolpath, joints: setupSim.j, mode: null, showReach: true, hover: setupHover });
   // what these numbers give, measured over a grid across the drawing square
   let ok = 0, n = 0, worst = 1;

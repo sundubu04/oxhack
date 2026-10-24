@@ -73,6 +73,37 @@ arduino-cli upload -p /dev/cu.usbmodem1101 --fqbn arduino:avr:uno firmware/clock
 4. If a servo doesn't reach its ends, change its `US_MIN` / `US_MAX` pulse widths at the top of the sketch (the defaults are the Servo library's, 544 to 2400 µs).
 5. In Studio, Connect arm, then drag the pen on the board: the real arm should follow. Then draw a sample and Send to arm.
 
+## Smoothing the line
+
+The jagged line the sim used to show was the sim, not the motors: it rounded every command to a whole degree and
+jumped from waypoint to waypoint, which draws a staircase. The firmware sends microseconds and moves smoothly
+between keyframes, so the real limits are the servo's dead band and the play in its gears.
+`node app/tools/compare-servos.mjs <dir>` draws the clock under each model (results below, for the design numbers).
+
+| Model of the clock face | Off the line, mean | Worst |
+|---|---|---|
+| Whole-degree commands, jumping (the old sim) | 1.0 mm | 3.3 mm, a staircase (+27% ink) |
+| SG92R, 1° dead band, smooth commands | 1.4 mm | 4.0 mm, smooth but trailing, hooks at stroke starts |
+| Same with 1° of gear play | 3.1 mm | 8.0 mm |
+| Dead band and play compensated, 3 mm lead-in (now the default) | 0.0 mm | 0.1 mm |
+| 2:1 reduction, no compensation, 1° play | 1.4 mm | 4.0 mm (half the error of no reduction) |
+| Stepper, 1/16 microsteps, direct | 0.1 mm | 0.3 mm |
+
+What the app now does (software, no new parts):
+- **Compensation:** a servo stops half its dead band short of a command and its gears leave the link half the play behind, both on the side it came from. Each base and elbow command is pushed that far ahead in the direction the joint is moving, flipping when it reverses.
+- **Lead-in:** each stroke starts with a 3 mm pen-up glide in the stroke's own direction, so the slack is already taken up when the pen touches down. This removes the hooks at the start of strokes.
+
+The model is tidier than a real servo: its dead band is exact and the same every time. Expect a clear gain on the
+real arm, not the model's 0.1 mm, and check it on the board.
+
+What to do with the motors, in order:
+1. **Measure, then enter the numbers** in Arm setup, Smoothing. Dead band: send `J` commands 0.1° apart from the Serial Monitor and note the smallest step that moves the horn. Gear play: with the servo holding, wiggle the link and measure how far the pen tip moves; play in degrees ≈ tip movement ÷ distance from the joint × 57.3.
+2. **Make the horn joint rigid:** screw the servo's own horn into the link. A printed spline that slips adds play that changes as it wears, which compensation can't follow.
+3. **Preload the joints:** a rubber band from each link to the frame keeps the gears pressed on one side, so the play stays taken up.
+4. **Give the servos their own 5 V supply.** A sagging supply makes them twitch, and no software removes that.
+5. **If it still wobbles, add a 2:1 reduction** (GT2 belt or printed gears) to base and elbow; it halves dead band and play at the link. The drawing square needs 89° of base travel and 83° of elbow, so 2:1 uses 178° and 166° of a 180° servo: it fits, with the zero offsets set carefully. 3:1 does not fit. Set the ratio in the servo table.
+6. **Steppers** are the step after that: in the sim, 1/16 microstepping is within 0.3 mm with no compensation. They need drivers and are much heavier; mount both at the base and drive the elbow with a belt.
+
 ## Where a Raspberry Pi fits
 
 | Setup | When | Notes |

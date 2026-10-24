@@ -41,6 +41,7 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 - **Simulation switches**: servo limits on or off (ideal servos), the reach (grey where the arm can't get to), and keep time (erase and redraw the clock every minute).
 - **⌘K**: every command, and "Draw …" for anything you type.
 - Drag on the board to move the pen by hand when nothing is playing.
+- **Smoothing** (Arm setup): the servos' dead band and gear play, compensated in every command, plus a 3 mm lead-in to each stroke. Why, and what to do with the motors: [`docs/hardware-link.md`](../docs/hardware-link.md#smoothing-the-line).
 
 ## The arm's dimensions
 
@@ -72,3 +73,4 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `../firmware/clockwork` | the Arduino sketch (Uno or Nano) |
 | `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |
+| `tools/compare-servos.mjs` | the clock under each servo model, side by side |

@@ -61,7 +61,7 @@ export function keyframes(job, g) {
   const cd = (j, a) => Math.round(Math.max(0, Math.min(180, servoAngle(j, a, g))) * 100);
   const out = []; let prev = null, lastTilt = null;
   for (let i = 0; i < job.n; i++) {
-    const a = job.path[i]; if (a.out_of_reach) continue;
+    const a = (job.cmd || job.path)[i]; if (a.out_of_reach) continue;
     const s = [cd("base", a.base), cd("elbow", a.elbow), cd("tilt", a.tilt)];
     if (prev && a.tilt !== lastTilt) {
       out.push({ t: job.tTilt[i], a: [prev[0], prev[1], s[2]] });

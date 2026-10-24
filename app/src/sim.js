@@ -26,7 +26,29 @@ export function makeJob(toolpath, angles, g) {
     if (tilt != null) lastTilt = tilt;
     if (!a.out_of_reach) last = a;
   }
-  return { toolpath, path: angles.path, tCmd, tGo, tTilt, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
+  return { toolpath, path: angles.path, cmd: compensate(angles.path, g), tCmd, tGo, tTilt, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
+}
+
+// What to command so the link lands where the plan wants it. A hobby servo stops half its dead band short of a
+// command, and gear play leaves the link half the play behind the motor, both on the side it came from; so
+// each base and elbow command is pushed that far ahead in the direction the joint is moving, and the push
+// flips when the joint reverses. Off when the config says so, or with nothing to make up.
+export function compensate(path, g) {
+  const s = g.servo || {}, on = s.compensate !== false;
+  const out = path.map((a) => ({ ...a }));
+  if (!on) return out;
+  for (const k of ["base", "elbow"]) {
+    const ratio = +(s[k]?.ratio) || 1, push = ((+s.resolution || 0) / 2 + (+s.backlash || 0) / 2) / ratio;
+    if (!push) continue;
+    let dir = 0, prev = null;
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].out_of_reach) continue;
+      const v = path[i][k];
+      if (prev != null && Math.abs(v - prev) > 1e-4) dir = Math.sign(v - prev);
+      out[i][k] = v + dir * push; prev = v;
+    }
+  }
+  return out;
 }
 
 // The pose the arm parks in: pen up, beside the drawing on the elbow's side, so neither link crosses it.
@@ -38,14 +60,20 @@ export function homePose(g) {
 
 function homeTip(g) { const h = homePose(g), f = fk(h.base * D2R, h.elbow * D2R, g.L1, g.L2); return { x: f.px, y: f.py }; }
 
+// How a servo turns a command into a position (physics on):
+//   deadband  it only moves when the command is more than half its dead band away, and stops at the edge of it,
+//             so it trails a moving command by half the band and kinks where the joint reverses (a real hobby servo)
+//   steps     every command rounded to whole steps first (a firmware sending whole degrees, or a stepper)
+// backlash (deg) is play in the gears between the motor and the link. The command is interpolated between
+// waypoints the way the Arduino firmware does it, unless smooth is false.
 export class Sim {
-  constructor(g) { this.g = g; this.physics = true; this.job = null; this.reset(); }
+  constructor(g) { this.g = g; this.physics = true; this.model = "deadband"; this.smooth = true; this.job = null; this.reset(); }
 
   setGeom(g) { this.g = g; }
 
   // Back to the park pose with the clock at zero; the board's ink is the caller's to clear.
   reset() {
-    this.j = homePose(this.g); this.t = 0; this.i = 0; this.ti = 0; this.manual = null;
+    this.j = homePose(this.g); this.m = { ...this.j }; this.t = 0; this.i = 0; this.ti = 0; this.manual = null;
     this.prevTip = this.tip(); this.prevMode = null;
     this.dev = { max: 0, sum: 0, n: 0 };
   }
@@ -75,8 +103,17 @@ export class Sim {
     const job = this.job; if (!job || !job.n) return homePose(this.g);
     let k = this.i; while (k > 0 && job.path[k].out_of_reach) k--;
     let m = this.ti; while (m > 0 && job.path[m].out_of_reach) m--;
-    const a = job.path[k], b = job.path[m];
-    return { base: a.out_of_reach ? this.j.base : a.base, elbow: a.out_of_reach ? this.j.elbow : a.elbow, tilt: b.out_of_reach ? this.j.tilt : b.tilt };
+    // compensated commands are for real servos; ideal ones follow the plan itself
+    const P = (this.physics && job.cmd) || job.path, a = P[k], b = P[m];
+    if (a.out_of_reach) return { base: this.j.base, elbow: this.j.elbow, tilt: b.out_of_reach ? this.j.tilt : b.tilt };
+    let base = a.base, elbow = a.elbow;
+    // between set-off and arrival the command slides from the last waypoint to this one, as the firmware does
+    const p = P[k - 1];
+    if (this.smooth && k > 0 && p && !p.out_of_reach && k === this.i) {
+      const span = job.tCmd[k] - job.tGo[k], u = span > 0 ? Math.max(0, Math.min(1, (this.t - job.tGo[k]) / span)) : 1;
+      base = p.base + (a.base - p.base) * u; elbow = p.elbow + (a.elbow - p.elbow) * u;
+    }
+    return { base, elbow, tilt: b.out_of_reach ? this.j.tilt : b.tilt };
   }
 
   // Advance by dt seconds in small steps. onInk(from, to, mode) gets every piece of line the tip leaves.
@@ -96,15 +133,19 @@ export class Sim {
     const tg = this.target(), s = this.g.servo;
     for (const k of ["base", "elbow", "tilt"]) {
       let want = tg[k];
-      if (this.physics) {
-        // a servo stops at the ends of its travel, wherever the plan wanted it
-        const c = s[k];
-        if (c) { const dir = +c.dir || 1, v = Math.min(+c.max, Math.max(+c.min, +c.offset + dir * want)); want = (v - +c.offset) / dir; }
-        const res = s.resolution || 0;
-        if (res > 0) want = Math.round(want / res) * res;
-        const lim = s.speed * dt, d = want - this.j[k];
-        this.j[k] += Math.max(-lim, Math.min(lim, d));
-      } else this.j[k] = want;
+      if (!this.physics) { this.j[k] = this.m[k] = want; continue; }
+      // a servo stops at the ends of its travel, wherever the plan wanted it
+      const c = s[k], ratio = +(c?.ratio) || 1;
+      if (c) { const dir = +c.dir || 1, v = Math.min(+c.max, Math.max(+c.min, +c.offset + dir * ratio * want)); want = (v - +c.offset) / (dir * ratio); }
+      // a gear reduction divides the servo's dead band, speed and play by its ratio at the link
+      const res = (s.resolution || 0) / ratio, lim = (s.speed / ratio) * dt, play = (+(s.backlash) || 0) / ratio;
+      let d;
+      if (this.model === "steps") { if (res > 0) want = Math.round(want / res) * res; d = want - this.m[k]; }
+      else { const e = want - this.m[k]; d = Math.abs(e) > res / 2 ? e - Math.sign(e) * res / 2 : 0; }
+      this.m[k] += Math.max(-lim, Math.min(lim, d));
+      // gear play: the link only follows once the motor has taken it up
+      if (play > 0) { if (this.m[k] - this.j[k] > play / 2) this.j[k] = this.m[k] - play / 2; else if (this.j[k] - this.m[k] > play / 2) this.j[k] = this.m[k] + play / 2; }
+      else this.j[k] = this.m[k];
     }
     const tip = this.tip(), mode = this.mode();
     if (mode && mode === this.prevMode && onInk) onInk(this.prevTip, tip, mode);

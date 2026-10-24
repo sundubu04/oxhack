@@ -66,7 +66,14 @@ export function plan(strokes, g = GEOM, opts = {}) {
   let s = fitStrokes(strokes, half, cx, cy);
   s = order(s).map(st => resample(st, step));
   const toolpath = []; let ink = 0, travel = 0; let prev = null;
+  const lead = opts.leadIn ?? 0;
   for (const st of s) {
+    // lead-in: stop short of the stroke and glide onto its start pen-up, moving the way the stroke goes, so the
+    // servos' dead band and gear play are already taken up when the pen touches down
+    if (lead > 0 && st.length > 1) {
+      const dx = st[1].x - st[0].x, dy = st[1].y - st[0].y, d = Math.hypot(dx, dy) || 1;
+      toolpath.push({ x: st[0].x - (dx / d) * lead, y: st[0].y - (dy / d) * lead, pen: 0 });
+    }
     for (let i = 0; i < st.length; i++) {
       const pen = i === 0 ? 0 : 1;
       toolpath.push({ x: st[i].x, y: st[i].y, pen });

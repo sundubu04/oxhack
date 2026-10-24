@@ -9,13 +9,15 @@ export const DEFAULT_CONFIG = {
   drawing: { size: 180 },
   elbow: "up",
   pen: { drawTilt: -14, liftTilt: -2, eraseTilt: 16, pressure: 60, eraserWidth: 20 },
-  motion: { drawSpeed: 150, travelSpeed: 300 },
-  // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg effective resolution (docs/pages/arm-sim.html).
+  motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3 },   // leadIn: mm of pen-up glide onto each stroke
+  // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
+  // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both.
   servos: {
-    model: "TowerPro SG92R", speed: 600, resolution: 1,
-    base: { min: 0, max: 180, offset: 0, dir: 1 },
-    elbow: { min: 0, max: 180, offset: 0, dir: 1 },
-    tilt: { min: 0, max: 180, offset: 90, dir: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
+    model: "TowerPro SG92R", speed: 600, resolution: 1, backlash: 0, compensate: true,
+    // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
+    base: { min: 0, max: 180, offset: 0, dir: 1, ratio: 1 },
+    elbow: { min: 0, max: 180, offset: 0, dir: 1, ratio: 1 },
+    tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
 };
 
@@ -38,13 +40,13 @@ export function geomFrom(cfg) {
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     tilt: { draw: +c.pen.drawTilt, lift: +c.pen.liftTilt, erase: +c.pen.eraseTilt },
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
-    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed,
-    servo: { speed: +c.servos.speed, resolution: +c.servos.resolution, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
+    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn,
+    servo: { speed: +c.servos.speed, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
   };
 }
 
 // Geometry angle -> the angle the servo is commanded to, through its calibration.
-export function servoAngle(joint, a, g) { const s = g.servo[joint]; return +s.offset + +s.dir * a; }
+export function servoAngle(joint, a, g) { const s = g.servo[joint]; return +s.offset + +s.dir * (+s.ratio || 1) * a; }
 export function inServoRange(joint, a, g) { const s = g.servo[joint], v = servoAngle(joint, a, g); return v >= +s.min - 1e-6 && v <= +s.max + 1e-6; }
 
 export async function loadConfig() {

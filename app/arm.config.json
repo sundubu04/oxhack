@@ -23,29 +23,35 @@
   },
   "motion": {
     "drawSpeed": 150,
-    "travelSpeed": 300
+    "travelSpeed": 300,
+    "leadIn": 3
   },
   "servos": {
     "model": "TowerPro SG92R",
     "speed": 600,
     "resolution": 1,
+    "backlash": 0,
+    "compensate": true,
     "base": {
       "min": 0,
       "max": 180,
       "offset": 0,
-      "dir": 1
+      "dir": 1,
+      "ratio": 1
     },
     "elbow": {
       "min": 0,
       "max": 180,
       "offset": 0,
-      "dir": 1
+      "dir": 1,
+      "ratio": 1
     },
     "tilt": {
       "min": 0,
       "max": 180,
       "offset": 90,
-      "dir": 1
+      "dir": 1,
+      "ratio": 1
     }
   }
 }

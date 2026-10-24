@@ -31,7 +31,7 @@ export function drawCentre(g = GEOM) { return { cx: 0, cy: g.standoff + g.board 
 // geometry carries servo calibration (see config.js).
 export function toAngles(toolpath, g = GEOM) {
   let unreachable = 0, worstDex = 1, outOfRange = 0;
-  const lim = (j, a) => { const s = g.servo?.[j]; if (!s) return true; const v = +s.offset + +s.dir * a; return v >= +s.min - 1e-6 && v <= +s.max + 1e-6; };
+  const lim = (j, a) => { const s = g.servo?.[j]; if (!s) return true; const v = +s.offset + +s.dir * (+s.ratio || 1) * a; return v >= +s.min - 1e-6 && v <= +s.max + 1e-6; };
   const path = toolpath.map((p) => {
     const s = ik(p.x, p.y, g.L1, g.L2, g.elbowUp);
     if (!s) { unreachable++; return { out_of_reach: true }; }
