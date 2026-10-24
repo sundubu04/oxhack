@@ -4,6 +4,7 @@ Three sketches for an Arduino Uno or Nano, and one command to build, upload and 
 
 | Sketch | What it is for |
 | --- | --- |
+| `servo-check/` | Nothing to type or set: sweeps the servo on D9, then D10, then D11, so a servo that stays still is a wiring or power fault |
 | `servo-test/` | Move each servo by hand from the Serial Monitor: check it turns, find its range, calibrate it, draw a square |
 | `playback/` | Draw one drawing by itself, baked into the board by `./firmware/arm draw` |
 | `clockedin/` | The firmware the Clockedin app streams to over USB |
@@ -26,6 +27,9 @@ Three sketches for an Arduino Uno or Nano, and one command to build, upload and 
 Set `BOARD=arduino:avr:nano:cpu=atmega328old` for an older or clone Nano, and `PORT=/dev/ttyACM0` (the Pi) or `PORT=/dev/cu.usbmodem1101` to choose the port.
 
 ## First run, in this order
+
+If nothing moves at all: `./firmware/arm servos` (or upload `servo-check` from the IDE). Check that each servo has 5 V and GND, that a separate supply's GND is joined to the Arduino's, and that signals are on D9, D10, D11. In the motor test the Serial Monitor must send "Newline" (each command comes back as `> b 90`), and the playback sketches wait for `go`.
+
 
 1. **Servos off the arm.** `./firmware/arm test`, then `b 90`, `e 90`, `t 90`: each horn turns and stops. `sweep all` swings base and elbow through their range twice.
 2. **Ends of travel.** `us b 544`, then `us b 2400`: if the horn buzzes or strains at an end, step the number in until it stops, and put the two values in `arduino.usMin` / `usMax` in `app/arm.config.json`. Run `./firmware/arm config`.

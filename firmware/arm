@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run the arm straight from a terminal, without the app (macOS or the Raspberry Pi; needs arduino-cli and node).
 #   ./firmware/arm ports                      the boards plugged in
+#   ./firmware/arm servos                     upload the servo check (sweeps D9, D10, D11 in turn, no typing)
 #   ./firmware/arm test                       upload the motor test and open the Serial Monitor (type help)
 #   ./firmware/arm draw <what> [--speed 0.5] [--wipe]
 #                                             plan a drawing, upload it with the playback sketch, open the monitor
@@ -34,12 +35,13 @@ config() { node "$app/tools/arduino-export.mjs"; }
 
 case "${1:-help}" in
   ports)   arduino-cli board list ;;
+  servos)  upload servo-check; monitor ;;
   test)    config; upload servo-test; monitor ;;
   draw)    shift; [ $# -gt 0 ] || { echo "Draw what? e.g. ./firmware/arm draw calibrate" >&2; exit 1; }
            node "$app/tools/arduino-export.mjs" "$@"; upload playback; monitor ;;
   app)     config; upload clockedin ;;
   monitor) monitor ;;
   config)  config ;;
-  check)   config; for s in clockedin servo-test playback; do compile "$s" >/dev/null && echo "$s compiles"; done ;;
-  *)       sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+  check)   config; for s in servo-check clockedin servo-test playback; do compile "$s" >/dev/null && echo "$s compiles"; done ;;
+  *)       sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
