@@ -8,3 +8,4 @@ Every page we publish with the Artifact tool. Republish the same source file to 
 | PHP2Shell idea research | https://claude.ai/artifact/3Zp6AaLNuv4gmZVVwWQ645 | `docs/pages/php2shell-research.html` | Eun | Private |
 | OxHack idea board (all routes) | https://claude.ai/artifact/Jp4jb8hWhLjKSF5DHMkBMC | `docs/pages/ideas.html` | Eun | Private |
 | Clock arm simulator + spec | https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k | `docs/pages/arm-sim.html` | Eun | Private |
+| Drawing arm research (Route D prior art, benchmark) | https://claude.ai/artifact/DE7tSVJYnyefa7GkchoWmH | `docs/pages/drawing-arm-research.html` | Eun | Private |

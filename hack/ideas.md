@@ -156,3 +156,7 @@ Filled from the research agents (see `docs/research.md`). An idea that already e
 | 4, 5, 17 | WPScan, droopescan, version checkers | Consumer framing, verified-owner only, no active exploitation | pending |
 | 8, 15, 20, 22 | News explainers (Malwarebytes, Krebs), CVE write-ups | Interactive and grounded; a safe visual, not prose | pending |
 | 9, 21 | crt.sh, certspotter, Have I Been Pwned | Framed around this incident and this user's own domains | pending |
+| H1, H8 | Plotclock (2014), Doodle Clock (2012), Whiteboard Clock (2015): write the time on a whiteboard and wipe it; Baas, *Real Time* (2016) | Answers a request (voice, video), decides what to draw, draws it from one fast Fourier path; the clock is only the opening joke | `docs/research-drawing-arm.md` |
+| H3, H9, H6 | iBoardbot, Joto, Scribit (2016 to 2018, now gone or stale); Osedea's voice-to-drawing Spot (May 2026); Robotticelli portrait arm (Oct 2026) | Model out of the motion loop, draw time computed before the pen moves, erases on an ordinary whiteboard | `docs/research-drawing-arm.md` |
+| H2 | 3Blue1Brown, Coding Train, Bad Apple Fourier videos: all on screen; Kelvin's tide machine (1872) in brass | The same maths on a real pen; none found driving a real plotter | `docs/research-drawing-arm.md` |
+| Benchmark | Clock Drawing Test on LLMs (Google, Oct 2024: 2 of 12 set the hands right; BMJ, Dec 2024: none passed the MoCA clock) | Score our clocks on the same rubrics, blind, against current image models we re-run | `docs/research-drawing-arm.md` |

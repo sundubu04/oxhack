@@ -1,0 +1,209 @@
+<title>Drawing arm research</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* House research page: one reading column, groups separated by space; one pink accent; the one visual is a log-scale time chart. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.page { max-width: 48rem; margin: 0 auto; padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 52px; }
+header { display: grid; gap: 12px; }
+h1 { font: 600 2.25rem/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.3rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.lede { font-size: 1.125rem; }
+.meta { color: var(--ink-3); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+section { display: grid; gap: 16px; min-width: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code { font: .875em var(--mono); }
+.muted { color: var(--ink-2); }
+ul.points { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 65ch; }
+
+.rows { overflow-x: auto; }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 16px 8px 0; white-space: nowrap; }
+.rows td { padding: 8px 16px 8px 0; vertical-align: top; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+.rows tr[data-lead] td { background: var(--accent-wash); }
+.rows tr[data-lead] td:first-child { border-radius: 6px 0 0 6px; padding-left: 10px; }
+.rows tr[data-lead] td:last-child { border-radius: 0 6px 6px 0; }
+.rows .year { color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The one visual: how long each step takes, placed on one log scale from 10 ms to 1 h. */
+.timeline { display: grid; gap: 10px; }
+.trow { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 4px 16px; align-items: center; }
+.trow .label { font-size: .9375rem; }
+.trow .label small { display: block; color: var(--ink-3); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.track { position: relative; height: 18px; background: linear-gradient(var(--wash), var(--wash)) 0 50% / 100% 2px no-repeat; }
+.dot { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--ink-2); }
+.dot[data-model] { background: var(--accent); }
+.span { position: absolute; top: 50%; height: 6px; margin-top: -3px; border-radius: 3px; background: var(--accent); }
+.trow[data-open] .label { color: var(--ink-2); }
+.trow[data-open] .track { background: none; }
+.trow[data-open] .track span { font-size: .8125rem; color: var(--ink-3); line-height: 18px; }
+.axis { position: relative; height: 18px; font-size: .75rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.axis span:first-child { transform: none; }
+.axis span:last-child { transform: translateX(-100%); }
+.axisrow { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 16px; }
+.legend { color: var(--ink-2); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+@media (max-width: 560px) {
+  .trow, .axisrow { grid-template-columns: minmax(0, 1fr); }
+  .axisrow > :first-child { display: none; }
+}
+
+.claim { font: 500 1.0625rem/1.5 var(--display); max-width: 60ch; }
+.formula { font: .9375rem/1.6 var(--mono); background: var(--wash); border-radius: 6px; padding: 10px 14px; overflow-x: auto; }
+figure { margin: 0; display: grid; gap: 8px; overflow-x: auto; }
+figcaption { color: var(--ink-2); font-size: .875rem; }
+pre.mermaid { background: none; margin: 0; }
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; }
+details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>Drawing arm research</h1>
+    <p class="lede">A robot that writes the time on a whiteboard and wipes it is twelve years old, so the clock is our joke, not our claim. What nobody has built is an arm that hears you, decides what to draw, and draws it fast and exactly from one Fourier path. And there is a published clock-drawing test that language models fail and we can try to pass.</p>
+    <p class="meta"><span>24 Oct 2026</span><span>Route D, drawing clock</span><span>Prior art and logistics</span></p>
+  </header>
+
+  <section aria-labelledby="h-exists">
+    <h2 id="h-exists">What already exists</h2>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Thing</th><th>Year</th><th>What it does, and where it falls short</th></tr></thead>
+        <tbody>
+          <tr data-lead><td><b>Plotclock</b></td><td class="year">2014</td><td>3 servos write the time on a whiteboard and wipe it each minute. A rebuild left ink behind and wrote unreadable digits</td></tr>
+          <tr><td>Doodle Clock</td><td class="year">2012</td><td>Rewrites the changed digits; the marker "would dry up after only 30 minutes"</td></tr>
+          <tr><td>Whiteboard Clock</td><td class="year">2015</td><td>Marker inside the eraser; every 5 minutes; erasing "clumsy like a toddler"</td></tr>
+          <tr><td>Maarten Baas, <i>Real Time</i></td><td class="year">2016</td><td>A film of a man painting and wiping the hands each minute. Judges may know it</td></tr>
+          <tr><td>iBoardbot, Joto, Scribit</td><td class="year">2016–18</td><td>Whiteboard and wall robots that erase. Scribit: a drawing takes minutes to 2 hours and needs heat-vanishing ink. Sites gone or last updated 2022–23</td></tr>
+          <tr><td>SketchAgent (MIT)</td><td class="year">2025</td><td>Claude writes strokes on a grid: about 20 s a sketch, 8 s a stroke. Screen only</td></tr>
+          <tr><td>Spot draws on voice (Osedea)</td><td class="year">2026</td><td>A hackathon build: speech, then an image model, then a traced outline, then G-code. The model never moves the pen</td></tr>
+          <tr><td>Robotticelli</td><td class="year">2026</td><td>A cheap arm photographs you and draws your portrait live; won La Machine, Amsterdam (self-reported)</td></tr>
+          <tr><td>Fourier epicycle videos</td><td class="year">2019–22</td><td>3Blue1Brown, The Coding Train, Bad Apple as a Fourier series. No open project drives a real pen from them</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Erasing is the weak point in every build: markers dry, felt leaves residue, a magnetic board scratched in a day. Plan the eraser as carefully as the pen.</p>
+  </section>
+
+  <section aria-labelledby="h-time">
+    <h2 id="h-time">Why a live model API can't hold the pen</h2>
+    <p>A model in the loop answers in seconds; the motor wants a command every 20 ms. Everything below is placed on one log scale.</p>
+    <div class="timeline" role="img" aria-label="Log-scale chart from 10 milliseconds to 1 hour. A servo command every 20 ms; Gemini Robotics end to end about 250 ms; the Live API sees one video frame a second; realtime voice models take 0.63 to 2.99 s to first audio; SketchAgent about 20 s a sketch; healthy adults 35 s to draw the clinic clock; Paul the robot about 30 minutes a portrait. Our arm is not yet measured.">
+      <div class="trow"><div class="label">A hobby servo wants a command<small>every 20 ms</small></div><div class="track"><i class="dot" style="left:5.4%"></i></div></div>
+      <div class="trow"><div class="label">Gemini Robotics, end to end<small>about 250 ms, with a decoder on the robot</small></div><div class="track"><i class="dot" data-model style="left:25.2%"></i></div></div>
+      <div class="trow"><div class="label">Live API sees one video frame<small>every 1 s</small></div><div class="track"><i class="dot" data-model style="left:36.0%"></i></div></div>
+      <div class="trow"><div class="label">Realtime voice, first audio<small>0.63 to 2.99 s</small></div><div class="track"><i class="span" style="left:32.4%;width:12.2%"></i></div></div>
+      <div class="trow"><div class="label">SketchAgent plans one sketch<small>about 20 s, before any pen moves</small></div><div class="track"><i class="dot" data-model style="left:59.4%"></i></div></div>
+      <div class="trow"><div class="label">Healthy adult draws the clinic clock<small>35.0 s mean, aged 55+</small></div><div class="track"><i class="dot" style="left:63.8%"></i></div></div>
+      <div class="trow"><div class="label">Paul the robot draws a portrait<small>about 30 min</small></div><div class="track"><i class="dot" style="left:94.6%"></i></div></div>
+      <div class="trow" data-open><div class="label">Our arm draws a clock</div><div class="track"><span>to be measured tonight</span></div></div>
+      <div class="axisrow"><div></div><div class="axis"><span style="left:0">10 ms</span><span style="left:18%">0.1 s</span><span style="left:36%">1 s</span><span style="left:54%">10 s</span><span style="left:68%">1 min</span><span style="left:86%">10 min</span><span style="left:100%">1 h</span></div></div>
+    </div>
+    <p class="legend"><span><i style="background:var(--accent)"></i>an AI model</span><span><i style="background:var(--ink-2)"></i>a motor, a person or a robot</span></p>
+    <ul class="points">
+      <li><b>Nothing to wire up.</b> Models that output motor actions (Gemini Robotics 2, its on-device version, the Pi API) are waitlist or tester only; OpenAI has no robotics API. The public Gemini Robotics-ER 2 returns text points on a 0–1000 grid.</li>
+      <li><b>Imprecise.</b> On Point-Bench, where any point inside the object counts, GPT-4o scored 29.5% and Gemini 2.5 Flash 46.8%. A clock needs a true circle.</li>
+      <li><b>Not repeatable.</b> One prompt run 1,000 times at temperature 0 gave 80 different answers. A rehearsed demo needs the same clock every time.</li>
+      <li><b>Where a model belongs:</b> hearing the request, choosing what to draw, and checking the board from a photo. One second is fine there, outside the motion loop. SayCan, Code as Policies and Gemini Robotics-ER all split the job this way.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-bench">
+    <h2 id="h-bench">The benchmark to beat: the Clock Drawing Test</h2>
+    <p>Doctors ask patients to draw a clock showing a set time, as a dementia screen. Two published studies gave language models the same test. Nobody has published a "draw a clock at HH:MM" benchmark, so this is the fair ground.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Study</th><th>Result</th><th>Fair for us?</th></tr></thead>
+        <tbody>
+          <tr data-lead><td><b>Google, arXiv 2410.11756</b> (Oct 2024)</td><td>12 models, WMS-IV rubric out of 15. Best 14/15. Only 2 of 12 set the hands to the right time</td><td>Yes, rubric published in full</td></tr>
+          <tr data-lead><td><b>BMJ "Age against the machine"</b> (Dec 2024)</td><td>MoCA clock, "10 past 11": none of the language models fully passed</td><td>Yes, 3-point rubric</td></tr>
+          <tr><td>Davoudi et al. (2021)</td><td>430 healthy adults draw it in 35.0 s on average</td><td>Yes, as the human speed reference</td></tr>
+          <tr><td>The 10:10 problem</td><td>Image models drift to the watch-advert time; one blog test found 0 of 10 fully right at 3:27</td><td>Motivation only: re-run it ourselves</td></tr>
+          <tr><td>ClockBench (2025)</td><td>Models reading clocks: best went from 13.3% to 83.3% in a year</td><td>No: reading, not drawing</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="claim">The claim, once measured: "20 random times, 20 of 20 clocks right to the minute, X seconds each. Healthy adults take 35 s; in published tests no language model passed the clinic clock."</p>
+    <ul class="points">
+      <li>Times from a seeded random generator; the same prompt for every system; current image models re-run by us on the same times.</li>
+      <li>Score on the MoCA and WMS-IV rubrics, graded blind by someone outside the team. Minute hand within 6°, hour hand within about 5°, measured from photos.</li>
+      <li>Time from request to pen-up, path planning included; 10 runs, median and range.</li>
+      <li>Draw 12, 3, 6, 9 first: the rubric gives 2 points for it.</li>
+      <li>The judge's question will be "a calculator beating a poet at sums". The answer is the thesis: for a job with a right answer, the model chooses and code draws.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-fourier">
+    <h2 id="h-fourier">The Fourier pipeline, and why it is fast</h2>
+    <figure>
+<pre class="mermaid">
+flowchart LR
+  in["Voice or camera"] --> llm["Model: what to draw<br/>about 1 s, once"]
+  llm --> path["One continuous path"]
+  path --> fft["FFT, keep top N circles"]
+  fft --> time["Draw time from limits"]
+  time --> ik["Joint angles"] --> motor["Motors, every 20 ms"]
+</pre>
+      <figcaption>The model runs once per request. Everything after it is deterministic: the same input gives the same drawing.</figcaption>
+    </figure>
+    <ul class="points">
+      <li><b>Pen-up travel is most of plot time.</b> Reordering strokes "can reduce the plotting time by 30-50%" (AxiDraw docs); on one big map pen-up was about 87% of travel. One Fourier loop has no pen lifts.</li>
+      <li><b>Corners force slowdowns</b> (Klipper caps a right angle at 5 mm/s by default). A truncated Fourier series has no corners.</li>
+      <li><b>The draw time is known before the pen moves.</b> With the arm's speed and acceleration limits, the shortest safe time follows from the coefficients alone, so N becomes a dial between detail and seconds:</li>
+    </ul>
+    <p class="formula">T = max( 2π·Σ|k||c<sub>k</sub>| / v<sub>max</sub> ,  2π·√( Σk²|c<sub>k</sub>| / a<sub>max</sub> ) )</p>
+    <p class="muted">Our own working from the series' derivatives. The clock face barely needs it: a circle is a one-term Fourier series, the hands are lines and the numerals come from a single-stroke font. The pipeline is for whatever the camera or microphone gives it next.</p>
+  </section>
+
+  <section aria-labelledby="h-story">
+    <h2 id="h-story">Video and voice, as data over time</h2>
+    <p>The story to open with: in 1872 Lord Kelvin built a brass Fourier machine that drew the future. Ten rotating components, summed by a chain over pulleys, moved a pen that plotted tidal height against time. Machines like it predicted the tides for D-Day.</p>
+    <ul class="points">
+      <li><b>Voice.</b> The phonautograph drew sound in soot in 1857. Draw a voice's waveform or pitch as one loop, then play the same path back as stereo audio, the way oscilloscope music draws pictures with sound.</li>
+      <li><b>Video.</b> Chain a short clip's frames into one line, as the Bad Apple Fourier video did: a flip-book on the whiteboard where position along the line is time. Live: the camera sees a face and the arm draws it as one loop.</li>
+      <li><b>Data.</b> Fit harmonics to a periodic series and draw its future, Kelvin's method. This is the forecast plotter, with a 150-year-old precedent for the HRT prize.</li>
+      <li><b>The time dial.</b> A slider for N shows the computed draw time before the pen moves, so a judge watches detail traded for seconds.</li>
+    </ul>
+  </section>
+
+  <details>
+    <summary>Sources, and what not to overstate</summary>
+    <ul>
+      <li>Clocks: <a href="https://makezine.com/article/craft/artbot-clock-draws-the-time/">Doodle Clock</a>, <a href="https://www.elektormagazine.com/news/plotclock-writes-the-time-?view=print">Plotclock</a>, <a href="https://hackaday.com/2015/02/23/whiteboard-clock/">Whiteboard Clock</a>, <a href="https://en.wikipedia.org/wiki/Real_Time_(art_series)">Real Time</a>. Whiteboard robots: <a href="https://spectrum.ieee.org/the-iboardbot-brings-xy-plotters-into-the-cloud-age">iBoardbot</a>, <a href="https://www.dezeen.com/2017/03/14/joto-drawing-robot-etch-sketch-digital-age-those-design-products/">Joto</a>, <a href="https://www.inverse.com/article/50506-scribit-art-robot-draws-on-walls">Scribit</a>.</li>
+      <li>AI drawing: <a href="https://arxiv.org/abs/2411.17673">SketchAgent</a>, <a href="https://osedea.com/insight/making-spot-draw-anything-with-diffusion-and-gcode">Osedea Spot</a>, <a href="https://luma.com/ni360mav">La Machine</a>, <a href="https://ispr.info/2012/11/27/his-sketching-robots-saved-his-sanity-and-tell-us-how-we-relate-emotionally-to-machines/">Paul</a>.</li>
+      <li>Model APIs and timing: <a href="https://ai.google.dev/gemini-api/docs/robotics-overview">Gemini Robotics-ER</a> (read 24 Oct 2026), <a href="https://deepmind.google/models/model-cards/gemini-robotics-on-device-2/">On-Device 2 card</a>, <a href="https://arxiv.org/abs/2503.20020">Gemini Robotics paper</a>, <a href="https://docs.cloud.google.com/vertex-ai/generative-ai/docs/live-api/send-audio-video-streams">Live API video</a>, <a href="https://artificialanalysis.ai/speech-to-speech">Artificial Analysis</a> (July 2026), <a href="https://docs.openmv.io/openmvcam/tutorial/hardware/pwm/servos.html">servo timing</a>, <a href="https://arxiv.org/abs/2505.09990">Point-Bench</a>, <a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference">nondeterminism</a>, <a href="https://arxiv.org/abs/2209.07753">Code as Policies</a>.</li>
+      <li>Benchmarks: <a href="https://arxiv.org/abs/2410.11756">Galatzer-Levy et al.</a>, <a href="https://www.bmj.com/content/387/bmj-2024-081948">BMJ</a>, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8379638">Davoudi et al.</a>, <a href="https://clockbench.ai">ClockBench</a>, <a href="http://polymath07.blogspot.com/2026/08/getting-clocks-right-ai-almost-there.html">10:10 blog test</a>.</li>
+      <li>Fourier and plotting: <a href="https://www.youtube.com/watch?v=r6sGWTCMz2k">3Blue1Brown</a>, <a href="https://en.wikipedia.org/wiki/Tide-predicting_machine">tide-predicting machine</a>, <a href="https://axidraw.com/doc/py_api/">AxiDraw API</a>, <a href="https://github.com/ezheidtmann/polargraph-optimizer">polargraph-optimizer</a>, <a href="https://www.klipper3d.org/Config_Reference.html">Klipper</a>, <a href="https://github.com/Adneths/fourier-drawer">Adneths fourier-drawer</a>, <a href="https://en.wikipedia.org/wiki/Phonautograph">phonautograph</a>, <a href="https://oscilloscopemusic.com">oscilloscope music</a>.</li>
+      <li>Don't overstate: the model clock scores are from 2024 models, one try each; the Google paper's prompt and scoring disagree on the time; the voice latencies span reasoning settings; "no Fourier-driven real plotter exists" means none was found. Our own clock time is not measured yet.</li>
+      <li>Full notes, tables and the library list: <code>docs/research-drawing-arm.md</code> in the repo.</li>
+    </ul>
+  </details>
+</main>
