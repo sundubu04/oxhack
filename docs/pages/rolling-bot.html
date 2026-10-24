@@ -1,0 +1,296 @@
+<title>Rolling clock bot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* A whiteboard-rolling drawing bot: top view (rolling + drawing), side view (tilt draw/erase on a ball), and which drive wins. */
+:root{
+  --bg:#fcfbfb;--ink:#1f1a1d;--ink-2:#5f575b;--ink-3:#8a8186;
+  --wash:#f4f0f2;--line:#e6e0e3;--accent:#b23a6e;--accent-wash:#fbe6ee;
+  --board-line:#cfc7cc;--body2:#2a2327;--metal:#8a8186;
+  --ok:#2e7a4f;--warn:#9a5a06;--stop:#b42318;
+  --display:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161214;--ink:#f2edf0;--ink-2:#b4abb0;--ink-3:#8c8388;
+  --wash:#241e21;--line:#352d31;--accent:#ec8fb6;--accent-wash:#3b1f2c;
+  --board-line:#4a4044;--body2:#e8e2e5;--metal:#8c8388;
+  --ok:#72c79a;--warn:#e3a95a;--stop:#f08b80;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#161214;--ink:#f2edf0;--ink-2:#b4abb0;--ink-3:#8c8388;
+  --wash:#241e21;--line:#352d31;--accent:#ec8fb6;--accent-wash:#3b1f2c;
+  --board-line:#4a4044;--body2:#e8e2e5;--metal:#8c8388;
+  --ok:#72c79a;--warn:#e3a95a;--stop:#f08b80;color-scheme:dark;}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);}
+.page{max-width:60rem;margin:0 auto;padding-block:36px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px;}
+header{display:grid;gap:10px;}
+h1{font:600 1.9rem/1.1 var(--display);margin:0;text-wrap:balance;}
+h2{font:600 1.25rem/1.3 var(--display);margin:0;text-wrap:balance;}
+p{margin:0;max-width:68ch;}
+.lede{font-size:1.0625rem;}
+.meta{color:var(--ink-3);font-size:.85rem;display:flex;flex-wrap:wrap;gap:4px 14px;}
+section{display:grid;gap:16px;min-width:0;}
+a{color:var(--accent);}
+code{font:.85em var(--mono);}
+.muted{color:var(--ink-2);}
+.small{font-size:.875rem;}
+.stage{display:grid;gap:12px;}
+.seg{display:inline-flex;background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px;justify-self:start;}
+.seg button{border:0;background:none;border-radius:999px;padding:7px 15px;font:600 .88rem/1 var(--display);color:var(--ink-2);cursor:pointer;}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff;}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.canvas-wrap.side{aspect-ratio:16/10;}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.badge{position:absolute;top:10px;left:10px;font:600 .8rem/1 var(--display);padding:5px 9px;border-radius:999px;background:var(--accent-wash);color:var(--accent);}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+button.btn{font:600 .9rem/1 var(--display);color:var(--ink);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer;}
+button.btn.primary{background:var(--accent);color:#fff;border-color:transparent;}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;}
+.toggle{display:inline-flex;align-items:center;gap:7px;font:600 .82rem/1.2 var(--display);color:var(--ink-2);}
+.toggle input{accent-color:var(--accent);width:16px;height:16px;}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font:600 .9rem/1.3 var(--display);}
+.flow span{background:var(--wash);border-radius:999px;padding:6px 12px;}
+.flow .hot{background:var(--accent-wash);color:var(--accent);}
+.flow .arrow{background:none;color:var(--accent);padding:0 2px;}
+.verdict{display:grid;gap:6px;border-left:3px solid var(--accent);padding:2px 0 2px 18px;}
+.verdict b{color:var(--accent);font:600 1rem/1.4 var(--display);}
+.rows{overflow-x:auto;}
+.rows table{border-collapse:collapse;width:100%;font-size:.9rem;}
+.rows th{text-align:left;font-weight:600;color:var(--ink-2);padding:0 13px 7px 0;white-space:nowrap;}
+.rows td{padding:7px 13px 7px 0;vertical-align:top;}
+.rows td:last-child,.rows th:last-child{padding-right:0;}
+.rows tr[data-pick] td{background:var(--accent-wash);}
+.rows tr[data-pick] td:first-child{border-radius:6px 0 0 6px;padding-left:8px;}
+.rows tr[data-pick] td:last-child{border-radius:0 6px 6px 0;}
+.rows .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.metric{display:grid;gap:3px;padding:12px;background:var(--wash);border-radius:10px;}
+.metric b{font:600 .78rem/1.2 var(--display);color:var(--ink-3);}
+.metric .d{font-size:.84rem;color:var(--ink-2);}
+details{color:var(--ink-2);font-size:.875rem;}
+summary{cursor:pointer;}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;}}
+</style>
+
+<main class="page">
+  <header>
+    <h1>Rolling clock bot</h1>
+    <p class="lede">A little robot that <b>rolls on the whiteboard itself</b>, drawing as it goes. A spherical wheel holds it at a constant height (so no lift motor), and the marker <b>tilts one way to draw, the other way to erase</b> — the way a hand holds a pen. This page shows it from the <b>top</b> (rolling and drawing a clock) and the <b>side</b> (the tilt and the ball), and works out which drive is most effective.</p>
+    <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Rolling surface bot</span></p>
+  </header>
+
+  <section aria-label="Views">
+    <div class="seg" role="group" aria-label="View">
+      <button id="v-top" aria-pressed="true">Top view — rolling &amp; drawing</button>
+      <button id="v-side" aria-pressed="false">Side view — tilt to draw/erase</button>
+    </div>
+    <div class="stage">
+      <div class="canvas-wrap" id="wrap-top"><canvas id="cv-top" aria-label="Top view: the bot rolling on the board drawing a clock"></canvas><span class="badge" id="badge-top">drawing</span></div>
+      <div class="canvas-wrap side" id="wrap-side" hidden><canvas id="cv-side" aria-label="Side view: the marker tilting to draw or erase while a ball keeps constant height"></canvas><span class="badge" id="badge-side">draw tilt</span></div>
+      <div class="transport" id="ctl-top">
+        <button class="btn primary" id="play">Play</button>
+        <button class="btn" id="reset">Reset</button>
+        <label class="toggle"><input type="checkbox" id="drift"> Show drift (no re-homing)</label>
+        <label class="toggle">Drive
+          <select id="model">
+            <option value="omni">3-omni holonomic</option>
+            <option value="diff">Differential (2 wheel + ball)</option>
+            <option value="mec">4-mecanum</option>
+            <option value="ball">Ball-drive</option>
+          </select>
+        </label>
+      </div>
+      <div class="transport" id="ctl-side" hidden>
+        <button class="btn primary" id="mode">Switch to erase</button>
+        <span class="small muted">Draw: marker trails ~15° off vertical, like a hand. Erase: tilts the other way so the eraser end meets the board. The ball keeps the height fixed, so tilt alone sets contact — no lift motor.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-eff">
+    <h2 id="h-eff">Which drive is most effective?</h2>
+    <p>"Effective" here means five things, weighted: <b>fidelity</b> (can it draw any direction and tight curves — 35%), <b>accuracy</b> (how far it drifts over a clock — 30%), <b>simplicity</b> (motor count and build — 20%), <b>pen-height hold</b> (constant contact — 15%), and draw time. Simulated by planning the clock path (ink 1341 mm, pen-up moves 1884 mm, total travel 3226 mm) and modelling each drive's slip and holonomy.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Drive</th><th>Holonomic</th><th>Motors +tilt</th><th>Curve</th><th>Drift / clock</th><th>Drift if re-homed</th><th>Time</th><th class="n">Score</th></tr></thead>
+        <tbody>
+          <tr data-model="omni" data-pick><td><b>3-omni holonomic</b></td><td>yes</td><td class="n">3 +1</td><td>5/5</td><td class="n">65 mm</td><td class="n">19 mm</td><td class="n">32 s</td><td class="n">6.2</td></tr>
+          <tr data-model="ball"><td>Ball-drive (spherical)</td><td>yes</td><td class="n">3 +1</td><td>5/5</td><td class="n">81 mm</td><td class="n">24 mm</td><td class="n">36 s</td><td class="n">6.2</td></tr>
+          <tr data-model="mec"><td>4-mecanum</td><td>yes</td><td class="n">4 +1</td><td>4/5</td><td class="n">97 mm</td><td class="n">28 mm</td><td class="n">32 s</td><td class="n">5.4</td></tr>
+          <tr data-model="diff"><td>Differential (2 wheel + ball)</td><td>no</td><td class="n">2 +1</td><td>2/5</td><td class="n">32 mm</td><td class="n">9 mm</td><td class="n">27 s</td><td class="n">5.0</td></tr>
+          <tr><td class="muted">[ref] fixed five-bar arm</td><td>yes</td><td class="n">2 +1</td><td>5/5</td><td class="n">0 mm</td><td class="n">0 mm</td><td class="n">20 s</td><td class="n">9.7</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="verdict"><b>Drift is the decider, and it's brutal for a clock that redraws for hours.</b>
+      <p>With no position reference, odometry error grows with distance travelled — 32–97 mm over a single clock, so it walks off the board. The fix is to <b>re-home against the board edges every redraw</b> (drive into two perpendicular edges to zero position and heading), which bounds drift to one stroke's worth (~9–24 mm). A camera watching the bot closes the loop properly. The fixed arm has none of this — its angles are absolute, so it never drifts, which is why it tops the table. Among rolling drives, <b>a holonomic one (3-omni, or a driven ball) wins on drawing quality</b>; pure differential is simplest but can't do the curves and ticks cleanly.</p></div>
+  </section>
+
+  <section aria-labelledby="h-metrics">
+    <h2 id="h-metrics">What the simulation measured</h2>
+    <div class="metrics">
+      <div class="metric"><b>DRIFT</b><div class="d">slip × travel. The clock is ~3.2 m of rolling, so even 1% slip = 32 mm wander. The killer metric.</div></div>
+      <div class="metric"><b>HOLONOMY</b><div class="d">Can it move any direction without turning? Holonomic drives draw smooth curves; differential must arc or stop-turn.</div></div>
+      <div class="metric"><b>PATH OVERHEAD</b><div class="d">Pen-up moves (1884 mm) exceed ink (1341 mm), so stroke ordering matters — start from one side and sweep across.</div></div>
+      <div class="metric"><b>HEIGHT HOLD</b><div class="d">The ball keeps the chassis a fixed height off the board, so pressure is set by tilt alone — the lift motor disappears.</div></div>
+      <div class="metric"><b>MOTORS</b><div class="d">Fewer is simpler and lighter (less to drift). Differential 2, omni/ball 3, mecanum 4 — plus one tilt servo each.</div></div>
+      <div class="metric"><b>TIME</b><div class="d">~20–36 s per clock. All are well within a minute, so speed isn't the constraint — accuracy is.</div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-tilt">
+    <h2 id="h-tilt">The tilt, the ball, and no lift motor</h2>
+    <p>Holding the marker a few degrees off vertical (a trailing angle, like handwriting) draws a cleaner line than straight-down — it won't dig in or skip, and it tolerates small height changes. Tilting the <b>other</b> way brings the eraser end of the marker down. Because the spherical wheel fixes the ride height, the single tilt servo does both jobs — draw, erase, and lift — so you drop the separate Z motor your earlier designs needed. The side view shows it: watch the contact point and the tilt flip when you switch modes.</p>
+    <div class="flow" aria-label="constant height from the ball, then tilt sets draw or erase">
+      <span class="hot">ball → constant height</span><span class="arrow">→</span><span>tilt −15° = draw</span><span class="arrow">→</span><span>tilt +15° = erase</span><span class="arrow">→</span><span>one servo, no lift motor</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-prior">
+    <h2 id="h-prior">This already exists — borrow from it</h2>
+    <p>The closest prior art is <b>iRobot Root</b> (Harvard Wyss, patent US11529740B2) — a bot that rolls on a vertical magnetic whiteboard and does <b>exactly your tilt-to-draw, tilt-to-erase</b> with one motor turning a double-ended arm through three states (pen down, neutral, eraser down) with an angle sensor. Credit it in the pitch, and copy two tricks: put the <b>pen at the robot's centre of rotation</b> (so turning on the spot leaves a dot, not a smear) and <b>offset the eraser to the rear</b> (so turning while erasing doesn't wipe ahead of where it's going).</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Prior art</th><th>What it solves</th><th>Take</th></tr></thead>
+        <tbody>
+          <tr><td><b>iRobot Root</b> (US11529740B2)</td><td>Tilt draw/erase; drift via a surface-pull (Hall) sensor + edge detection, corrected per board</td><td>The whole mechanism + edge re-homing</td></tr>
+          <tr><td>CMU "Friction Force Explorers"</td><td>Mecanum drawbots localised by <b>overhead AprilTags</b> in the corners; pulse the pen motor so it doesn't burn out</td><td>Camera + tags = cheap closed loop</td></tr>
+          <tr><td>Dusty Robotics FieldPrinter</td><td>Construction layout at mm accuracy using an <b>external reference</b> (total station), not odometry</td><td>Confirms: absolute reference beats dead-reckoning</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">Prior art from the companion <a href="https://claude.ai/artifact/DE7tSVJYnyefa7GkchoWmH">drawing-arm research</a>. All three agree with the simulation: a surface bot needs an absolute position reference, which the fixed arm gets for free from its joint angles.</p>
+  </section>
+
+  <section aria-labelledby="h-eff2">
+    <h2 id="h-eff2">Rolling efficiently: start from one side</h2>
+    <p>Every millimetre the bot rolls costs time and drift, and the pen-up moves between strokes are more than half the travel. So order the strokes as a <b>sweep from one edge across to the other</b> (and draw the ring in one continuous loop), instead of hopping around. For the clock that cuts backtracking and keeps the wheel rolling one way — which also means less slip reversal, so less drift. The top view draws in that swept order.</p>
+  </section>
+
+  <section aria-labelledby="h-rec">
+    <h2 id="h-rec">Recommendation</h2>
+    <p>If the clock must <b>redraw reliably all evening</b>, the fixed arm wins on paper (zero drift) — but if you want the rolling bot for its whole-board reach and the elegant ball-plus-tilt, build a <b>holonomic drive (3-omni, or two drive wheels plus a ball caster) with Root-style edge re-homing every cycle</b>, and if you can, an <b>overhead camera with AprilTags</b> on the bot and the four corners (as CMU did) for a true closed loop. Keep the marker on one tilt servo over the ball, pen at the centre of rotation, eraser offset to the rear. And if the demo allows, <b>run the board flat on a table</b> — the patent's biggest drift term is gravity on a vertical board, and flat removes it. Differential is quickest to build and fine for a loose one-off drawing, but it fights you on curves and can't hold a clock in place without help.</p>
+    <details><summary>Notes &amp; next</summary><p style="margin-top:8px">Numbers from a path-planning + slip model over the clock toolpath (slip: differential 1%, omni 2%, mecanum 3%, ball 2.5% of distance; these are estimates — measure yours). Next on request: a re-homing routine, a camera-correction loop, or exporting the swept wheel-speed stream.</p></details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const BOARD=350,R=150,CX=175,CY=175;
+
+// ---- clock toolpath, ordered as a left->right sweep ----
+function clockStrokes(){const st=[];const ring=[];for(let i=0;i<=180;i++){const a=i/180*2*Math.PI;ring.push({x:CX+R*Math.cos(a),y:CY+R*Math.sin(a)});}st.push(ring);
+  for(let h=0;h<12;h++){const a=h/12*2*Math.PI,r0=h%3===0?R*0.8:R*0.9;st.push([{x:CX+r0*Math.cos(a),y:CY+r0*Math.sin(a)},{x:CX+R*0.98*Math.cos(a),y:CY+R*0.98*Math.sin(a)}]);}
+  const now=new Date(),hr=(now.getHours()%12)+now.getMinutes()/60,mn=now.getMinutes();
+  const ah=hr/12*2*Math.PI-Math.PI/2,am=mn/60*2*Math.PI-Math.PI/2;
+  st.push([{x:CX,y:CY},{x:CX+R*0.5*Math.cos(ah),y:CY-R*0.5*Math.sin(ah)}]);
+  st.push([{x:CX,y:CY},{x:CX+R*0.8*Math.cos(am),y:CY-R*0.8*Math.sin(am)}]);return st;}
+function buildPath(){const st=clockStrokes().sort((a,b)=>Math.min(a[0].x,a[a.length-1].x)-Math.min(b[0].x,b[b.length-1].x));
+  const pts=[];let first=true;for(const s of st){let fp=true;for(const p of s){pts.push({x:p.x,y:p.y,pen:fp?0:1});fp=false;}first=false;}return pts;}
+let path=buildPath();
+
+// ---- top view ----
+const cvT=$("#cv-top"),ctxT=cvT.getContext("2d");
+let tScale=1,tOx=0,tOy=0;
+function fitT(){const r=cvT.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cvT.width=r.width*dpr;cvT.height=r.height*dpr;ctxT.setTransform(dpr,0,0,dpr,0,0);
+  tScale=Math.min(r.width,r.height)/(BOARD+70);tOx=(r.width-BOARD*tScale)/2;tOy=(r.height-BOARD*tScale)/2;drawTop();}
+function PT(x,y){return[tOx+x*tScale,tOy+y*tScale];}
+let anim={on:false,i:0,last:0,acc:0},trace=[],drX=0,drY=0;
+const SLIP={omni:0.02,diff:0.01,mec:0.03,ball:0.025};
+function drawTop(){const r=cvT.getBoundingClientRect();ctxT.clearRect(0,0,r.width,r.height);
+  // board
+  const bl=PT(0,BOARD),tr=PT(BOARD,0);ctxT.strokeStyle=css("--board-line");ctxT.lineWidth=2;ctxT.strokeRect(PT(0,0)[0],PT(0,0)[1],BOARD*tScale,BOARD*tScale);
+  ctxT.fillStyle=css("--ink-3");ctxT.font="11px "+css("--display");ctxT.fillText("35 cm",PT(6,BOARD-8)[0],PT(0,BOARD-8)[1]);
+  // faint planned path
+  ctxT.strokeStyle=css("--line");ctxT.lineWidth=1;ctxT.beginPath();for(let i=1;i<path.length;i++){const a=PT(path[i-1].x,path[i-1].y),b=PT(path[i].x,path[i].y);if(path[i].pen===1){ctxT.moveTo(a[0],a[1]);ctxT.lineTo(b[0],b[1]);}}ctxT.stroke();
+  // drawn trace
+  ctxT.strokeStyle=css("--accent");ctxT.lineWidth=2.4;ctxT.lineCap="round";ctxT.beginPath();for(const s of trace){const a=PT(s.x0,s.y0),b=PT(s.x,s.y);ctxT.moveTo(a[0],a[1]);ctxT.lineTo(b[0],b[1]);}ctxT.stroke();
+  // chassis
+  const cur=path[Math.min(anim.i,path.length-1)];let bx=cur.x+drX,by=cur.y+drY;const c=PT(bx,by);const sz=22*tScale;
+  ctxT.fillStyle=css("--wash");ctxT.strokeStyle=css("--body2");ctxT.lineWidth=2;
+  ctxT.beginPath();ctxT.roundRect(c[0]-sz,c[1]-sz,sz*2,sz*2,6);ctxT.fill();ctxT.stroke();
+  // wheels (dots) per model
+  const m=$("#model").value;ctxT.fillStyle=css("--metal");const wr=4;
+  const pos=m==="diff"?[[-sz,0],[sz,0]]:m==="mec"?[[-sz,-sz],[sz,-sz],[-sz,sz],[sz,sz]]:[[0,-sz],[-sz*0.87,sz*0.5],[sz*0.87,sz*0.5]];
+  for(const[dx,dy]of pos){ctxT.beginPath();ctxT.arc(c[0]+dx,c[1]+dy,wr,0,2*Math.PI);ctxT.fill();}
+  // pen at centre
+  const down=anim.on?cur.pen===1:0;ctxT.fillStyle=down?css("--accent"):css("--ink-3");ctxT.beginPath();ctxT.arc(c[0],c[1],down?5:3.5,0,2*Math.PI);ctxT.fill();
+  $("#badge-top").textContent=down?"drawing":"moving";
+}
+function tickTop(ts){if(!anim.on)return;const dt=Math.min(0.05,(ts-anim.last)/1000||0);anim.last=ts;anim.acc+=140*dt;
+  while(anim.acc>0&&anim.i<path.length-1){const a=path[anim.i],b=path[anim.i+1],d=Math.hypot(b.x-a.x,b.y-a.y)||0.001;
+    if(anim.acc>=d){anim.acc-=d;anim.i++;
+      if($("#drift").checked){const k=SLIP[$("#model").value];drX+=(Math.random()-0.5)*k*d*2;drY+=(Math.random()-0.5)*k*d*2;}
+      if(path[anim.i].pen===1)trace.push({x:path[anim.i].x+drX,y:path[anim.i].y+drY,x0:path[anim.i-1].x+drX,y0:path[anim.i-1].y+drY});
+    }else break;}
+  drawTop();
+  if(anim.i>=path.length-1){anim.on=false;$("#play").textContent="Play";return;}requestAnimationFrame(tickTop);}
+
+// ---- side view ----
+const cvS=$("#cv-side"),ctxS=cvS.getContext("2d");
+let mode="draw",tilt=-1,tiltTarget=-1;
+function fitS(){const r=cvS.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cvS.width=r.width*dpr;cvS.height=r.height*dpr;ctxS.setTransform(dpr,0,0,dpr,0,0);drawSide();}
+function drawSide(){const r=cvS.getBoundingClientRect();ctxS.clearRect(0,0,r.width,r.height);
+  const W=r.width,Hh=r.height,surfY=Hh*0.72,cxp=W*0.5;
+  // board surface
+  ctxS.strokeStyle=css("--board-line");ctxS.lineWidth=3;ctxS.beginPath();ctxS.moveTo(W*0.1,surfY);ctxS.lineTo(W*0.9,surfY);ctxS.stroke();
+  ctxS.fillStyle=css("--ink-3");ctxS.font="12px "+css("--display");ctxS.fillText("whiteboard surface",W*0.1,surfY+22);
+  // ball keeping height
+  const ballR=22,bodyH=56,bodyW=120,ride=ballR*2;
+  const ballCx=cxp-44,ballCy=surfY-ballR;
+  ctxS.fillStyle=css("--wash");ctxS.strokeStyle=css("--metal");ctxS.lineWidth=2;ctxS.beginPath();ctxS.arc(ballCx,ballCy,ballR,0,2*Math.PI);ctxS.fill();ctxS.stroke();
+  ctxS.strokeStyle=css("--metal");ctxS.lineWidth=1;ctxS.beginPath();ctxS.moveTo(ballCx-ballR*0.6,ballCy-ballR*0.6);ctxS.lineTo(ballCx+ballR*0.6,ballCy+ballR*0.6);ctxS.stroke();
+  // body (chassis) sitting at constant height
+  const bodyY=surfY-ride-bodyH;
+  ctxS.fillStyle=css("--wash");ctxS.strokeStyle=css("--body2");ctxS.lineWidth=2.5;ctxS.beginPath();ctxS.roundRect(cxp-bodyW/2,bodyY,bodyW,bodyH,8);ctxS.fill();ctxS.stroke();
+  // height dimension
+  ctxS.strokeStyle=css("--ink-3");ctxS.setLineDash([4,3]);ctxS.lineWidth=1;ctxS.beginPath();ctxS.moveTo(cxp+bodyW/2+14,bodyY+bodyH);ctxS.lineTo(cxp+bodyW/2+14,surfY);ctxS.stroke();ctxS.setLineDash([]);
+  ctxS.fillStyle=css("--ink-3");ctxS.fillText("constant height",cxp+bodyW/2+20,(bodyY+bodyH+surfY)/2);
+  // marker: pivot under the body, tilts about pivot; length set so the tip meets the surface
+  const pivX=cxp+28,pivY=bodyY+bodyH;
+  const ang=Math.PI/2+tilt*(16*Math.PI/180); // 90deg = straight down; tilt ±16deg
+  const markLen=(surfY-pivY)/Math.sin(ang);
+  const tipX=pivX+markLen*Math.cos(ang),tipY=surfY;
+  // marker body (two ends: pen nib + eraser)
+  const penDown=mode==="draw";
+  ctxS.lineCap="round";
+  // the far (up) end is whichever tool is NOT down
+  const upX=pivX-24*Math.cos(ang),upY=pivY-24*Math.sin(ang);
+  ctxS.strokeStyle=css("--body2");ctxS.lineWidth=7;ctxS.beginPath();ctxS.moveTo(upX,upY);ctxS.lineTo(tipX,tipY);ctxS.stroke();
+  // tip colour: pen (accent) if draw, eraser (warn, fat) if erase
+  ctxS.strokeStyle=penDown?css("--accent"):css("--warn");ctxS.lineWidth=penDown?5:11;ctxS.beginPath();ctxS.moveTo(tipX-14*Math.cos(ang),tipY-14*Math.sin(ang));ctxS.lineTo(tipX,tipY);ctxS.stroke();
+  // top end (the other tool)
+  ctxS.strokeStyle=penDown?css("--warn"):css("--accent");ctxS.lineWidth=penDown?9:4;ctxS.beginPath();ctxS.moveTo(upX,upY);ctxS.lineTo(upX-10*Math.cos(ang),upY-10*Math.sin(ang));ctxS.stroke();
+  // contact mark
+  ctxS.fillStyle=penDown?css("--accent"):css("--warn");ctxS.beginPath();ctxS.arc(tipX,surfY,penDown?3:7,0,2*Math.PI);ctxS.fill();
+  // angle label
+  ctxS.fillStyle=css("--ink-2");ctxS.font="600 13px "+css("--display");ctxS.fillText(penDown?"draw: trailing ~15°":"erase: tilt back, eraser down",W*0.1,Hh*0.12);
+  $("#badge-side").textContent=penDown?"draw tilt":"erase tilt";
+}
+let sideAnim=false;
+function tickSide(){tilt+=(tiltTarget-tilt)*0.18;drawSide();if(Math.abs(tiltTarget-tilt)>0.01){requestAnimationFrame(tickSide);}else sideAnim=false;}
+
+// ---- view switching ----
+function showTop(t){$("#v-top").setAttribute("aria-pressed",t);$("#v-side").setAttribute("aria-pressed",!t);
+  $("#wrap-top").hidden=!t;$("#ctl-top").hidden=!t;$("#wrap-side").hidden=t;$("#ctl-side").hidden=t;
+  if(t)fitT();else fitS();}
+$("#v-top").addEventListener("click",()=>showTop(true));
+$("#v-side").addEventListener("click",()=>showTop(false));
+$("#play").addEventListener("click",()=>{if(anim.i>=path.length-1||!anim.on){if(anim.i>=path.length-1){anim.i=0;trace=[];drX=drY=0;}anim.on=true;$("#play").textContent="Pause";anim.last=performance.now();requestAnimationFrame(tickTop);}else{anim.on=false;$("#play").textContent="Play";}});
+$("#reset").addEventListener("click",()=>{anim.on=false;anim.i=0;anim.acc=0;trace=[];drX=drY=0;$("#play").textContent="Play";drawTop();});
+$("#drift").addEventListener("change",()=>{});
+$("#model").addEventListener("change",()=>{document.querySelectorAll("tr[data-model]").forEach(tr=>tr.removeAttribute("data-pick"));const tr=document.querySelector('tr[data-model="'+$("#model").value+'"]');if(tr)tr.setAttribute("data-pick","");drawTop();});
+$("#mode").addEventListener("click",()=>{mode=mode==="draw"?"erase":"draw";tiltTarget=mode==="draw"?-1:1;$("#mode").textContent=mode==="draw"?"Switch to erase":"Switch to draw";if(!sideAnim){sideAnim=true;requestAnimationFrame(tickSide);}});
+
+new ResizeObserver(()=>{if(!$("#wrap-top").hidden)fitT();else fitS();}).observe($("#wrap-top"));
+new ResizeObserver(()=>{if(!$("#wrap-side").hidden)fitS();}).observe($("#wrap-side"));
+fitT();
+</script>
