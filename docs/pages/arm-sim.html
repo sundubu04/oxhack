@@ -95,7 +95,7 @@ summary{cursor:pointer;}
 <main class="page">
   <header>
     <h1>Clock arm simulator</h1>
-    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing a <b>20 cm clock centred</b> on your 35 × 35 cm whiteboard (it doesn't fill the board; the margin is deliberate, and keeps the arm small). The pen tip rides on a <b>rolling ball</b> that holds a constant height, and the marker <b>tilts to lift, draw and erase</b> — no lift motor. The arm (<b>160 mm links</b>) stays small, so small motors. Read the base and elbow angles, dexterity and tip error live.</p>
+    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing a <b>20 cm clock centred</b> on your 35 × 35 cm whiteboard (the margin is deliberate). The pen tip rides on a <b>rolling ball</b> that holds a constant height, and the marker <b>tilts to lift, draw and erase</b> — no lift motor. With <b>200 mm links</b> and the base ~90 mm below the board, the clock sits right in the arm's sweet spot. Read the base and elbow angles, dexterity and tip error live.</p>
     <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Serial 2-link arm + rolling-ball tip</span><span>Output: base°, elbow°, tilt, pressure</span></p>
   </header>
 
@@ -127,10 +127,10 @@ summary{cursor:pointer;}
         <div class="ctl" id="custom-wrap" hidden><label for="custom">Vectors in — what "ask Claude" returns</label>
           <textarea id="custom" placeholder='M10 10 L90 10 L50 90 Z   or   [[[10,10],[90,10],[50,90]]]'></textarea></div>
         <div class="row2">
-          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">160</span></label><input type="range" id="l1" min="80" max="340" value="160"></div>
-          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">160</span></label><input type="range" id="l2" min="80" max="340" value="160"></div>
+          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">200</span></label><input type="range" id="l1" min="80" max="340" value="200"></div>
+          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">200</span></label><input type="range" id="l2" min="80" max="340" value="200"></div>
         </div>
-        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">30</span></label><input type="range" id="standoff" min="0" max="200" value="30"></div>
+        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">90</span></label><input type="range" id="standoff" min="0" max="240" value="90"></div>
         <button id="optimise" style="justify-self:start">Optimise links for this clock</button>
         <div class="ctl"><label for="fill">Clock size on board<span class="v" id="fillv">57</span></label><input type="range" id="fill" min="30" max="98" value="57"></div>
         <div class="ctl"><label for="pressure">Pen pressure (tilt firmness)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
@@ -149,20 +149,20 @@ summary{cursor:pointer;}
   </section>
 
   <section aria-labelledby="h-opt">
-    <h2 id="h-opt">Link length for a centred clock (least motor torque)</h2>
-    <p>You don't need to cover the whole board, so the arm only has to reach the clock — but centring the clock pushes it to the middle of the board, so the links are a little longer than for a clock tucked near the base. Base mounted ~30 mm below the board, centred; equal links are optimal:</p>
+    <h2 id="h-opt">200 mm links — mount the base to match</h2>
+    <p>With 200 mm links drawing a centred 200 mm clock, the one thing to get right is <b>how far below the board the base sits</b>: too close and the clock's bottom edge folds the elbow near its singularity; too far and the top edge over-stretches it. There's a sweet spot where the whole clock sits in the arm's best-conditioned band:</p>
     <div class="rows">
       <table>
-        <thead><tr><th>Clock (centred)</th><th>L1 = L2</th><th>Reach</th><th>Worst dexterity</th><th>Motor torque vs 250 mm arm</th></tr></thead>
+        <thead><tr><th>Base below board</th><th>Worst dexterity on clock</th><th>Elbow range</th><th>Note</th></tr></thead>
         <tbody>
-          <tr><td class="n">150 mm</td><td class="n">155 mm</td><td class="n">310 mm</td><td class="n">0.76</td><td class="n">38%</td></tr>
-          <tr data-pick><td class="n">200 mm</td><td class="n">160 mm</td><td class="n">320 mm</td><td class="n">0.58</td><td class="n">41%</td></tr>
-          <tr><td class="n">250 mm</td><td class="n">170 mm</td><td class="n">340 mm</td><td class="n">0.46</td><td class="n">46%</td></tr>
-          <tr><td class="n">300 mm</td><td class="n">180 mm</td><td class="n">360 mm</td><td class="n">0.33</td><td class="n">52%</td></tr>
+          <tr><td class="n">30 mm</td><td class="n">0.51</td><td>81°–150°</td><td>clock too near the base — folded</td></tr>
+          <tr><td class="n">60 mm</td><td class="n">0.64</td><td>63°–140°</td><td>good</td></tr>
+          <tr data-pick><td class="n">90 mm</td><td class="n">0.75</td><td>48°–131°</td><td>sweet spot — best conditioning</td></tr>
+          <tr><td class="n">120 mm</td><td class="n">0.31</td><td>35°–118°</td><td>far edge over-stretched</td></tr>
         </tbody>
       </table>
     </div>
-    <p><b>Recommendation: a 200 mm clock centred → L1 = L2 = 160 mm, base 30 mm below the board.</b> It leaves ~7.5 cm of margin all round, uses only ~40% of the torque of a whole-board arm (small, cheap motors, no sag), and the short lever keeps tip error low. Equal links are optimal (for a fixed L1²+L2² the product L1·L2, which sets dexterity, peaks when they're equal). A bigger centred clock drops the near-edge dexterity (its bottom nears the base), so raise the standoff if you go past 200 mm. The spec sheet has the print dimensions.</p>
+    <p><b>Recommendation: L1 = L2 = 200 mm, base 90 mm below the board, 200 mm clock centred.</b> That puts worst-case dexterity at 0.75 (elbow 48°–131°) — better-conditioned than a shorter arm, with 400 mm of reach to spare. The cost of the longer links is a bit more tip error (longer lever) and ~64% of a whole-board arm's torque, so still use geared servos or steppers. The spec sheet has the print dimensions.</p>
   </section>
 
   <section aria-labelledby="h-mech">
@@ -250,7 +250,7 @@ function ik(x,y,L1,L2,up){const r2=x*x+y*y,r=Math.sqrt(r2);
   const s2=Math.sqrt(1-c2*c2)*(up?1:-1),t2=Math.atan2(s2,c2);
   return{t1:Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2),t2,dex:Math.sqrt(1-c2*c2)};}
 
-const S={L1:160,L2:160,standoff:30,fill:57,pressure:60,res:0.1,speed:160,preset:"clock",
+const S={L1:200,L2:200,standoff:90,fill:57,pressure:60,res:0.1,speed:160,preset:"clock",
   fourier:false,terms:40,showcircles:true,elbow:true,showdex:true,showerr:false,custom:""};
 let seq=[],angles=[],worstDex=0,covered=true;
 let anim={on:false,i:0,mode:"draw",last:0,acc:0,flip:0};
