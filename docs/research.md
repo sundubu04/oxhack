@@ -62,9 +62,46 @@ So one coherent build can be entered for the main Time prize **and** up to six s
 
 ## Open-source resources
 
-Filled from the resources agent. Licence noted; flag anything that blocks commercial or hosted use.
+From the resources agent, 24 Oct. Licences noted; **FLAG** = limits commercial/hosted use or has a catch. Nothing here was code-reviewed, and most repos were created after 21 Oct — treat as starting points, not trusted dependencies.
 
-_(pending — resources agent running)_
+### The space is already crowded — so a plain checker won't win
+
+Within three days, many public "is my site affected" tools launched. A yet-another header checker is **not** differentiated. Our edge has to be the data/time/prediction layer and the end-user decision, not the lookup.
+
+- **Passive header checkers:** [Secure the Web](https://securetheweb.org) (ProjectDiscovery), [Brandefense](https://atlas.brandefense.io/php-vulnerability-check), an [Eye Security Chrome/Edge extension](https://chromewebstore.google.com/detail/php2shell-checker/dakblmoboeclnnlddlcpcaoeecannhae) (closed source).
+- **Version-paste sites:** php2shellcheck.com, [Arvion](https://arvion.ai/tools/php2shell), [simgen](https://simgen.dev/php-patch-check/), [php2shell.uk](https://php2shell.uk/checker).
+- **Active testers (not for us):** [Aikido](https://php2shell.aikido.io/), [Pentest-Tools](https://pentest-tools.com/network-vulnerability-scanning/php2shell-scanner).
+- **Open-source browser extensions (MIT):** [nocerainfosec](https://github.com/nocerainfosec/php2shell-checker), [newtro](https://github.com/newtro/php2shell-site-check), [sonuoffsec](https://github.com/sonuoffsec/php2shell-detector), [dinie](https://github.com/dinie/php2shellguard) — good references for the extension shell if we build #1. No consumer bot found.
+
+### The data we'd actually build on (all passive / public, permissive)
+
+| Resource | Licence | Use for us |
+| --- | --- | --- |
+| [OSV.dev](https://osv.dev/vulnerability/CVE-2026-109618) + distro trackers ([Debian](https://security-tracker.debian.org/tracker/CVE-2026-109618), [Ubuntu](https://ubuntu.com/security/CVE-2026-109618), [Rocky via OSV]) | Apache-2.0 | Map a host's distro/package to fixed-or-not — **avoids false "vulnerable" on backported builds** (the version banner lies) |
+| [endoflife.date API](https://endoflife.date/api/v1/products/php) | MIT | "Your PHP branch is end-of-life" message; 8.1 EOL 31 Dec 2025 |
+| [EPSS API](https://api.first.org/data/v1/epss?cve=CVE-2026-109618,CVE-2026-109619) | public | Exploitation-probability score **over time** — the predictive signal for the Time/HRT angle (-109618 = 0.116, 96th pct on 23 Oct) |
+| [NVD](https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2026-109618) / [CISA KEV JSON](https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json) | public | Scores, CPEs, an urgency badge (neither CVE in KEV as of 23 Oct) |
+| [wappalyzergo](https://github.com/projectdiscovery/wappalyzergo) / [httpx](https://github.com/projectdiscovery/httpx) | MIT | Read PHP version + CMS from headers passively, in a backend |
+| [enthec/webappanalyzer](https://github.com/enthec/webappanalyzer) | GPL-3.0 (share-alike) | The fingerprint dataset behind the above |
+| [NCSC-NL/php2shell](https://github.com/NCSC-NL/php2shell) | EUPL-1.2 | Machine-readable list of affected products/appliances (SPDX) — "is my NAS/router affected?" |
+| [HIBP Pwned Passwords](https://haveibeenpwned.com/API/v3) | free, no key | Password-strength step (k-anonymity), for the change-password feature |
+| [W3C change-password URL](https://www.w3.org/TR/change-password-url/) | W3C | Deep-link a user straight to a site's change-password page |
+| [crt.sh](https://crt.sh) / [certspotter](https://github.com/SSLMate/certspotter) | GPL-3.0 / MPL-2.0 | CT-log check for a user's own domain (memory-leak hygiene) |
+
+### Exposure numbers (for the "problem" board)
+
+- Shodan 21 Oct (via [Black Kite](https://blackkite.com/blog/php2shell-two-critical-remote-code-execution-vulnerabilities-in-the-php-core-)): ~1.90M PHP hosts; ~1.37M disclose an affected version, ~526K hide it; 72.5% of disclosers on end-of-life branches.
+- [W3Techs](https://w3techs.com/technologies/details/pl-php): PHP on 70.3% of sites with a known server-side language.
+
+### Signatures / detection rules (if we ever go owner-consented)
+
+OWASP CRS PRs [#4896](https://github.com/coreruleset/coreruleset/pull/4896) and [#4899](https://github.com/coreruleset/coreruleset/pull/4899) (the latter flags a **leaked PHPSESSID response cookie** — the memory-disclosure tell), [corelight/php2shell-detect](https://github.com/corelight/php2shell-detect) (BSD-3, Zeek + Suricata), [Lexsah/php2shell-detection](https://github.com/Lexsah/php2shell-detection) (YARA/Sigma/Suricata, unvetted). Owner-consented local checkers: [MakFly/php2shell-check](https://github.com/MakFly/php2shell-check), [aancw](https://github.com/aancw/php2shell-scanner) (MIT). **Avoid WPScan** (paid for hosted/commercial), droopescan (AGPL), Patchstack (paid). **Wordfence Intelligence v2 feed** is free for commercial use with attribution (WordPress plugin vulns).
+
+### Open conflicts to not overstate on stage
+
+- Exploitation-in-the-wild reports conflict (watchTowr honeypots on 21 Oct per some, none per others; an attempt logged 17 Oct). Say "exploited in the wild, reports vary" and cite.
+- The PHPSESSID heap-leak detail is in CRS PR #4899, not the php-src advisory. NVD scores v3.1 9.8 vs the CNA's v4 9.2.
+- CVE-2026-115560 has no advisory/patch yet.
 
 ## Precedents: how past vulnerabilities reached the public
 
