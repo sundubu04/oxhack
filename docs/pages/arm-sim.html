@@ -95,7 +95,7 @@ summary{cursor:pointer;}
 <main class="page">
   <header>
     <h1>Clock arm simulator</h1>
-    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing on your <b>35 × 35 cm whiteboard</b>. The pen tip rides on a <b>rolling ball</b> that holds it at a constant height as the arm sweeps, and the marker <b>tilts to lift, draw and erase</b>, so there's no lift motor. Tune the two links, watch the reachable ring cover the board, read the base and elbow angles, and check whether the accuracy is good enough at this size.</p>
+    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing a <b>20 cm clock centred</b> on your 35 × 35 cm whiteboard (it doesn't fill the board; the margin is deliberate, and keeps the arm small). The pen tip rides on a <b>rolling ball</b> that holds a constant height, and the marker <b>tilts to lift, draw and erase</b> — no lift motor. The arm (<b>160 mm links</b>) stays small, so small motors. Read the base and elbow angles, dexterity and tip error live.</p>
     <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Serial 2-link arm + rolling-ball tip</span><span>Output: base°, elbow°, tilt, pressure</span></p>
   </header>
 
@@ -116,7 +116,7 @@ summary{cursor:pointer;}
           <div><div class="k">Elbow θ₂</div><div class="val"><span id="r-e">—</span><small>°</small></div></div>
           <div><div class="k">Pen (tilt)</div><div class="val" id="r-p">up</div></div>
           <div><div class="k">Worst dexterity</div><div class="val" id="r-d">—</div></div>
-          <div><div class="k">Board covered</div><div class="val" id="r-c">—</div></div>
+          <div><div class="k">Drawing reachable</div><div class="val" id="r-c">—</div></div>
           <div><div class="k">Tip error (est.)</div><div class="val" id="r-err">—</div></div>
         </div>
         <figure class="eff"><div class="ew"><canvas id="cv-eff" aria-label="End effector side view: a ball rolls on the board to hold height while the marker tilts to draw, lift or erase"></canvas></div><figcaption>End effector (side view): the ball rolls on the board to hold height; the marker tilts to draw, lift or erase — no lift motor.</figcaption></figure>
@@ -127,12 +127,12 @@ summary{cursor:pointer;}
         <div class="ctl" id="custom-wrap" hidden><label for="custom">Vectors in — what "ask Claude" returns</label>
           <textarea id="custom" placeholder='M10 10 L90 10 L50 90 Z   or   [[[10,10],[90,10],[50,90]]]'></textarea></div>
         <div class="row2">
-          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">250</span></label><input type="range" id="l1" min="120" max="340" value="250"></div>
-          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">250</span></label><input type="range" id="l2" min="120" max="340" value="250"></div>
+          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">160</span></label><input type="range" id="l1" min="80" max="340" value="160"></div>
+          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">160</span></label><input type="range" id="l2" min="80" max="340" value="160"></div>
         </div>
-        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">100</span></label><input type="range" id="standoff" min="20" max="240" value="100"></div>
-        <button id="optimise" style="justify-self:start">Optimise links for this standoff</button>
-        <div class="ctl"><label for="fill">Drawing fills board<span class="v" id="fillv">85</span></label><input type="range" id="fill" min="30" max="98" value="85"></div>
+        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">30</span></label><input type="range" id="standoff" min="0" max="200" value="30"></div>
+        <button id="optimise" style="justify-self:start">Optimise links for this clock</button>
+        <div class="ctl"><label for="fill">Clock size on board<span class="v" id="fillv">57</span></label><input type="range" id="fill" min="30" max="98" value="57"></div>
         <div class="ctl"><label for="pressure">Pen pressure (tilt firmness)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
         <div class="ctl"><label for="res">Actuator (sets tip error)</label>
           <select id="res"><option value="1">Hobby servo (~1°)</option><option value="0.3">Digital metal-gear (~0.3°)</option><option value="0.1">Servo + 3:1 reduction (~0.1°)</option><option value="0.045">Stepper + microstep + belt (~0.05°)</option></select></div>
@@ -149,21 +149,20 @@ summary{cursor:pointer;}
   </section>
 
   <section aria-labelledby="h-opt">
-    <h2 id="h-opt">Optimal link length for a 35 × 35 cm board</h2>
-    <p>Base mounted below the board's bottom edge, centred, with standoff <code>s</code>. A full grid search lands on <b>equal links every time</b>: L1 = L2 = L, with <code>L = √(r_min² + r_max²) / 2</code> (<code>r_min = s</code>, <code>r_max = √(175² + (s+350)²)</code>). Bigger standoff buys accuracy but needs longer links:</p>
+    <h2 id="h-opt">Link length for a centred clock (least motor torque)</h2>
+    <p>You don't need to cover the whole board, so the arm only has to reach the clock — but centring the clock pushes it to the middle of the board, so the links are a little longer than for a clock tucked near the base. Base mounted ~30 mm below the board, centred; equal links are optimal:</p>
     <div class="rows">
       <table>
-        <thead><tr><th>Standoff s</th><th>L1 = L2</th><th>Reach (L1+L2)</th><th>Worst dexterity</th><th>Elbow range</th></tr></thead>
+        <thead><tr><th>Clock (centred)</th><th>L1 = L2</th><th>Reach</th><th>Worst dexterity</th><th>Motor torque vs 250 mm arm</th></tr></thead>
         <tbody>
-          <tr><td class="n">40 mm</td><td class="n">215 mm</td><td class="n">429 mm</td><td class="n">0.19</td><td>11°–169°</td></tr>
-          <tr><td class="n">60 mm</td><td class="n">225 mm</td><td class="n">450 mm</td><td class="n">0.26</td><td>15°–165°</td></tr>
-          <tr data-pick><td class="n">100 mm</td><td class="n">250 mm</td><td class="n">500 mm</td><td class="n">0.40</td><td>23°–157°</td></tr>
-          <tr><td class="n">120 mm</td><td class="n">258 mm</td><td class="n">516 mm</td><td class="n">0.45</td><td>27°–153°</td></tr>
-          <tr><td class="n">150 mm</td><td class="n">275 mm</td><td class="n">551 mm</td><td class="n">0.52</td><td>31°–149°</td></tr>
+          <tr><td class="n">150 mm</td><td class="n">155 mm</td><td class="n">310 mm</td><td class="n">0.76</td><td class="n">38%</td></tr>
+          <tr data-pick><td class="n">200 mm</td><td class="n">160 mm</td><td class="n">320 mm</td><td class="n">0.58</td><td class="n">41%</td></tr>
+          <tr><td class="n">250 mm</td><td class="n">170 mm</td><td class="n">340 mm</td><td class="n">0.46</td><td class="n">46%</td></tr>
+          <tr><td class="n">300 mm</td><td class="n">180 mm</td><td class="n">360 mm</td><td class="n">0.33</td><td class="n">52%</td></tr>
         </tbody>
       </table>
     </div>
-    <p><b>Recommendation: L1 = L2 ≈ 250 mm, standoff ≈ 100 mm</b> (reach ~500 mm). The whole board is reachable with the elbow between ~23° and ~157°, clear of both singularities, and the arm is no bigger than it needs to be. Equal links win because, for a fixed L1²+L2², the product L1·L2 (which sets dexterity) is largest when the links are equal, and equal links put the inner reach at 0 so no near point is cut off.</p>
+    <p><b>Recommendation: a 200 mm clock centred → L1 = L2 = 160 mm, base 30 mm below the board.</b> It leaves ~7.5 cm of margin all round, uses only ~40% of the torque of a whole-board arm (small, cheap motors, no sag), and the short lever keeps tip error low. Equal links are optimal (for a fixed L1²+L2² the product L1·L2, which sets dexterity, peaks when they're equal). A bigger centred clock drops the near-edge dexterity (its bottom nears the base), so raise the standoff if you go past 200 mm. The spec sheet has the print dimensions.</p>
   </section>
 
   <section aria-labelledby="h-mech">
@@ -251,13 +250,13 @@ function ik(x,y,L1,L2,up){const r2=x*x+y*y,r=Math.sqrt(r2);
   const s2=Math.sqrt(1-c2*c2)*(up?1:-1),t2=Math.atan2(s2,c2);
   return{t1:Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2),t2,dex:Math.sqrt(1-c2*c2)};}
 
-const S={L1:250,L2:250,standoff:100,fill:85,pressure:60,res:1,speed:160,preset:"clock",
+const S={L1:160,L2:160,standoff:30,fill:57,pressure:60,res:0.1,speed:160,preset:"clock",
   fourier:false,terms:40,showcircles:true,elbow:true,showdex:true,showerr:false,custom:""};
 let seq=[],angles=[],worstDex=0,covered=true;
 let anim={on:false,i:0,mode:"draw",last:0,acc:0,flip:0};
 let eraseList=[],eraseAng=[],trace=[];
 let scale=1,ox=0,oy=0,effState="up";
-function boardCY(){return S.standoff+H;}
+function boardCY(){return S.standoff+H;} // clock centred on the board
 function drawR(){return S.fill/100*H;}
 function tipErr(){return (S.L1+S.L2)*(S.res/R2D);}
 
@@ -304,9 +303,9 @@ function build(){
   if(S.fourier){fourierC=buildFourier(strokes);let first=true;for(let i=0;i<=720;i++){const p=fourierPoint(fourierC,S.terms,i/720);seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}
   else{fourierC=null;for(const s of strokes){const rs=resample(s,2.0);let first=true;for(const p of rs){seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}}
   angles=seq.map(p=>{const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);return s?{t1:s.t1,t2:s.t2,ok:true}:{ok:false};});
-  let mn=1,cov=true,n=11;for(let i=0;i<=n;i++)for(let j=0;j<=n;j++){const x=-H+2*H*i/n,y=S.standoff+BOARD*j/n;const s=ik(x,y,S.L1,S.L2,S.elbow);if(!s){cov=false;mn=0;}else mn=Math.min(mn,s.dex);}
+  let mn=1,cov=true;for(const p of seq){const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);if(!s){cov=false;mn=0;}else mn=Math.min(mn,s.dex);}
   worstDex=mn;covered=cov;
-  const rb=$("#reach");rb.textContent=covered?"board covered":"board NOT covered";rb.dataset.tone=covered?"ok":"warn";
+  const rb=$("#reach");rb.textContent=covered?"drawing reachable":"out of reach";rb.dataset.tone=covered?"ok":"warn";
   const rd=$("#r-d");rd.textContent=worstDex.toFixed(2);rd.dataset.tone=worstDex>0.35?"ok":(worstDex>0.2?"warn":"stop");
   const rc=$("#r-c");rc.textContent=covered?"yes":"no";rc.dataset.tone=covered?"ok":"stop";
   const re=$("#r-err");const e=tipErr();re.textContent=e.toFixed(1)+" mm";re.dataset.tone=e<1?"ok":(e<2.5?"warn":"stop");}
@@ -320,7 +319,7 @@ function draw(){const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.h
   const inner=Math.abs(S.L1-S.L2),outer=S.L1+S.L2,sweet=Math.hypot(S.L1,S.L2);
   ctx.fillStyle=css("--accent-wash");ctx.globalAlpha=.4;ctx.beginPath();ctx.arc(ox,oy,outer*scale,0,2*Math.PI);ctx.arc(ox,oy,inner*scale,0,2*Math.PI,true);ctx.fill();ctx.globalAlpha=1;
   if(S.showdex){const n=22;for(let i=0;i<n;i++)for(let j=0;j<n;j++){const x=-H+2*H*(i+0.5)/n,y=S.standoff+BOARD*(j+0.5)/n;const s=ik(x,y,S.L1,S.L2,S.elbow);const p=P(x,y);const w=2*H/n*scale*0.9;
-    if(!s){ctx.fillStyle="rgba(180,35,24,.20)";}else{ctx.fillStyle=`hsla(${120*s.dex},65%,50%,.28)`;}ctx.fillRect(p[0]-w/2,p[1]-w/2,w,w);}}
+    if(!s)continue;ctx.fillStyle=`hsla(${120*s.dex},65%,50%,.28)`;ctx.fillRect(p[0]-w/2,p[1]-w/2,w,w);}}
   ctx.setLineDash([5,5]);ctx.strokeStyle=css("--accent");ctx.lineWidth=1.3;ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(ox,oy,sweet*scale,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
   const bl=P(-H,S.standoff),tr=P(H,S.standoff+BOARD);ctx.strokeStyle=css("--board-line");ctx.lineWidth=2;ctx.strokeRect(bl[0],tr[1],tr[0]-bl[0],bl[1]-tr[1]);
   ctx.fillStyle=css("--ink-3");ctx.font="11px "+css("--display");ctx.fillText("35 cm",bl[0]+6,bl[1]-6);
@@ -374,7 +373,8 @@ $("#showcircles").addEventListener("change",e=>{S.showcircles=e.target.checked;}
 $("#elbow").addEventListener("change",e=>{S.elbow=e.target.checked;rebuild();});
 $("#showdex").addEventListener("change",e=>{S.showdex=e.target.checked;draw();});
 $("#showerr").addEventListener("change",e=>{S.showerr=e.target.checked;});
-$("#optimise").addEventListener("click",()=>{const rMin=S.standoff,rMax=Math.hypot(H,S.standoff+BOARD),L=Math.max(120,Math.min(340,Math.round(Math.sqrt(rMin*rMin+rMax*rMax)/2)));
+$("#optimise").addEventListener("click",()=>{build();let rMin=1e9,rMax=0;for(const p of seq){const r=Math.hypot(p.x,p.y);rMin=Math.min(rMin,r);rMax=Math.max(rMax,r);}
+  const L=Math.max(80,Math.min(340,Math.round(Math.sqrt(rMin*rMin+rMax*rMax)/2)));
   S.L1=S.L2=L;$("#l1").value=L;$("#l2").value=L;$("#l1v").textContent=L;$("#l2v").textContent=L;rebuild();});
 $("#run").addEventListener("click",startDraw);
 $("#pause").addEventListener("click",()=>{anim.on=!anim.on;$("#pause").textContent=anim.on?"Pause":"Resume";if(anim.on){anim.last=performance.now();requestAnimationFrame(tick);}});

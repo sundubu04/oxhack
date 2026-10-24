@@ -11,3 +11,4 @@ Every page we publish with the Artifact tool. Republish the same source file to 
 | Drawing arm research (Route D prior art, benchmark) | https://claude.ai/artifact/DE7tSVJYnyefa7GkchoWmH | `docs/pages/drawing-arm-research.html` | Eun | Private |
 | Clock arm simulator + spec (five-bar) | https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k | `docs/pages/arm-sim.html` | Eun | Private |
 | Rolling clock bot (views + hardware compare) | https://claude.ai/artifact/Y2X7H4zhxooCwYvn3jPxh2 | `docs/pages/rolling-bot.html` | Eun | Private |
+| Drawing arm build spec (3D print) | https://claude.ai/artifact/2gFJhEhu9WXtdMQibEL5ua | `docs/pages/arm-spec.html` | Eun | Private |
