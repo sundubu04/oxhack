@@ -1,0 +1,11 @@
+{
+  "name": "oxhack-arm-control",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Natural-language → image → path → angles control UI for the OxHack drawing arm (Gemini + ElevenLabs).",
+  "scripts": {
+    "dev": "node server.mjs",
+    "test": "node test.mjs"
+  }
+}

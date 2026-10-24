@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Clockwork — arm control</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%236e79d6'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#0e0e11">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><span class="mark"></span> Clockwork <span class="tag">arm control</span></div>
+      <div class="top-actions">
+        <span id="arm-status" class="chip">Arm: offline</span>
+        <button id="settings-btn" class="btn ghost">Settings</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="compose">
+        <div class="prompt">
+          <textarea id="prompt" rows="2" placeholder="Describe what to draw…  e.g. a smiling cat"></textarea>
+          <div class="prompt-actions">
+            <button id="mic" class="icon-btn" title="Hold to speak">🎤</button>
+            <button id="draw" class="btn primary">Draw ⏎</button>
+          </div>
+        </div>
+        <div class="chips" id="samples">
+          <button data-s="clock">Clock (now)</button>
+          <button data-s="house">House</button>
+          <button data-s="cat">Cat</button>
+          <button data-s="star">Star</button>
+          <button data-s="flower">Flower</button>
+        </div>
+        <ol class="steps" id="steps">
+          <li data-step="prompt"><span class="dot"></span><span>Understand the ask</span><span class="t"></span></li>
+          <li data-step="image"><span class="dot"></span><span>Draw the picture (Gemini)</span><span class="t"></span></li>
+          <li data-step="path"><span class="dot"></span><span>Plan the most effective path</span><span class="t"></span></li>
+          <li data-step="angles"><span class="dot"></span><span>Solve the joint angles</span><span class="t"></span></li>
+          <li data-step="ready"><span class="dot"></span><span>Ready to draw</span><span class="t"></span></li>
+        </ol>
+        <p class="empty" style="font-size:12px;text-align:left">Pipeline: ask → a line drawing → a deterministic plotter path (shortest pen travel) → base/elbow/tilt angles for the SG92R arm. Add API keys in Settings, or try a sample above with no key.</p>
+      </section>
+
+      <section class="preview">
+        <div class="tabs" id="tabs">
+          <button data-t="image" class="active">Image</button>
+          <button data-t="path">Path</button>
+          <button data-t="arm">Arm</button>
+        </div>
+        <div class="stage">
+          <div id="view-image" class="view"><span class="empty">Your drawing appears here.</span></div>
+          <canvas id="view-path" class="view" hidden></canvas>
+          <canvas id="view-arm" class="view" hidden></canvas>
+        </div>
+        <div class="stats" id="stats">
+          <div class="stat"><b id="s-strokes">—</b><span>strokes</span></div>
+          <div class="stat"><b id="s-ink">—</b><span>ink mm</span></div>
+          <div class="stat"><b id="s-travel">—</b><span>travel mm</span></div>
+          <div class="stat"><b id="s-dex">—</b><span>worst dex</span></div>
+          <div class="stat"><b id="s-time">—</b><span>est time</span></div>
+          <div class="stat"><b id="s-reach">—</b><span>out of reach</span></div>
+        </div>
+        <div class="actions">
+          <button id="play" class="btn" disabled>Preview draw</button>
+          <button id="narrate" class="btn ghost">🔊 Narrate</button>
+          <span class="spacer"></span>
+          <button id="copy" class="btn ghost" disabled>Copy angles</button>
+          <button id="download" class="btn ghost" disabled>Download</button>
+          <button id="send" class="btn primary" disabled>Send to arm</button>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="settings">
+      <form method="dialog" class="dlg">
+        <div class="dlg-head"><h2>Settings</h2><button class="btn ghost sm" value="close">Close</button></div>
+        <div class="dlg-body">
+          <div class="set">
+            <label for="set-gkey">Gemini API key</label>
+            <input id="set-gkey" type="password" placeholder="AIza… (from Google AI Studio)" autocomplete="off">
+            <span class="hint">Get one free at <a href="https://mlh.link/gemini-aistudio" target="_blank" rel="noopener">mlh.link/gemini-aistudio</a> → AI Studio → API key. Stored only in this browser.</span>
+          </div>
+          <div class="row">
+            <div class="set"><label for="set-gmodel">Gemini model</label><input id="set-gmodel" value="gemini-2.5-flash"></div>
+            <div class="set"><label for="set-route">Drawing route</label><select id="set-route"><option value="svg">SVG (vectors, fast)</option><option value="image">Image → trace</option></select></div>
+            <div class="set"><label for="set-gimg">Image model</label><input id="set-gimg" value="gemini-2.5-flash-image"></div>
+          </div>
+          <div class="set">
+            <label for="set-ekey">ElevenLabs API key (optional, for voice)</label>
+            <input id="set-ekey" type="password" placeholder="xi-… (from your ElevenLabs dashboard)" autocomplete="off">
+            <span class="hint">Promo code arrives in your MLH event email → sign up → API key. Voice input uses the browser (no key).</span>
+          </div>
+          <div class="row">
+            <div class="set"><label for="set-evoice">Voice id</label><input id="set-evoice" value="JBFqnCBsd6RMkjVDRZzb"></div>
+            <div class="set"><label for="set-l1">Link L1 (mm)</label><input id="set-l1" type="number" value="180"></div>
+            <div class="set"><label for="set-l2">Link L2 (mm)</label><input id="set-l2" type="number" value="180"></div>
+          </div>
+          <div class="row">
+            <div class="set"><label for="set-standoff">Standoff (mm)</label><input id="set-standoff" type="number" value="40"></div>
+            <div class="set"><label for="set-half">Draw size (mm)</label><input id="set-half" type="number" value="90"></div>
+            <div class="set" style="align-content:end"><button id="set-connect" class="btn" type="button">Connect arm (serial)</button></div>
+          </div>
+        </div>
+        <div class="dlg-foot"><button class="btn primary" value="save">Save</button></div>
+      </form>
+    </dialog>
+  </div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
