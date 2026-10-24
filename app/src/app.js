@@ -45,6 +45,7 @@ const hhmm = (t) => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinu
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
 let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
+let serverState = "checking";   // "checking" | "up" | "offline": whether /api/status last answered
 const S = load("clockedin.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
 let sims = [], doc = null;           // the saved simulations, and the open one
 let scene = emptyScene();            // what should be on the board
@@ -210,6 +211,8 @@ async function send(text) {
 }
 
 function friendly(msg) {
+  // the browser's own words when the request never reached the server (stopped, or restarting)
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) { refreshStatus(); return "Can't reach the Clockedin server. Start it with node server.mjs in app/, then try again."; }
   if (/503|high demand|overloaded|took over/i.test(msg)) return "Gemini is busy right now. Try again in a moment.";
   if (/quota/i.test(msg)) return msg.replace(/^Gemini \d+: /, "");
   return msg;
@@ -482,20 +485,28 @@ function stream() {
 function renderServices() {
   const gm = services.gemini.ready, vp = services.voice.provider;
   const voiceWord = { elevenlabs: "ElevenLabs", gemini: "Gemini voice", browser: "Browser voice" }[vp];
-  const cooling = (services.gemini.cooling || []).map((c) => c.model);
+  const cool = services.gemini.cooling || [];
   const models = (services.gemini.models || []).map((m) => m.split(":")[0]);
-  const usable = models.filter((m) => !cooling.includes(m));
+  const usable = models.filter((m) => !cool.some((c) => c.model === m && c.why === "quota"));
+  const until = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  // before the first answer, or when the server stops answering, the key is unknown: don't say "No key"
+  const word = serverState === "checking" ? "Checking" : serverState === "offline" ? "Server offline" : !gm ? "No key" : usable.length ? "Ready" : "Out of quota";
+  const mark = serverState === "checking" ? 'data-mark="ring"' : serverState === "offline" ? 'data-tone="stop"' : gm && usable.length ? 'data-mark="dot"' : 'data-tone="warn"';
   $("#services").innerHTML =
-    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${gm && usable.length ? 'data-mark="dot"' : 'data-tone="warn"'}>${!gm ? "No key" : usable.length ? "Ready" : "Out of quota"}</span></div>` +
+    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${mark}>${word}</span></div>` +
     `<div class="cw-service"><span>Voice</span><span>${voiceWord}</span></div>`;
+  const geminiLine = serverState === "offline" ? "Can't reach the Clockedin server: run node server.mjs in app/"
+    : serverState === "checking" ? "Asking the server"
+    : !gm ? "No key: add GEMINI_API_KEY to app/.env"
+    : `Tries ${models.map(modelName).join(", then ")}${cool.length ? `; ${cool.map((c) => `${modelName(c.model)} ${c.why === "quota" ? "out of quota" : c.why === "slow" ? "too slow, skipped" : "busy, skipped"} until ${until(c.until)}`).join(", ")}` : ""}`;
   $("#service-kv").innerHTML =
-    `<dt>Gemini</dt><dd>${!gm ? "No key: add GEMINI_API_KEY to app/.env" : `Tries ${models.map(modelName).join(", then ")}${cooling.length ? `; ${cooling.map(modelName).join(" and ")} out of quota for now` : ""}`}</dd>` +
+    `<dt>Gemini</dt><dd>${geminiLine}</dd>` +
     `<dt>Voice</dt><dd>${vp === "elevenlabs" ? "ElevenLabs" : `${voiceWord}, until an ElevenLabs key is added`}</dd>` +
     `<dt><label for="voice-id">ElevenLabs voice</label></dt><dd class="cw-voice"><input class="dl-input dl-mono" id="voice-id" placeholder="${esc(services.voice.voice || "")}" spellcheck="false"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="voice-test">${icon("volume-2")}Hear it</button></dd>` +
     `<dt>Arm</dt><dd>${arm.connected() ? "Connected over USB" : "Not connected"}</dd>`;
   $("#voice-id").value = S.voice || "";
 }
-function refreshStatus() { fetch("./api/status").then((r) => r.json()).then((s) => { services = s; renderServices(); }).catch(() => renderServices()); }
+function refreshStatus() { fetch("./api/status").then((r) => r.json()).then((s) => { services = s; serverState = "up"; renderServices(); }).catch(() => { serverState = "offline"; renderServices(); }); }
 
 // ---------- pages ----------
 function go(page) {
@@ -750,7 +761,7 @@ async function start() {
   buildJoints(); buildSetup();
   $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  wire(); renderServices(); refreshStatus(); setInterval(refreshStatus, 60000);
+  wire(); renderServices(); refreshStatus(); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
   await listSims();
   let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];

@@ -1,6 +1,7 @@
 // Gemini calls, run on the server so the key stays in .env: a description -> a plotter-friendly SVG line drawing,
 // a chat turn -> a reply and actions on the board, a raster image to trace, and speech. Models are tried in order;
 // one that answers "busy" is skipped for this call, one that is out of quota is skipped until its quota resets.
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export const DRAW_RULES = `- Output one <svg viewBox="0 0 100 100"> using only <path>, <polyline>, <line>, <circle>, <ellipse>, <rect>, <polygon>, all fill="none" stroke="black". No <text>: draw any letters as single-stroke paths.
@@ -17,9 +18,15 @@ function pickSVG(text) {
 // "gemini-3.5-flash:minimal" -> { model, level }
 const parse = (spec) => { const [model, level] = spec.split(":"); return { model, level: level || null }; };
 
-// When each model may be asked again, after a 429 with a retry delay (its daily or per-minute quota).
-const cooling = new Map();
-export function quotaState() { const now = Date.now(); return [...cooling].filter(([, t]) => t > now).map(([model, until]) => ({ model, until })); }
+// When each model may be asked again, and why: "quota" after a 429 (its retry delay), "busy" after a 503, "slow" after a timeout.
+// kept in data/ so a server restart doesn't spend the first turn finding out again (daily quotas last until midnight Pacific)
+const SAVED = new URL("../data/gemini-cooling.json", import.meta.url);
+const cooling = new Map((() => { try { return Object.entries(JSON.parse(readFileSync(SAVED, "utf8"))); } catch (e) { return []; } })());
+const cool = (model, ms, why) => {
+  cooling.set(model, { until: Date.now() + ms, why });
+  try { mkdirSync(new URL("../data/", import.meta.url), { recursive: true }); writeFileSync(SAVED, JSON.stringify(Object.fromEntries(cooling))); } catch (e) {}
+};
+export function quotaState() { const now = Date.now(); return [...cooling].filter(([, c]) => c.until > now).map(([model, c]) => ({ model, ...c })); }
 
 async function call(model, level, key, body, timeoutMs) {
   const levels = level ? [level, null] : [null];
@@ -36,7 +43,7 @@ async function call(model, level, key, body, timeoutMs) {
     const err = new Error(message(res.status, text)); err.status = res.status;
     if (res.status === 429) {
       let wait = 60; try { const d = JSON.parse(text).error.details.find((x) => x.retryDelay); wait = parseFloat(d.retryDelay) || 60; } catch (e) {}
-      cooling.set(model, Date.now() + wait * 1000); err.until = Date.now() + wait * 1000;
+      cool(model, wait * 1000, "quota"); err.until = Date.now() + wait * 1000;
     }
     throw err;
   }
@@ -51,7 +58,7 @@ function message(status, text) {
 // Walk the model list; move on when a model is busy, missing or out of quota.
 async function firstThatAnswers(specs, key, body, timeoutMs = 25000) {
   let last, soonest = Infinity;
-  const ready = specs.filter(Boolean).map(parse).filter(({ model }) => { const u = cooling.get(model); if (u && u > Date.now()) { soonest = Math.min(soonest, u); return false; } return true; });
+  const ready = specs.filter(Boolean).map(parse).filter(({ model }) => { const u = cooling.get(model)?.until; if (u && u > Date.now()) { soonest = Math.min(soonest, u); return false; } return true; });
   for (const [k, { model, level }] of ready.entries()) {
     const t0 = Date.now();
     // the last model left has nothing to fall back on, so it gets longer to answer
@@ -60,9 +67,9 @@ async function firstThatAnswers(specs, key, body, timeoutMs = 25000) {
     catch (e) {
       console.log(`  ${model} skipped: ${e.message}`); last = e; if (e.until) soonest = Math.min(soonest, e.until);
       // says it's busy: leave it alone for two minutes, so the next turns don't wait on it again
-      if ((e.status === 503 || e.status === 500) && !e.slow) cooling.set(model, Date.now() + 120000);
-      // too slow, with others still to try: skip it for three minutes
-      if (e.slow && k < ready.length - 1) cooling.set(model, Date.now() + 180000);
+      if ((e.status === 503 || e.status === 500) && !e.slow) cool(model, 120000, "busy");
+      // too slow, with others still to try: skip it for fifteen minutes, or every few turns wait 30 s on it again
+      if (e.slow && k < ready.length - 1) cool(model, 900000, "slow");
       if (![404, 429, 500, 503].includes(e.status)) throw e;
     }
   }
