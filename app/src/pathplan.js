@@ -77,3 +77,20 @@ export function plan(strokes, g = GEOM, opts = {}) {
   }
   return { toolpath, ink: Math.round(ink), travel: Math.round(travel), strokes: s };
 }
+
+// A wipe over the drawing area with the eraser end: rows `width * 0.7` apart so passes overlap, drawn as one
+// zigzag so the eraser never lifts between rows. Returns a toolpath in the same shape as plan()'s.
+export function erasePlan(g = GEOM, opts = {}) {
+  const half = (opts.half ?? g.half ?? 90) + 6, w = opts.width ?? g.eraserWidth ?? 20, step = opts.step ?? 4;
+  const { cx, cy } = drawCentre(g);
+  const gap = Math.max(4, w * 0.7), rows = Math.ceil((2 * half) / gap) + 1;
+  const toolpath = []; let ink = 0;
+  for (let r = 0; r < rows; r++) {
+    const y = cy + half - Math.min(2 * half, r * gap), ltr = r % 2 === 0;
+    const xs = [cx - half, cx + half]; if (!ltr) xs.reverse();
+    const row = resample([{ x: xs[0], y }, { x: xs[1], y }], step);
+    row.forEach((p, i) => toolpath.push({ x: p.x, y: p.y, pen: r === 0 && i === 0 ? 0 : 1, tool: r === 0 && i === 0 ? "lift" : "erase" }));
+    ink += 2 * half + (r ? gap : 0);
+  }
+  return { toolpath, ink: Math.round(ink), travel: 0, strokes: [] };
+}

@@ -1,77 +1,78 @@
-# Clockwork — arm control
+# Clockwork
 
-A Linear-style control app for the OxHack drawing arm. You ask for a drawing in words (or by voice); it
-turns the ask into a line drawing, plans the most effective pen path, solves the joint angles, and sends
-them to the arm.
-
-## The pipeline
+Control app for the OxHack drawing arm. Ask for a drawing in words or by voice; Clockwork draws the picture,
+plans the shortest pen path, solves the joint angles and plays them through a to-scale simulation of the arm
+with the servos' real limits. Then it sends the same angles to the arm, at the same pace.
 
 ```
-natural language ask
-   → a line drawing (Gemini: an SVG, or an image we trace)      "create the image first"
-   → deterministic path plan (fit to board, order strokes for the shortest pen travel, resample)
-   → inverse kinematics → base°, elbow°, tilt, pressure per waypoint
-   → the arm (Web Serial to the Pi) — or Copy / Download the angle stream
+words or voice
+  → a line drawing (Gemini, through the dev server)          the picture first
+  → the shortest pen path (fit to the board, order strokes, resample every 2 mm)
+  → base, elbow and tilt angles for every waypoint (inverse kinematics)
+  → live sim: SG92R top speed and 1° steps, so the line wobbles like the real one
+  → the arm over USB (Web Serial), or the angles as a file
 ```
 
-Every step after the image is **deterministic** (no model in the loop), so the same picture always gives the
-same path and the same angles. Gemini only makes the picture; ElevenLabs gives the arm a voice; the browser's
-own speech recognition lets you talk to it (no key needed for voice input).
+Everything after the picture is deterministic: the same picture always gives the same path and angles.
 
 ## Run it
 
-No build step.
-
 ```
 cd app
-node server.mjs          # → http://localhost:5178
+cp .env.example .env      # then add the keys (see below)
+npm install               # only for the checks; the app itself has no dependencies
+node server.mjs           # → http://localhost:5178
 ```
 
-Open the URL in Chrome. Try a **sample** (Clock, House, Cat, Star, Flower) with no key at all. For your own
-prompts, add API keys in **Settings**:
+Open it in Chrome. The samples (the time now, house, cat, star, flower) work with no key.
 
-- **Gemini** — free key from [mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio) → Google AI Studio → *Get API key*. Default model `gemini-2.5-flash` (set yours if different). "Nano Banana" image model is `gemini-2.5-flash-image` for the image→trace route.
-- **ElevenLabs** (optional, for the spoken feedback) — your promo code arrives in the MLH event email → sign up → API key from the dashboard.
+## Keys
 
-Keys live only in this browser's `localStorage`; nothing is committed or sent anywhere but the APIs.
+They live in `app/.env`, which git ignores. The dev server reads them and calls the APIs itself; the browser never sees a key.
+
+- **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). The free tier covers the vector drawings and the Gemini voice. `gemini-2.5-flash` is closed to new keys, so the default is `gemini-3.5-flash`, then `gemini-3.8-flash`, then `gemini-3.1-flash-lite` when one is busy. The image route (Nano Banana) needs billing on the key's project.
+- **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart; until then the arm speaks with Gemini's voice.
 
 ## Using it
 
-- Type a prompt and press **Draw** (or ⏎), or click the **mic** and say it.
-- Watch the five pipeline steps tick, then flip between **Image / Path / Arm** and press **Preview draw**.
-- **Send to arm** streams the angles over Web Serial (connect first in Settings); **Download** / **Copy angles** always work.
-- Settings also holds the arm geometry (L1, L2, standoff, draw size) — defaults match the build: 180 mm links, base 40 mm below a 350 mm board, a 200 mm centred clock.
+- **Studio**: type or say what to draw (⏎ or Draw). The board shows the plan faintly and the simulated ink as the arm lays it. Play, start again, erase, scrub and speed sit under the board.
+- **Board, Picture, Angles**: the sim, the picture Gemini made, and every waypoint with its time and angles.
+- **Inspector**: time to draw, ink, pen-up travel, the worst wobble measured in the sim, the four pipeline steps, live joint meters against each servo's range, and the arm connection.
+- **Simulation switches**: servo limits on or off (ideal servos), the reach (grey where the arm can't get to), and keep time (erase and redraw the clock every minute).
+- **⌘K**: every command, and "Draw …" for anything you type.
+- Drag on the board to move the pen by hand when nothing is playing.
 
-## The arm serial protocol
+## The arm's dimensions
 
-The Pi/microcontroller reads one line per waypoint at 115200 baud:
+`app/arm.config.json` is the one place for them: link lengths, board size and how far the base sits below it,
+drawing size, pen tilts and eraser width, speeds, and each servo's range, zero offset and direction. Edit it
+in **Arm setup** (it saves the file and shows reach, coverage, dexterity and the clock's draw time as you type)
+or by hand. The numbers in it now are the design ones (`"measured": false`); saving from the app marks them measured.
+
+## Serial protocol
+
+115200 baud, one line per waypoint, sent when the arm should set off for it (the sim's schedule):
 
 ```
-base,elbow,tilt,pressure      e.g.  57.03,85.02,-14,60
-SKIP                          a waypoint out of reach (hold / skip)
-HOME                          end of path — return to the park pose
+base,elbow,tilt,pressure      e.g.  57.03,85.02,-14,60     degrees, pressure 0 to 100
+SKIP                          a waypoint out of reach
+HOME                          end of the path: park
 ```
 
-`tilt` is the marker-tilt servo in degrees (draw ≈ −14, lift ≈ −2, erase ≈ +16); `pressure` is 0–100.
+When the tilt changes, the firmware should move the tilt servo first and let it settle before moving the arm; the sim assumes that.
 
 ## Files
 
 | Path | What |
 |---|---|
-| `index.html`, `style.css` | the Linear-style UI shell |
-| `src/app.js` | wiring: settings, pipeline run, canvas preview, voice, arm |
-| `src/ik.js` | 2-link inverse kinematics + toolpath → angle stream (verified to 1e-13 mm) |
-| `src/svg.js` | SVG / JSON → polylines (path, polyline, line, rect, circle, ellipse) |
-| `src/vectorize.js` | raster image → polylines (threshold + Moore boundary tracing + simplify) |
-| `src/pathplan.js` | fit to board, order strokes for least pen travel, resample, flatten |
-| `src/gemini.js` | prompt → SVG line drawing, or → raster image |
-| `src/voice.js` | ElevenLabs TTS out, browser speech-to-text in |
-| `src/arm.js` | Web Serial send + download |
-| `src/sample.js` | built-in drawings so it runs with no key |
-| `server.mjs` | static dev server |
-
-## Status / next
-
-- Working now: the whole pipeline on samples and on Gemini SVGs, the preview, the angle export, the Linear UI, voice in (browser) and out (ElevenLabs).
-- Needs the hardware to verify: the Web Serial send (the firmware side on the Pi that reads the lines).
-- Nice next: a queue of drawings, the erase pass between redraws, and a camera closed-loop for crisper lines.
+| `index.html`, `style.css` | the screens; components come from the team kit (`ui/kit.css`, `ui/icons.json`, copied from `.claude/skills/oxh-ui-kit`) |
+| `src/app.js` | the pipeline, sim loop, palette, history and setup page |
+| `src/sim.js` | the arm simulation: schedule, servo speed and resolution, servo end stops, wobble measurement |
+| `src/board.js` | draws the board, plan, ink and arm to scale |
+| `src/config.js`, `arm.config.json` | the arm's dimensions and servo calibration |
+| `src/ik.js` | two-link inverse kinematics and the angle stream |
+| `src/pathplan.js` | fit, order, resample; the eraser's zigzag |
+| `src/svg.js`, `src/vectorize.js` | SVG to polylines; raster to polylines |
+| `src/voice.js`, `src/arm.js` | speech in and out; Web Serial |
+| `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
+| `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |

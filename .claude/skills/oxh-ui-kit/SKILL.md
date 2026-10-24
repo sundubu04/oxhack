@@ -12,7 +12,7 @@ Adapted from darling-agentic's drl-ui-kit. One look for every screen of the app:
 | `assets/kit.css` | The stylesheet: `--dl-*` tokens (a twelve-step pink scale among them), then every component as a `dl-` class |
 | `assets/kit.tsx` | React components with no dependencies: buttons, fields, checkbox, radio, switch, segmented control, tabs, rows, status, banner, empty, skeleton, stats, meter, progress, steps, thread, composer, timeline, spark, icon |
 | `assets/overlays.tsx` | What opens over a page, on Base UI: `RowMenu`, `Pick`, `Confirm`, `Dialog`, `Tip`, `useToast`, inside one `<Overlays>` at the app's root |
-| `assets/icons.json` | 74 Lucide 1.53 icons for `Icon`; `assets/LICENSE-lucide.txt` is their licence and goes wherever they go |
+| `assets/icons.json` | 81 Lucide 1.53 icons for `Icon`; `assets/LICENSE-lucide.txt` is their licence and goes wherever they go |
 | `assets/specimen.html` | Every piece in every state. Open it beside the sheet |
 | `references/rules.md` | The eighteen rules a screen follows, and what makes an interface look generated |
 | `scripts/check.mjs` | Measures a rendered page against the rules a number can catch; `--axe` and `--impeccable` add those tools' checks |

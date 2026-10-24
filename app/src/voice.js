@@ -1,26 +1,29 @@
-// Voice: ElevenLabs text-to-speech for the arm's spoken feedback, and the browser's own speech
-// recognition for talking to it (free, no key). Key + voice from Settings.
+// Voice: the arm speaks through the server (ElevenLabs when app/.env has its key, Gemini TTS otherwise, the
+// browser's own voice as the last resort), and listens with the browser's speech recognition (no key).
 
-export async function speak(text, { key, voice = "JBFqnCBsd6RMkjVDRZzb", model = "eleven_flash_v2_5" } = {}) {
-  if (!key) throw new Error("No ElevenLabs key set (Settings).");
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
-    method: "POST",
-    headers: { "xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: model, voice_settings: { stability: 0.4, similarity_boost: 0.7 } }),
-  });
-  if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 160)}`);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  await audio.play().catch(() => {});
-  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-  return audio;
+let playing = null;
+
+export async function say(text) {
+  try {
+    const r = await fetch("./api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    if (r.status === 200) {
+      const url = URL.createObjectURL(await r.blob());
+      if (playing) playing.pause();
+      playing = new Audio(url);
+      playing.addEventListener("ended", () => URL.revokeObjectURL(url));
+      await playing.play();
+      return;
+    }
+  } catch (e) {}
+  if ("speechSynthesis" in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-GB"; speechSynthesis.speak(u); }
 }
 
-// Browser speech-to-text. Returns a controller with start()/stop(); resolves text via onResult.
+export function canListen() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+
+// Browser speech-to-text. onResult(text) while speaking, onEnd(finalText) when it stops.
 export function listen({ onResult, onEnd } = {}) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) throw new Error("Speech recognition not available in this browser.");
+  if (!SR) throw new Error("Speech input needs Chrome");
   const rec = new SR();
   rec.lang = "en-GB"; rec.interimResults = true; rec.continuous = false;
   let finalText = "";
@@ -30,9 +33,9 @@ export function listen({ onResult, onEnd } = {}) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) finalText += t; else interim += t;
     }
-    onResult && onResult(finalText + interim, !!finalText && !interim);
+    onResult && onResult(finalText + interim);
   };
   rec.onend = () => onEnd && onEnd(finalText.trim());
   rec.start();
-  return { stop: () => rec.stop(), abort: () => rec.abort() };
+  return { stop: () => rec.stop() };
 }

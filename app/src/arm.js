@@ -7,7 +7,7 @@ let port = null, writer = null;
 export function supported() { return "serial" in navigator; }
 
 export async function connect(baud = 115200) {
-  if (!supported()) throw new Error("Web Serial not supported (use Chrome, over https or localhost).");
+  if (!supported()) throw new Error("Connecting needs Chrome on localhost (Web Serial)");
   port = await navigator.serial.requestPort();
   await port.open({ baudRate: baud });
   writer = port.writable.getWriter();
@@ -21,11 +21,14 @@ export async function disconnect() {
 
 export function connected() { return !!writer; }
 
-// Stream the angle path. onProgress(i, n) fires per waypoint. Lines: base,elbow,tilt,pressure
-export async function send(path, { onProgress } = {}) {
-  if (!writer) throw new Error("Arm not connected.");
-  const enc = new TextEncoder();
+// Stream the angle path, one line per waypoint: base,elbow,tilt,pressure. With times (seconds, from the sim's
+// schedule) each line goes out when the arm should set off for it, so the real arm keeps the sim's pace.
+export async function send(path, { times, onProgress, signal } = {}) {
+  if (!writer) throw new Error("Arm not connected");
+  const enc = new TextEncoder(), t0 = performance.now();
   for (let i = 0; i < path.length; i++) {
+    if (signal?.aborted) break;
+    if (times) { const wait = times[i] * 1000 - (performance.now() - t0); if (wait > 2) await new Promise(r => setTimeout(r, wait)); }
     const p = path[i];
     const line = p.out_of_reach ? "SKIP\n" : `${p.base},${p.elbow},${p.tilt},${p.pressure}\n`;
     await writer.write(enc.encode(line));

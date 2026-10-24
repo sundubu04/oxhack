@@ -35,3 +35,6 @@ pitch/**/preview/
 .obsidian/
 .vscode/
 .idea/
+
+# Reference screenshots of other apps (Mobbin): local only, links in docs/refs/*/refs.md
+docs/refs/**/*.png

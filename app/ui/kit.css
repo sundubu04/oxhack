@@ -1,0 +1,1402 @@
+/*
+ * Pink UI kit (adapted from Darling's UI kit): one light stylesheet for the screens we draw ourselves. Neutral greys, the system font, and flow-er's flower pink for the one action that matters, the
+ * current item, links and the focus ring. Hover is grey; things that are on are ink.
+ *
+ * One root element carries it; everything the app draws sits inside:
+ *   <html data-dl-look="pink">                              an app
+ *   <html data-dl-look="pink" data-dl-density="compact">    a dense console
+ *
+ * Light only. Every size is px, because rem inside a content script follows the host page's root size.
+ * Every custom property is --dl-*, because a host page's custom properties reach into a shadow root.
+ * Type is set with longhands, because the font shorthand resets font-feature-settings and tabular figures.
+ * State is styled on ARIA attributes, and on Base UI's data attributes only where ARIA has none
+ * ([data-highlighted], [data-starting-style], [data-ending-style]).
+ */
+
+@layer dl.tokens, dl.base, dl.components;
+
+/* ───────────────────────── tokens ───────────────────────── */
+
+@layer dl.tokens {
+  [data-dl-look] {
+    color-scheme: light;
+
+    --dl-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+    --dl-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --dl-features: normal;
+
+    /* Type: eight sizes. 11 is the floor. */
+    --dl-fs-meta: 11px;
+    --dl-fs-xs: 12px;
+    --dl-fs-sm: 13px;
+    --dl-fs-ui: 14px;
+    --dl-fs-prose: 15px;
+    --dl-fs-lg: 17px;
+    --dl-fs-xl: 21px;
+    --dl-fs-hero: 28px;
+    --dl-fs-sub: 12px;
+
+    /* Heights on the 4px grid. */
+    --dl-ctl-h: 32px;
+    --dl-ctl-sm: 28px;
+    --dl-nav-h: 32px;
+    --dl-row-h: 40px;
+    --dl-list-row: 48px;
+
+    --dl-tint: .16s ease;
+    --dl-enter: .2s ease;
+    --dl-travel: .34s cubic-bezier(.22, .61, .36, 1);
+
+    --dl-panel-w: 340px;
+    --dl-tab-w: 34px;
+    --dl-rail-w: 232px;
+
+    --dl-r-tag: 4px;
+    --dl-r-ctl: 10px;
+    --dl-r-row: 10px;
+    --dl-r-card: 14px;
+    --dl-r-bubble: 16px;
+    --dl-r-pill: 999px;
+
+    /* The pink, as a twelve-step scale: 1–2 backgrounds, 3–5 fills, 6–8 edges, 9–10 solid, 11–12 text.
+       9 is flow-er's flower core (#c0577c) darkened until white on it passes 4.5:1. */
+    --dl-pink-1: #fffcfd;
+    --dl-pink-2: #fdf7f9;
+    --dl-pink-3: #faeef2;
+    --dl-pink-4: #f6e4ea;
+    --dl-pink-5: #f1d8e1;
+    --dl-pink-6: #ebcad6;
+    --dl-pink-7: #e2b5c5;
+    --dl-pink-8: #d77f9c;
+    --dl-pink-9: #a34a69;
+    --dl-pink-10: #984562;
+    --dl-pink-11: #863854;
+    --dl-pink-12: #4d1e2f;
+
+    --dl-hue: var(--dl-pink-9);
+    --dl-hue-hover: var(--dl-pink-10);
+    --dl-hue-press: #7d3851;
+    --dl-on-hue: #ffffff;
+    --dl-brand: var(--dl-hue);
+    --dl-on-brand: var(--dl-on-hue);
+
+    /* Neutrals. */
+    --dl-bg: #ffffff;
+    --dl-surface-2: #f7f7f8;
+    --dl-raised: #ffffff;
+    --dl-bubble: #f2f2f3;
+    --dl-field: #ffffff;
+    --dl-ink: #1d1d1f;
+    --dl-hover: rgb(0 0 0 / .045);
+    --dl-press: rgb(0 0 0 / .08);
+    --dl-selected: rgb(215 127 156 / .18);
+    --dl-line: rgb(0 0 0 / .08);
+    --dl-line-ctl: rgb(0 0 0 / .13);
+    --dl-line-strong: #808084;
+
+    --dl-text: #1d1d1f;
+    --dl-text-2: #4d4d52;
+    --dl-text-3: #636368;
+    --dl-kicker: var(--dl-text-2);
+    --dl-link: var(--dl-pink-11);
+
+    --dl-primary: var(--dl-hue);
+    --dl-primary-hover: var(--dl-hue-hover);
+    --dl-primary-press: var(--dl-hue-press);
+    --dl-on-primary: var(--dl-on-hue);
+    --dl-accent: var(--dl-hue);
+    --dl-focus: var(--dl-hue);
+    /* What a switch, checkbox or radio fills with when on. Ink, so a list of switches doesn't turn the screen pink. */
+    --dl-control-on: var(--dl-ink);
+
+    /* State: a colour for the mark and the word, and an opaque wash that reads the same on any row under it. */
+    --dl-ok: #11704f;
+    --dl-warn: #7f5c00;
+    --dl-stop: #a4262c;
+    --dl-stop-hover: #8a1f24;
+    --dl-info: #0a62b8;
+    --dl-ok-wash: #e2eeea;
+    --dl-warn-wash: #f0ebe0;
+    --dl-stop-wash: #f4e5e6;
+    --dl-info-wash: #e2ecf6;
+
+    --dl-shadow-float: 0 0 0 1px rgb(0 0 0 / .06), 0 1px 2px rgb(0 0 0 / .06), 0 12px 28px -12px rgb(0 0 0 / .22);
+    --dl-shadow-panel: 0 0 0 1px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .14), 0 28px 64px -18px rgb(0 0 0 / .32);
+    --dl-shadow-tab: 0 0 0 1px rgb(0 0 0 / .10), 0 1px 3px rgb(0 0 0 / .18), 0 6px 14px -6px rgb(0 0 0 / .28);
+    --dl-shadow-raised: 0 0 0 1px var(--dl-line-strong), 0 1px 2px rgb(0 0 0 / .10);
+  }
+
+  /* Compact density for a dense console: smaller type, shorter controls and rows. */
+  [data-dl-density="compact"] {
+    --dl-fs-ui: 13px;
+    --dl-fs-prose: 14px;
+    --dl-fs-sub: 11px;
+    --dl-ctl-h: 28px;
+    --dl-ctl-sm: 24px;
+    --dl-nav-h: 28px;
+    --dl-row-h: 36px;
+    --dl-list-row: 40px;
+    --dl-quote-lines: 1;
+  }
+
+  /* A finger needs 44px. Touch screens get it whatever the density. */
+  @media (pointer: coarse) {
+    [data-dl-look] {
+      --dl-ctl-h: 44px;
+      --dl-ctl-sm: 36px;
+      --dl-nav-h: 44px;
+      --dl-row-h: 48px;
+      --dl-list-row: 56px;
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    [data-dl-look] {
+      --dl-line: var(--dl-line-ctl);
+      --dl-line-ctl: var(--dl-line-strong);
+      --dl-text-3: var(--dl-text-2);
+    }
+  }
+}
+
+/* ───────────────────────── base ───────────────────────── */
+
+@layer dl.base {
+  :host {
+    all: initial;
+    display: block;
+    direction: ltr;
+  }
+
+  /* The root also resets the text properties a host page's rules would otherwise pass in through :host. */
+  :where([data-dl-look]) {
+    font-family: var(--dl-font);
+    font-size: var(--dl-fs-ui);
+    font-weight: 400;
+    line-height: 1.45;
+    font-feature-settings: var(--dl-features);
+    color: var(--dl-text);
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-transform: none;
+    text-align: start;
+    text-indent: 0;
+    text-shadow: none;
+    white-space: normal;
+    cursor: auto;
+    visibility: visible;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :where([data-dl-look]), :where([data-dl-look]) *,
+  :where([data-dl-look])::before, :where([data-dl-look])::after,
+  :where([data-dl-look]) *::before, :where([data-dl-look]) *::after { box-sizing: border-box; }
+  :where([data-dl-look]) :where(button, input, textarea, select) { font: inherit; font-feature-settings: inherit; letter-spacing: inherit; color: inherit; }
+  :where([data-dl-look]) :where(h1, h2, h3, h4, p, ul, ol, dl, figure) { margin: 0; }
+  :where(html[data-dl-look]) { background: var(--dl-bg); }
+  :where(html[data-dl-look]) body { margin: 0; }
+
+  /* One focus ring: 2px of pink, 2px out. Fields carry it on their own edge (see .dl-input). */
+  :where([data-dl-look]) :focus-visible {
+    outline: 2px solid var(--dl-focus);
+    outline-offset: 2px;
+  }
+
+  :where([data-dl-look]) ::selection { background: var(--dl-pink-5); }
+
+  /* A link in running text: pink and underlined, so it is never colour alone. */
+  :where([data-dl-look]) a:where(:not([class])), .dl-link {
+    color: var(--dl-link);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    border-radius: 2px;
+  }
+  :where([data-dl-look]) a:where(:not([class])):hover, .dl-link:hover { text-decoration-thickness: 2px; }
+  .dl-link { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* The single entrance: a 6px rise. Played in reverse it is also the exit, so a panel leaves the way it came. */
+  @keyframes dl-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(.985);
+    }
+  }
+
+  /* The one loop: a spinner while something is actually running. */
+  @keyframes dl-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where([data-dl-look]), :where([data-dl-look]) *,
+    :where([data-dl-look])::before, :where([data-dl-look])::after,
+    :where([data-dl-look]) *::before, :where([data-dl-look]) *::after {
+      transition-duration: 1ms !important;
+      transition-delay: 0ms !important;
+      animation-duration: 1ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}
+
+/* ───────────────────────── components ───────────────────────── */
+
+@layer dl.components {
+
+  /* Text read by a screen reader and not drawn: <span class="dl-sr">done</span>. */
+  .dl-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The first stop for a keyboard, so it can pass the rail: <a class="dl-skip" href="#main">Skip to content</a>. */
+  .dl-skip {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 100;
+    padding: 8px 12px;
+    border-radius: var(--dl-r-ctl);
+    background: var(--dl-ink);
+    color: #ffffff;
+    font-weight: 500;
+    text-decoration: none;
+    transform: translateY(-200%);
+  }
+  .dl-skip:focus-visible { transform: none; }
+
+  /* Labels and text roles. A group's label is in sentence case at the normal spacing, never small capitals:
+     smaller than the body and heavier, the way a settings list names its groups. */
+  .dl-kicker {
+    font-size: var(--dl-fs-xs);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--dl-kicker);
+  }
+  .dl-title { font-size: var(--dl-fs-lg); font-weight: 600; line-height: 1.3; letter-spacing: -.01em; text-wrap: balance; }
+  .dl-h1 { font-size: var(--dl-fs-xl); font-weight: 600; line-height: 1.25; letter-spacing: -.015em; text-wrap: balance; }
+  .dl-meta { font-size: var(--dl-fs-meta); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+  .dl-muted { color: var(--dl-text-2); }
+  .dl-mono { font-family: var(--dl-mono); font-size: var(--dl-fs-xs); }
+  .dl-num { font-variant-numeric: tabular-nums; }
+  .dl-sep { height: 1px; margin: 0; border: 0; background: var(--dl-line); }
+
+  /* A Lucide line icon in currentColor. Its size comes from its width and height, 16 when it has none. */
+  .dl-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .dl-icon:not([width]) { width: 16px; height: 16px; }
+
+  /* Spinner: joins a busy button's label, or stands alone with a label of its own. */
+  .dl-spinner {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: dl-spin .8s linear infinite;
+  }
+
+  /* A still shape where content will load, so the page doesn't jump when it arrives. */
+  .dl-skeleton { display: block; height: 12px; border-radius: 6px; background: var(--dl-bubble); }
+
+  /* Buttons: <button class="dl-btn dl-btn--primary">Keep</button>.
+     Disabled keeps the button's shape with a grey fill and quiet text; busy keeps the label, adds a .dl-spinner and takes no presses. */
+  .dl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: var(--dl-ctl-h);
+    padding: 4px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--dl-r-ctl);
+    background: transparent;
+    font-size: var(--dl-fs-ui);
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--dl-tint), color var(--dl-tint), border-color var(--dl-tint);
+  }
+  .dl-btn:has(> .dl-icon:first-child, > .dl-spinner:first-child) { padding-left: 10px; }
+  .dl-btn--primary { background: var(--dl-primary); color: var(--dl-on-primary); }
+  .dl-btn--primary:hover { background: var(--dl-primary-hover); }
+  .dl-btn--primary:active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-primary-press); }
+  .dl-btn--secondary { background: var(--dl-raised); color: var(--dl-text); border-color: var(--dl-line-ctl); }
+  .dl-btn--secondary:hover { background: var(--dl-surface-2); border-color: var(--dl-line-strong); }
+  .dl-btn--secondary:active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-bubble); }
+  .dl-btn--ghost { color: var(--dl-text-2); }
+  .dl-btn--ghost:hover { background: var(--dl-hover); color: var(--dl-text); }
+  .dl-btn--ghost:active:not(:disabled, [aria-disabled="true"]) { background: var(--dl-press); }
+  .dl-btn--danger { background: var(--dl-raised); color: var(--dl-stop); border-color: var(--dl-line-ctl); }
+  .dl-btn--danger:hover { background: var(--dl-stop-wash); border-color: var(--dl-stop); }
+  .dl-btn--danger:active:not(:disabled, [aria-disabled="true"]) { background: color-mix(in srgb, var(--dl-stop) 18%, #ffffff); }
+  /* Solid red only confirms a loss, inside the dialog that names it. */
+  .dl-btn--danger-solid { background: var(--dl-stop); color: #ffffff; }
+  .dl-btn--danger-solid:hover { background: var(--dl-stop-hover); }
+  .dl-btn--danger-solid:active:not(:disabled, [aria-disabled="true"]) { background: #741a1e; }
+  .dl-btn--sm { height: var(--dl-ctl-sm); padding: 4px 10px; gap: 6px; font-size: var(--dl-fs-xs); }
+  .dl-btn--wide { width: 100%; }
+  .dl-btn[aria-busy="true"] { cursor: progress; }
+  .dl-btn:disabled,
+  .dl-btn[aria-disabled="true"]:not([aria-busy="true"]) {
+    background: var(--dl-bubble);
+    color: var(--dl-text-3);
+    border-color: transparent;
+    cursor: not-allowed;
+  }
+  .dl-btn--ghost:disabled, .dl-btn--ghost[aria-disabled="true"]:not([aria-busy="true"]) { background: transparent; }
+  .dl-btn--secondary:disabled, .dl-btn--danger:disabled { border-color: var(--dl-line); background: var(--dl-surface-2); }
+
+  /* Square icon button for toolbars and rows: <button class="dl-icon-btn" aria-label="Close"><svg class="dl-icon"/></button>. */
+  .dl-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--dl-ctl-h);
+    height: var(--dl-ctl-h);
+    padding: 0;
+    border: 0;
+    border-radius: var(--dl-r-ctl);
+    background: transparent;
+    color: var(--dl-text-2);
+    cursor: pointer;
+    transition: background var(--dl-tint), color var(--dl-tint);
+  }
+  .dl-icon-btn:hover { background: var(--dl-hover); color: var(--dl-text); }
+  .dl-icon-btn:active:not(:disabled), .dl-icon-btn[aria-expanded="true"], .dl-icon-btn[data-popup-open] { background: var(--dl-press); color: var(--dl-text); }
+  .dl-icon-btn:disabled { color: var(--dl-line-strong); background: transparent; cursor: not-allowed; }
+
+  /* Fields. A field's edge is the only thing that marks it, so it uses the 3:1 line; focus is the pink ring on that edge.
+     <div class="dl-field"><label class="dl-label" for="em">Email</label><input class="dl-input" id="em" aria-describedby="em-hint">
+       <p class="dl-hint" id="em-hint">…</p><p class="dl-error" id="em-error">…</p></div> */
+  .dl-field { display: grid; gap: 4px; min-width: 0; }
+  .dl-label { margin-bottom: 4px; padding: 0; font-size: var(--dl-fs-sm); font-weight: 500; line-height: 1.3; color: var(--dl-text); }
+  .dl-hint { font-size: var(--dl-fs-xs); line-height: 1.4; color: var(--dl-text-3); }
+  .dl-error { display: flex; align-items: center; gap: 4px; font-size: var(--dl-fs-xs); font-weight: 500; line-height: 1.4; color: var(--dl-stop); }
+  .dl-input {
+    width: 100%;
+    height: var(--dl-ctl-h);
+    min-width: 0;
+    padding: 0 12px;
+    border: 1px solid var(--dl-line-strong);
+    border-radius: var(--dl-r-ctl);
+    background: var(--dl-field);
+    color: var(--dl-text);
+    transition: border-color var(--dl-tint);
+  }
+  .dl-input:hover { border-color: var(--dl-text-3); }
+  .dl-input:focus-visible { outline-offset: -1px; border-color: var(--dl-focus); }
+  .dl-input::placeholder { color: var(--dl-text-3); }
+  .dl-input:is([aria-invalid="true"], [data-invalid]) { border-color: var(--dl-stop); }
+  .dl-input:disabled { background: var(--dl-surface-2); border-color: var(--dl-line-ctl); color: var(--dl-text-3); cursor: not-allowed; }
+  .dl-textarea { height: auto; min-height: 72px; padding: 8px 12px; line-height: 1.45; resize: vertical; }
+
+  /* Native select with the kit's chevron: <span class="dl-select"><select class="dl-input">…</select><svg class="dl-icon"/></span>. */
+  .dl-select { position: relative; display: grid; align-items: center; min-width: 0; }
+  .dl-select > select { appearance: none; padding-right: 36px; cursor: pointer; }
+  .dl-select > .dl-icon { position: absolute; right: 12px; color: var(--dl-text-3); pointer-events: none; }
+
+  /* Search: an icon, the field, and the key that focuses it.
+     <label class="dl-search"><svg class="dl-icon"/><input class="dl-input" type="search"><kbd class="dl-kbd">/</kbd></label> */
+  .dl-search { position: relative; display: inline-grid; align-items: center; width: 240px; max-width: 100%; }
+  .dl-search > .dl-icon { position: absolute; left: 12px; color: var(--dl-text-3); pointer-events: none; }
+  .dl-search > .dl-input { padding-left: 36px; padding-right: 36px; }
+  .dl-search > .dl-kbd { position: absolute; right: 8px; }
+  .dl-search > .dl-input::-webkit-search-cancel-button { display: none; }
+
+  /* Checkbox and radio: native inputs drawn by the kit. On is --dl-control-on.
+     <label class="dl-choice"><input class="dl-check" type="checkbox"><span>A summary every Monday</span></label> */
+  .dl-choice { display: flex; align-items: flex-start; gap: 8px; min-height: 24px; padding: 2px 0; line-height: 1.45; cursor: pointer; }
+  .dl-choice:has(:disabled) { color: var(--dl-text-3); cursor: not-allowed; }
+  .dl-check, .dl-radio {
+    appearance: none;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    border: 1.5px solid var(--dl-line-strong);
+    border-radius: 4px;
+    background: var(--dl-field);
+    cursor: inherit;
+    transition: background var(--dl-tint), border-color var(--dl-tint);
+  }
+  .dl-radio { border-radius: 50%; }
+  .dl-check:hover:not(:disabled), .dl-radio:hover:not(:disabled) { border-color: var(--dl-text-2); }
+  .dl-check::after, .dl-radio::after { content: ""; opacity: 0; }
+  .dl-check:is(:checked, :indeterminate), .dl-radio:checked { border-color: var(--dl-control-on); background: var(--dl-control-on); }
+  .dl-check:checked::after {
+    width: 9px;
+    height: 5px;
+    margin-top: -2px;
+    border-bottom: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    transform: rotate(-45deg);
+    opacity: 1;
+  }
+  .dl-check:indeterminate::after { width: 8px; height: 2px; border-radius: 1px; background: #ffffff; opacity: 1; }
+  .dl-radio:checked::after { width: 6px; height: 6px; border-radius: 50%; background: #ffffff; opacity: 1; }
+  .dl-check:disabled, .dl-radio:disabled { border-color: var(--dl-line-ctl); background: var(--dl-surface-2); }
+  .dl-check:disabled:is(:checked, :indeterminate), .dl-radio:disabled:checked { border-color: transparent; background: var(--dl-line-strong); }
+  .dl-fieldset { display: grid; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; }
+  .dl-fieldset > legend { margin-bottom: 4px; }
+
+  /* Composer: a floating box with the message field over a toolbar and a round send.
+     <form class="dl-composer"><textarea class="dl-composer__input"></textarea><div class="dl-composer__bar">…<button class="dl-send"></button></div></form> */
+  .dl-composer {
+    display: grid;
+    gap: 8px;
+    padding: 12px 8px 8px 16px;
+    border: 1px solid var(--dl-line-strong);
+    border-radius: var(--dl-r-bubble);
+    background: var(--dl-raised);
+    transition: border-color var(--dl-tint);
+  }
+  .dl-composer:hover { border-color: var(--dl-text-3); }
+  .dl-composer:focus-within { border-color: var(--dl-focus); outline: 1px solid var(--dl-focus); }
+  .dl-composer[aria-busy="true"] { background: var(--dl-surface-2); }
+  .dl-composer__input {
+    min-height: 22px;
+    max-height: 132px;
+    padding: 0 8px 0 0;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    font-size: var(--dl-fs-prose);
+    line-height: 1.5;
+  }
+  .dl-composer__input::placeholder { color: var(--dl-text-3); }
+  .dl-composer__bar { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .dl-composer__context { display: flex; align-items: center; gap: 4px; min-width: 0; margin-right: auto; padding: 4px; margin-block: -4px; margin-left: -4px; }
+  .dl-send {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--dl-r-pill);
+    background: var(--dl-primary);
+    color: var(--dl-on-primary);
+    cursor: pointer;
+    transition: background var(--dl-tint);
+  }
+  .dl-send:hover { background: var(--dl-primary-hover); }
+  .dl-send:active:not(:disabled) { background: var(--dl-primary-press); }
+  .dl-send:disabled { background: var(--dl-bubble); color: var(--dl-text-3); cursor: not-allowed; }
+
+  /* Composer pickers: what the next ask changes, and where, chosen before sending. A value, so a Select trigger.
+     <button class="dl-pick" type="button" aria-haspopup="listbox"><span>New change</span><svg class="dl-icon" width="12" height="12"/></button>
+     data-tone="warn" marks an edit of something already built. */
+  .dl-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: var(--dl-ctl-sm);
+    padding: 0 8px 0 12px;
+    border: 1px solid var(--dl-line-ctl);
+    border-radius: var(--dl-r-pill);
+    background: transparent;
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-text-2);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--dl-tint), color var(--dl-tint);
+  }
+  .dl-pick:hover { background: var(--dl-hover); color: var(--dl-text); }
+  .dl-pick:active, .dl-pick:is([aria-expanded="true"], [data-popup-open]) { background: var(--dl-press); color: var(--dl-text); }
+  .dl-pick > span { overflow: hidden; text-overflow: ellipsis; }
+  .dl-pick > .dl-icon { color: var(--dl-text-3); }
+  .dl-pick[data-tone="warn"] { border-color: transparent; background: var(--dl-warn-wash); color: var(--dl-warn); }
+  .dl-pick[data-tone="warn"] > .dl-icon { color: currentColor; }
+
+  /* Answer chips, 2 to 4 under a question. aria-pressed marks the one sent; the others go quiet once one is. */
+  .dl-chip {
+    display: inline-flex;
+    align-items: center;
+    height: var(--dl-ctl-sm);
+    padding: 0 12px;
+    border: 1px solid var(--dl-line-ctl);
+    border-radius: var(--dl-r-pill);
+    background: var(--dl-raised);
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-text);
+    cursor: pointer;
+    transition: background var(--dl-tint), border-color var(--dl-tint);
+  }
+  .dl-chip:hover { background: var(--dl-surface-2); border-color: var(--dl-line-strong); }
+  .dl-chip:active:not(:disabled) { background: var(--dl-bubble); }
+  .dl-chip[aria-pressed="true"] { background: var(--dl-selected); border-color: var(--dl-accent); }
+  .dl-chip:disabled:not([aria-pressed="true"]) { background: transparent; border-color: var(--dl-line); color: var(--dl-text-3); cursor: default; }
+
+  /* Status mark: a glyph and a word, never a filled pill. Tone sets the colour; mark sets the shape.
+     <span class="dl-status" data-tone="ok">Kept</span>  <span class="dl-status" data-tone="ok" data-mark="square">Shipped</span>
+     Default shapes: no tone = dash · ok = dot · info = ring · warn = half · stop = diamond. The shapes carry about the same ink. */
+  .dl-status {
+    --dl-tone: var(--dl-text-3);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--dl-tone);
+    white-space: nowrap;
+  }
+  .dl-status::before {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--dl-tone);
+  }
+  .dl-status[data-tone="ok"] { --dl-tone: var(--dl-ok); }
+  .dl-status[data-tone="info"] { --dl-tone: var(--dl-info); }
+  .dl-status[data-tone="warn"] { --dl-tone: var(--dl-warn); }
+  .dl-status[data-tone="stop"] { --dl-tone: var(--dl-stop); }
+  .dl-status[data-tone="ok"]::before,
+  .dl-status[data-mark="dot"]::before { height: 8px; border-radius: 50%; background: var(--dl-tone); box-shadow: none; clip-path: none; transform: none; }
+  .dl-status[data-tone="info"]::before,
+  .dl-status[data-mark="ring"]::before { height: 8px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 2px var(--dl-tone); clip-path: none; transform: none; }
+  /* Half: a ring with its left half filled. The hard stop draws a shape, it isn't a gradient of colour. */
+  .dl-status[data-tone="warn"]::before,
+  .dl-status[data-mark="half"]::before { height: 8px; border-radius: 50%; background: linear-gradient(90deg, var(--dl-tone) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--dl-tone); clip-path: none; transform: none; }
+  .dl-status[data-tone="stop"]::before,
+  .dl-status[data-mark="diamond"]::before { width: 9px; height: 9px; margin-inline: -.5px; border-radius: 0; background: var(--dl-tone); box-shadow: none; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: none; }
+  .dl-status[data-mark="square"]::before { width: 7px; height: 7px; margin-inline: .5px; border-radius: 1.5px; background: var(--dl-tone); box-shadow: none; clip-path: none; transform: none; }
+  .dl-status[data-mark="triangle"]::before { width: 9px; height: 8px; margin-inline: -.5px; border-radius: 0; background: var(--dl-tone); box-shadow: none; clip-path: polygon(50% 0, 100% 100%, 0 100%); transform: translateY(-.5px); }
+  .dl-status[data-mark="dash"]::before { height: 2px; border-radius: 1px; background: var(--dl-tone); box-shadow: none; clip-path: none; transform: none; }
+
+  /* Tag: a small fixed label such as Preview or Sample. data-tone tints it; without one it is grey. */
+  .dl-tag {
+    --dl-tone: var(--dl-text-2);
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: var(--dl-r-tag);
+    background: var(--dl-bubble);
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-tone);
+    white-space: nowrap;
+  }
+  .dl-tag[data-tone="ok"] { --dl-tone: var(--dl-ok); background: var(--dl-ok-wash); }
+  .dl-tag[data-tone="info"] { --dl-tone: var(--dl-info); background: var(--dl-info-wash); }
+  .dl-tag[data-tone="warn"] { --dl-tone: var(--dl-warn); background: var(--dl-warn-wash); }
+  .dl-tag[data-tone="stop"] { --dl-tone: var(--dl-stop); background: var(--dl-stop-wash); }
+
+  /* Banner: a notice at the top of what it is about, until its cause is gone. The text stays ink; the tone is the wash and the icon.
+     <div class="dl-banner" data-tone="warn" role="status"><svg class="dl-icon"/><p>…</p><button class="dl-btn dl-btn--secondary dl-btn--sm">…</button></div> */
+  .dl-banner {
+    --dl-tone: var(--dl-info);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 8px 8px 12px;
+    border-radius: var(--dl-r-ctl);
+    background: var(--dl-info-wash);
+    font-size: var(--dl-fs-sm);
+    line-height: 1.45;
+    color: var(--dl-text);
+  }
+  .dl-banner > .dl-icon { color: var(--dl-tone); }
+  .dl-banner > p { margin: 0; }
+  .dl-banner > p:last-child { grid-column: 2 / -1; }
+  .dl-banner[data-tone="ok"] { --dl-tone: var(--dl-ok); background: var(--dl-ok-wash); }
+  .dl-banner[data-tone="warn"] { --dl-tone: var(--dl-warn); background: var(--dl-warn-wash); }
+  .dl-banner[data-tone="stop"] { --dl-tone: var(--dl-stop); background: var(--dl-stop-wash); }
+
+  /* Thread: the person's words in a bubble, the assistant's answer as plain prose. role="log" on the thread. */
+  .dl-thread { display: grid; gap: 16px; align-content: start; }
+  .dl-msg { margin: 0; max-width: 72ch; font-size: var(--dl-fs-prose); line-height: 1.55; overflow-wrap: anywhere; }
+  .dl-msg--user {
+    justify-self: end;
+    max-width: 88%;
+    padding: 8px 16px;
+    border-radius: var(--dl-r-bubble);
+    background: var(--dl-bubble);
+  }
+  .dl-msg--user[aria-busy="true"] { color: var(--dl-text-2); }
+  .dl-msg--user[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--dl-stop); }
+  .dl-msg--assistant { color: var(--dl-text); }
+  .dl-msg__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .dl-msg__note { margin: 8px 0 0; font-size: var(--dl-fs-xs); color: var(--dl-text-3); }
+
+  /* Build card: named steps, elapsed time, and a bar whose fill scales with real progress.
+     data-state: running | stopped | failed | lost (the connection dropped; the mark stops turning) | ready.
+     <section class="dl-steps" data-state="running"><div class="dl-steps__head">…</div>
+       <ol class="dl-steps__list"><li class="dl-step" data-state="done|now|next">…</li></ol>
+       <div class="dl-steps__bar"><div class="dl-steps__fill" style="--dl-p:.4"></div></div></section> */
+  .dl-steps {
+    --dl-under: var(--dl-surface-2);
+    display: grid;
+    gap: 12px;
+    padding: 12px 16px 16px;
+    border-radius: var(--dl-r-card);
+    background: var(--dl-surface-2);
+  }
+  .dl-steps__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dl-steps__list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .dl-step {
+    display: grid;
+    grid-template-columns: 16px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--dl-fs-sm);
+    color: var(--dl-text-3);
+  }
+  .dl-step::before {
+    content: "";
+    justify-self: center;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1.5px var(--dl-line-strong);
+  }
+  .dl-step[data-state="done"] { color: var(--dl-text-2); }
+  .dl-step[data-state="done"]::before { background: var(--dl-ok); box-shadow: none; }
+  .dl-step[data-state="now"] { color: var(--dl-text); }
+  .dl-step[data-state="now"]::before {
+    width: 12px;
+    height: 12px;
+    border: 2px solid color-mix(in srgb, var(--dl-text) 18%, transparent);
+    border-top-color: var(--dl-text);
+    box-shadow: none;
+    animation: dl-spin .8s linear infinite;
+  }
+  .dl-steps:is([data-state="stopped"], [data-state="lost"]) .dl-step[data-state="now"]::before,
+  .dl-steps[data-state="failed"] .dl-step[data-state="now"]::before { animation: none; border-color: var(--dl-line-strong); }
+  .dl-steps[data-state="failed"] .dl-step[data-state="now"]::before { width: 10px; height: 10px; border: 0; border-radius: 0; background: var(--dl-stop); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .dl-step__time { font-size: var(--dl-fs-meta); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+  .dl-steps__bar { height: 4px; overflow: hidden; border-radius: 2px; background: var(--dl-bubble); }
+  .dl-steps__fill {
+    --dl-p: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--dl-accent);
+    transform: translateX(calc((var(--dl-p) - 1) * 100%));
+    transition: transform var(--dl-travel);
+  }
+  .dl-steps:is([data-state="stopped"], [data-state="lost"]) .dl-steps__fill { background: var(--dl-line-strong); }
+  .dl-steps[data-state="failed"] .dl-steps__fill { background: var(--dl-stop); }
+  .dl-steps[data-state="ready"] .dl-steps__fill { background: var(--dl-ok); }
+  .dl-steps__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+  /* Surfaces. --dl-under tells sticky children what they sit on. */
+  .dl-card {
+    --dl-under: var(--dl-raised);
+    padding: 16px;
+    border: 1px solid var(--dl-line);
+    border-radius: var(--dl-r-card);
+    background: var(--dl-raised);
+  }
+  .dl-card--sunk { --dl-under: var(--dl-surface-2); border-color: transparent; background: var(--dl-surface-2); }
+  .dl-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .dl-stack { display: grid; gap: 16px; }
+
+  /* List row: one grammar. A title, a second line that says why the row is there, and its actions; one line each.
+     To open something, the title holds a link or button with .dl-row__link, which covers the row; the actions stay above it.
+     <li class="dl-row dl-row--plain"><div class="dl-row__text"><p class="dl-row__title"><a class="dl-row__link" href="…">…</a></p>
+       <p class="dl-row__sub">…</p></div><div class="dl-row__action">…</div></li>
+     data-current marks the row whose page is open; its link carries aria-current="page". */
+  .dl-list { display: grid; margin: 0; padding: 0; list-style: none; }
+  .dl-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--dl-list-row);
+    padding: 8px 12px;
+    border-radius: var(--dl-r-row);
+    transition: background var(--dl-tint);
+  }
+  .dl-row--plain { grid-template-columns: minmax(0, 1fr) auto; }
+  .dl-list > .dl-row + .dl-row::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: var(--dl-line);
+  }
+  .dl-row:is(:hover, [data-current]) + .dl-row::after, .dl-row:is(:hover, [data-current])::after { visibility: hidden; }
+  .dl-row:hover { background: var(--dl-hover); }
+  .dl-row[data-current] { background: var(--dl-selected); }
+  .dl-row[data-cursor] { box-shadow: inset 0 0 0 1px var(--dl-line-strong); }
+  .dl-row[data-off] .dl-row__title { color: var(--dl-text-2); }
+  .dl-row__lead { display: grid; place-items: center; align-self: start; min-width: 16px; height: 20px; }
+  .dl-row__text { min-width: 0; }
+  .dl-row__title, .dl-row__sub { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-row__title { font-weight: 500; line-height: 20px; color: var(--dl-text); }
+  .dl-row__sub { margin-top: 2px; font-size: var(--dl-fs-sub); line-height: 16px; color: var(--dl-text-2); }
+  .dl-row__link {
+    display: block;
+    width: 100%;
+    margin-block: -2px;
+    padding: 2px 0;
+    overflow: hidden;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .dl-row__link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .dl-row__link:focus-visible { outline: 0; }
+  .dl-row:has(.dl-row__link:focus-visible) { outline: 2px solid var(--dl-focus); outline-offset: -2px; }
+  .dl-row__action { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; }
+  /* Extra row actions beyond the main one appear on pointer hover; touch and keyboard always see them. */
+  @media (hover: hover) and (pointer: fine) {
+    .dl-row__more { opacity: 0; transition: opacity var(--dl-tint); }
+    .dl-row:is(:hover, :focus-within, [data-current]) .dl-row__more,
+    .dl-row__more:is([aria-expanded="true"], [data-popup-open]) { opacity: 1; }
+  }
+
+  /* Dense table for the vendor console. Header sticks; numbers align; the current row shows the whole quote.
+     A row opens from a link in its first cell. data-cursor marks the keyboard row (j/k) apart from the current one. */
+  .dl-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--dl-fs-ui); }
+  .dl-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    height: 32px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--dl-line);
+    background: var(--dl-under, var(--dl-bg));
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-text-2);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .dl-table td {
+    height: var(--dl-row-h);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--dl-line);
+    color: var(--dl-text);
+    vertical-align: middle;
+  }
+  .dl-table tbody tr { transition: background var(--dl-tint); }
+  .dl-table tbody tr:hover { background: var(--dl-hover); }
+  .dl-table tbody tr:is([data-current], [aria-selected="true"]) { background: var(--dl-selected); }
+  .dl-table tbody tr[data-cursor] td { box-shadow: inset 0 1px 0 var(--dl-line-strong), inset 0 -1px 0 var(--dl-line-strong); }
+  .dl-table .dl-num { text-align: right; white-space: nowrap; }
+  .dl-quote {
+    display: -webkit-box;
+    -webkit-line-clamp: var(--dl-quote-lines, 2);
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+  }
+  .dl-table tr:is([data-current], [aria-selected="true"]) .dl-quote,
+  .dl-quote[aria-expanded="true"] { display: block; overflow: visible; }
+
+  /* App frame and rail for both consoles. Under 720px a top bar takes the rail's place and its button opens the rail as a drawer.
+     <div class="dl-app" data-nav-open><header class="dl-topbar">…</header><nav class="dl-rail">…</nav><button class="dl-scrim"></button><main class="dl-main">…</main></div> */
+  .dl-app { display: grid; grid-template-columns: var(--dl-rail-w) minmax(0, 1fr); min-height: 100%; background: var(--dl-bg); }
+  .dl-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: none;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    height: 56px;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--dl-line);
+    background: var(--dl-bg);
+  }
+  .dl-topbar__title { overflow: hidden; font-size: var(--dl-fs-lg); font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-scrim { position: fixed; inset: 0; z-index: 39; display: none; padding: 0; border: 0; background: rgb(29 29 31 / .32); }
+  .dl-rail {
+    --dl-under: var(--dl-surface-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 12px 8px;
+    border-right: 1px solid var(--dl-line);
+    background: var(--dl-surface-2);
+  }
+  .dl-nav__group { margin: 0; padding: 16px 12px 4px; font-size: var(--dl-fs-meta); font-weight: 500; color: var(--dl-text-3); }
+  .dl-nav__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+    height: var(--dl-nav-h);
+    padding: 0 12px;
+    border-radius: var(--dl-r-row);
+    color: var(--dl-text-2);
+    text-decoration: none;
+    transition: background var(--dl-tint), color var(--dl-tint);
+  }
+  .dl-nav__item > .dl-icon { color: var(--dl-text-3); }
+  .dl-nav__item:hover { background: var(--dl-hover); color: var(--dl-text); }
+  .dl-nav__item:active { background: var(--dl-press); }
+  .dl-nav__item[aria-current="page"] { background: var(--dl-selected); color: var(--dl-text); font-weight: 500; }
+  .dl-nav__item[aria-current="page"] > .dl-icon { color: var(--dl-accent); }
+  .dl-nav__label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-nav__count { flex: none; margin-left: auto; font-size: var(--dl-fs-meta); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+  .dl-main { min-width: 0; padding: 24px 32px 32px; }
+
+  @media (max-width: 720px) {
+    .dl-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    .dl-topbar { display: grid; }
+    .dl-rail {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 40;
+      width: min(300px, 85vw);
+      overflow-y: auto;
+      box-shadow: var(--dl-shadow-panel);
+      transform: translateX(-100%);
+      visibility: hidden;
+      transition: transform var(--dl-travel), visibility 0s linear .34s;
+    }
+    .dl-app[data-nav-open] .dl-rail { transform: none; visibility: visible; transition: transform var(--dl-travel); }
+    .dl-app[data-nav-open] .dl-scrim { display: block; }
+    .dl-main { padding: 16px; }
+    .dl-row__lead:has(img) { display: none; }
+    /* On a phone a row opens its own page, which holds the actions its menu would. */
+    .dl-row__more { display: none; }
+  }
+
+  /* Sheet layout: the rail sits on the page, the content on a sheet rounded on its open side.
+     <div class="dl-app dl-app--sheet"><nav class="dl-rail">…</nav><main class="dl-sheet">…</main></div> */
+  .dl-app--sheet > .dl-rail { border-right: 0; background: transparent; }
+  .dl-sheet {
+    --dl-under: var(--dl-surface-2);
+    min-width: 0;
+    margin: 8px 0;
+    overflow: hidden;
+    border: 1px solid var(--dl-line);
+    border-right: 0;
+    border-radius: calc(var(--dl-r-card) + 8px) 0 0 calc(var(--dl-r-card) + 8px);
+    background: var(--dl-surface-2);
+  }
+  .dl-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  /* Segmented control: one of 2 to 4 views. A radio group (role="radio", aria-checked) or toggle buttons (aria-pressed).
+     The chosen side is raised and carries an edge, not only a fill. */
+  .dl-seg {
+    display: inline-flex;
+    justify-self: start;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--dl-line-ctl);
+    border-radius: var(--dl-r-ctl);
+    background: var(--dl-surface-2);
+  }
+  .dl-seg > :is(button, [role="radio"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: calc(var(--dl-ctl-h) - 6px);
+    padding: 0 12px;
+    border: 0;
+    border-radius: calc(var(--dl-r-ctl) - 3px);
+    background: transparent;
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-text-2);
+    cursor: pointer;
+    transition: background var(--dl-tint), color var(--dl-tint);
+  }
+  .dl-seg > :is(button, [role="radio"]):hover { background: var(--dl-hover); color: var(--dl-text); }
+  .dl-seg > :is(button, [role="radio"]):active { background: var(--dl-press); }
+  .dl-seg > :is([aria-pressed="true"], [aria-checked="true"]),
+  .dl-seg > :is([aria-pressed="true"], [aria-checked="true"]):is(:hover, :active) {
+    background: var(--dl-raised);
+    color: var(--dl-text);
+    box-shadow: var(--dl-shadow-raised);
+  }
+
+  /* Switch: something that takes effect at once. Off is an outlined track with a small grey thumb; on is filled with a white one.
+     <button class="dl-switch" type="button" role="switch" aria-checked="true" aria-label="Unread count beside each label"></button>
+     aria-busy holds it still while the write is in flight. */
+  .dl-switch {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 40px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid var(--dl-line-strong);
+    border-radius: var(--dl-r-pill);
+    background: var(--dl-field);
+    cursor: pointer;
+    transition: background var(--dl-tint), border-color var(--dl-tint);
+  }
+  .dl-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--dl-line-strong);
+    transform: scale(.75);
+    transition: transform var(--dl-tint), background var(--dl-tint);
+  }
+  .dl-switch:hover:not(:disabled) { border-color: var(--dl-text-2); }
+  .dl-switch:hover:not(:disabled)::after { background: var(--dl-text-2); }
+  .dl-switch[aria-checked="true"] { border-color: var(--dl-control-on); background: var(--dl-control-on); }
+  .dl-switch[aria-checked="true"]::after { background: #ffffff; transform: translateX(16px); }
+  .dl-switch[aria-checked="true"]:hover:not(:disabled) { border-color: var(--dl-control-on); }
+  .dl-switch[aria-checked="true"]:hover:not(:disabled)::after { background: #ffffff; }
+  .dl-switch[aria-busy="true"] { cursor: progress; }
+  .dl-switch[aria-busy="true"]::after { opacity: .6; }
+  .dl-switch:disabled { border-color: var(--dl-line-ctl); background: var(--dl-surface-2); cursor: not-allowed; }
+  .dl-switch:disabled::after { background: var(--dl-line-ctl); }
+  .dl-switch[aria-checked="true"]:disabled { border-color: transparent; background: var(--dl-line-strong); }
+  .dl-switch[aria-checked="true"]:disabled::after { background: var(--dl-surface-2); }
+  .dl-choice > .dl-switch { margin-top: -2px; }
+
+  .dl-kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--dl-line-ctl);
+    border-bottom-width: 2px;
+    border-radius: var(--dl-r-tag);
+    background: var(--dl-raised);
+    font-family: var(--dl-font);
+    font-size: var(--dl-fs-meta);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--dl-text-2);
+  }
+  .dl-btn--primary .dl-kbd { border-color: rgb(255 255 255 / .35); background: transparent; color: inherit; }
+
+  /* Toast: one line in ink over the page, with the way back. Mount one viewport (role="region", aria-live="polite")
+     at the root and add toasts to it; a toast with an action stays while the pointer or focus is on it. */
+  .dl-toast {
+    --dl-text: #f5f5f7;
+    --dl-text-2: #c7c7cc;
+    --dl-hover: rgb(255 255 255 / .12);
+    --dl-press: rgb(255 255 255 / .2);
+    --dl-focus: var(--dl-pink-7);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 4px 4px 4px 16px;
+    border-radius: var(--dl-r-pill);
+    background: var(--dl-ink);
+    color: var(--dl-text);
+    font-size: var(--dl-fs-sm);
+    font-weight: 500;
+    line-height: 1.2;
+    box-shadow: var(--dl-shadow-float);
+    animation: dl-panel-in var(--dl-enter);
+  }
+  .dl-toast > .dl-icon { margin-left: -4px; color: var(--dl-text-2); }
+  .dl-toast .dl-btn { border-radius: var(--dl-r-pill); }
+  .dl-toast[data-ending-style] { opacity: 0; transform: translateY(6px); transition: opacity var(--dl-enter), transform var(--dl-enter); }
+  .dl-toast__title { margin: 0; font-size: inherit; font-weight: inherit; }
+  /* The one place toasts appear: bottom centre, newest at the bottom. */
+  .dl-toasts { position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom, 0px)); z-index: 60; display: grid; justify-items: center; gap: 8px; padding: 0 16px; pointer-events: none; }
+  .dl-toasts > * { pointer-events: auto; }
+
+  /* Tooltip: names an icon button, on hover and on focus. Ink, small, never holds an action. */
+  .dl-tooltip {
+    display: inline-block;
+    max-width: 240px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--dl-ink);
+    color: #f5f5f7;
+    font-size: var(--dl-fs-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    box-shadow: var(--dl-shadow-float);
+  }
+  .dl-tooltip:is([data-starting-style], [data-ending-style]) { opacity: 0; }
+  .dl-tooltip { transition: opacity var(--dl-tint); }
+
+  /* Menu: a raised list of actions at its trigger. Corners nest: 12 outside, 4 of padding, 8 on the rows.
+     Base UI marks the keyboard's row with [data-highlighted]; the one that loses something comes last, after a separator. */
+  .dl-menu {
+    display: grid;
+    min-width: 200px;
+    max-width: 320px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--dl-raised);
+    box-shadow: var(--dl-shadow-float);
+    outline: 0;
+  }
+  .dl-menu:is([data-starting-style], [data-ending-style]) { opacity: 0; transform: translateY(-4px); }
+  .dl-menu { transition: opacity var(--dl-tint), transform var(--dl-tint); }
+  .dl-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--dl-nav-h);
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--dl-text);
+    font-size: var(--dl-fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .dl-menu__item:focus-visible { outline-offset: -2px; }
+  .dl-menu__item > .dl-icon { color: var(--dl-text-3); }
+  .dl-menu__item:is(:hover, [data-highlighted], [data-cursor]) { background: var(--dl-hover); }
+  .dl-menu__item:active { background: var(--dl-press); }
+  .dl-menu__item:is([aria-checked="true"], [data-selected]) { font-weight: 500; }
+  .dl-menu__item--danger, .dl-menu__item--danger > .dl-icon { color: var(--dl-stop); }
+  .dl-menu__item:is(:disabled, [aria-disabled="true"], [data-disabled]) { color: var(--dl-text-3); background: transparent; cursor: not-allowed; }
+  .dl-menu__item:is(:disabled, [aria-disabled="true"], [data-disabled]) > .dl-icon { color: var(--dl-line-strong); }
+  .dl-menu__hint { margin-left: auto; padding-left: 16px; font-size: var(--dl-fs-xs); color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+  .dl-menu__sep { height: 1px; margin: 4px 8px; background: var(--dl-line); }
+
+  /* Dialog: one question, what is lost, and verbs on the buttons. Works on a native <dialog> opened with showModal() or a Base UI Popup.
+     <dialog class="dl-dialog" aria-labelledby="t"><h2 class="dl-dialog__title" id="t">…</h2><p class="dl-dialog__body">…</p>
+       <div class="dl-dialog__actions"><button class="dl-btn dl-btn--secondary">Cancel</button><button class="dl-btn dl-btn--danger-solid">Remove</button></div></dialog> */
+  .dl-dialog {
+    display: grid;
+    gap: 12px;
+    width: min(440px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    margin: auto;
+    padding: 24px;
+    overflow: auto;
+    border: 0;
+    border-radius: var(--dl-r-card);
+    background: var(--dl-raised);
+    color: var(--dl-text);
+    box-shadow: var(--dl-shadow-panel);
+    animation: dl-panel-in var(--dl-enter);
+  }
+  .dl-dialog:not([open]):where(dialog) { display: none; }
+  .dl-dialog::backdrop, .dl-backdrop { background: rgb(29 29 31 / .32); }
+  .dl-backdrop { position: fixed; inset: 0; z-index: 50; }
+  .dl-dialog-viewport { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; }
+  .dl-dialog:is([data-starting-style], [data-ending-style]) { opacity: 0; transform: translateY(6px) scale(.985); }
+  .dl-dialog__title { margin: 0; font-size: var(--dl-fs-lg); font-weight: 600; line-height: 1.3; text-wrap: balance; }
+  .dl-dialog__body { margin: 0; font-size: var(--dl-fs-ui); line-height: 1.5; color: var(--dl-text-2); }
+  .dl-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+
+  /* Tabs across a page. Route tabs are links with aria-current="page"; in-page tabs are role="tab" with aria-selected. */
+  .dl-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--dl-line); }
+  .dl-tabs__item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    height: 40px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px 8px 0 0;
+    background: transparent;
+    color: var(--dl-text-2);
+    font-size: var(--dl-fs-ui);
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--dl-tint), background var(--dl-tint);
+  }
+  .dl-tabs__item:first-child { margin-left: -8px; }
+  .dl-tabs__item:hover { color: var(--dl-text); background: var(--dl-hover); }
+  .dl-tabs__item:active { background: var(--dl-press); }
+  .dl-tabs__item:focus-visible { outline-offset: -2px; }
+  .dl-tabs__item:is([aria-selected="true"], [aria-current="page"]) { color: var(--dl-text); }
+  .dl-tabs__item:is([aria-selected="true"], [aria-current="page"])::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--dl-accent);
+  }
+  .dl-tabs__count { font-size: var(--dl-fs-xs); font-weight: 500; color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+
+  /* Avatar: initials on a grey disc beside the name they stand for; --brand is Darling's own voice, the only pink one. */
+  .dl-avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--dl-bubble);
+    box-shadow: inset 0 0 0 1px var(--dl-line);
+    color: var(--dl-text-2);
+    font-size: var(--dl-fs-meta);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .dl-avatar--brand { background: var(--dl-brand); box-shadow: none; color: var(--dl-on-brand); }
+  .dl-avatar--lg { width: 32px; height: 32px; font-size: var(--dl-fs-xs); }
+
+  /* Key and value pairs: <dl class="dl-kv"><dt>First version</dt><dd>29 s</dd></dl>. */
+  .dl-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: var(--dl-fs-sm); }
+  .dl-kv dt { color: var(--dl-text-3); }
+  .dl-kv dd { margin: 0; color: var(--dl-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+  /* Empty state: what would be here, in a title a step larger than the line under it, and the one step that fills it. */
+  .dl-empty { display: grid; justify-items: center; gap: 4px; padding: 40px 16px; text-align: center; font-size: var(--dl-fs-sm); color: var(--dl-text-2); }
+  .dl-empty__title { font-size: var(--dl-fs-prose); font-weight: 500; color: var(--dl-text); text-wrap: balance; }
+  .dl-empty > :is(.dl-btn, .dl-toolbar) { margin-top: 12px; }
+
+  /* Before and after picture with a corner label. The label's backing is fixed: the picture has the host's polarity, not ours. */
+  .dl-ba {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    max-width: 100%;
+    border: 1px solid var(--dl-line);
+    border-radius: var(--dl-r-card);
+    background: var(--dl-surface-2);
+  }
+  .dl-ba__label { position: absolute; top: 8px; left: 8px; --dl-tone: #ffffff; border-radius: 6px; background: rgb(0 0 0 / .62); color: #ffffff; }
+
+  /* Extension: the edge tab and the docked panel. Docked right by default; data-dock="left" mirrors it. */
+  .dl-tab {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 4px;
+    width: var(--dl-tab-w);
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: 10px 0 0 10px;
+    background: var(--dl-brand);
+    color: var(--dl-on-brand);
+    font-family: var(--dl-font);
+    font-size: var(--dl-fs-prose);
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: var(--dl-shadow-tab);
+    cursor: pointer;
+  }
+  .dl-tab[data-dock="left"] { border-radius: 0 10px 10px 0; }
+  /* The number of changes kept on this site, under the mark. */
+  .dl-tab__count { font-size: var(--dl-fs-meta); font-weight: 600; font-variant-numeric: tabular-nums; color: currentColor; }
+
+  .dl-panel {
+    --dl-fs-prose: 14px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: var(--dl-panel-w);
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: var(--dl-r-card) 0 0 var(--dl-r-card);
+    background: var(--dl-bg);
+    color: var(--dl-text);
+    box-shadow: var(--dl-shadow-panel);
+    transform-origin: 100% 50%;
+    animation: dl-panel-in var(--dl-enter);
+  }
+  .dl-panel[data-dock="left"] { border-radius: 0 var(--dl-r-card) var(--dl-r-card) 0; transform-origin: 0 50%; }
+  .dl-panel[data-closing] { animation: dl-panel-in var(--dl-enter) reverse forwards; pointer-events: none; }
+  /* Floating: inset from the window edge with every corner rounded, as tall as its content. */
+  .dl-panel[data-float] { border-radius: var(--dl-r-card); max-height: calc(100vh - 24px); transform-origin: 100% 0; }
+  .dl-panel[data-float][data-dock="left"] { border-radius: var(--dl-r-card); transform-origin: 0 0; }
+  .dl-panel__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 16px;
+    border-bottom: 1px solid var(--dl-line);
+  }
+  .dl-panel__id { flex: 1; min-width: 0; }
+  .dl-panel__title { margin: 0; font-size: var(--dl-fs-ui); font-weight: 600; line-height: 1.2; }
+  .dl-panel__host {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--dl-mono);
+    font-size: var(--dl-fs-meta);
+    line-height: 1.2;
+    color: var(--dl-text-3);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .dl-panel__body {
+    --dl-under: var(--dl-bg);
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 16px;
+  }
+  .dl-panel__foot { padding: 8px 12px 12px; }
+  /* A section of a list: a label, a count, and an optional action on one line. */
+  .dl-section { display: flex; align-items: center; gap: 8px; min-height: 24px; padding: 0 12px 4px; }
+  .dl-section > .dl-kicker { margin-right: auto; }
+  .dl-section > a { min-height: 24px; }
+
+  /* Build notice: the chat hidden while the agent works. It takes the tab's place at the window edge and its body
+     reopens the panel. data-state: running | ready | away (ready on a page the person has left) | refused.
+     The clock inside is aria-hidden; the state words are what a screen reader hears.
+     <div class="dl-notice" data-state="running"><span class="dl-notice__mark" aria-hidden="true">D</span>
+       <button class="dl-notice__body"><span class="dl-notice__title">Building a preview</span><span class="dl-notice__sub">…</span></button>
+       <span class="dl-meta" aria-hidden="true">0:41</span><button class="dl-btn dl-btn--ghost dl-btn--sm">Stop</button>
+       <div class="dl-notice__bar"><div class="dl-notice__fill" style="--dl-p:.58"></div></div></div> */
+  .dl-notice {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 12px;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    padding: 12px 12px 16px;
+    overflow: hidden;
+    border-radius: var(--dl-r-card);
+    background: var(--dl-raised);
+    color: var(--dl-text);
+    box-shadow: var(--dl-shadow-panel);
+    animation: dl-panel-in var(--dl-enter);
+  }
+  .dl-notice__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--dl-brand);
+    color: var(--dl-on-brand);
+    font-size: var(--dl-fs-xs);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .dl-notice__mark::after { content: none; position: absolute; }
+  .dl-notice[data-state="running"] .dl-notice__mark::after {
+    content: "";
+    inset: -4px;
+    border: 2px solid transparent;
+    border-top-color: var(--dl-accent);
+    border-right-color: var(--dl-accent);
+    border-radius: 50%;
+    animation: dl-spin 1.1s linear infinite;
+  }
+  .dl-notice:is([data-state="ready"], [data-state="away"]) .dl-notice__mark::after,
+  .dl-notice[data-state="refused"] .dl-notice__mark::after {
+    content: "";
+    right: -2px;
+    bottom: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dl-ok);
+    box-shadow: 0 0 0 2px var(--dl-bg);
+  }
+  .dl-notice[data-state="refused"] .dl-notice__mark::after { width: 8px; height: 8px; border-radius: 1px; background: var(--dl-stop); transform: rotate(45deg); }
+  .dl-notice__body {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    text-align: start;
+    cursor: pointer;
+  }
+  .dl-notice__title, .dl-notice__sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-notice__title { font-size: var(--dl-fs-ui); font-weight: 600; line-height: 1.3; }
+  .dl-notice__sub { font-size: var(--dl-fs-xs); line-height: 1.35; color: var(--dl-text-2); }
+  .dl-notice__actions { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .dl-notice__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; overflow: hidden; background: var(--dl-bubble); }
+  .dl-notice__fill { height: 100%; background: var(--dl-accent); transform: translateX(calc((var(--dl-p, 0) - 1) * 100%)); transition: transform var(--dl-travel); }
+
+  /* Pieces for showing data: a number that answers the question, a meter, a span of time and a
+     trend. data-tone (ok, warn, stop, info, accent) colours each. */
+  .dl-stat { --dl-tone: var(--dl-text); }
+  .dl-meter, .dl-spark { --dl-tone: var(--dl-accent); }
+  .dl-timeline__block { --dl-tone: var(--dl-line-strong); }
+  :is(.dl-stat, .dl-meter, .dl-timeline__block, .dl-spark)[data-tone="ok"] { --dl-tone: var(--dl-ok); }
+  :is(.dl-stat, .dl-meter, .dl-timeline__block, .dl-spark)[data-tone="warn"] { --dl-tone: var(--dl-warn); }
+  :is(.dl-stat, .dl-meter, .dl-timeline__block, .dl-spark)[data-tone="stop"] { --dl-tone: var(--dl-stop); }
+  :is(.dl-stat, .dl-meter, .dl-timeline__block, .dl-spark)[data-tone="info"] { --dl-tone: var(--dl-info); }
+  :is(.dl-stat, .dl-meter, .dl-timeline__block, .dl-spark)[data-tone="accent"] { --dl-tone: var(--dl-accent); }
+
+  /* <div class="dl-stats"><div class="dl-stat"><span class="dl-stat__n">3</span><span class="dl-stat__l">kept this week</span></div></div> */
+  .dl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 12px; }
+  .dl-stat { display: grid; gap: 2px; align-content: start; min-width: 0; }
+  .dl-stat__n { font-size: var(--dl-fs-xl); font-weight: 600; line-height: 1.15; letter-spacing: -.015em; font-variant-numeric: tabular-nums; color: var(--dl-tone); }
+  .dl-stat__l { font-size: var(--dl-fs-xs); color: var(--dl-text-2); }
+  .dl-stat--hero .dl-stat__n { font-size: var(--dl-fs-hero); letter-spacing: -.02em; }
+
+  /* Progress toward something with an end. Its numbers are always in words beside it; the bar is for the eye.
+     <div class="dl-meter" role="meter" aria-label="Storage used" aria-valuetext="1.9 of 3 GB" style="--dl-p: .63"></div> */
+  .dl-meter { --dl-p: 0; height: 6px; overflow: hidden; border-radius: 3px; background: var(--dl-bubble); }
+  .dl-meter::after { content: ""; display: block; height: 100%; border-radius: inherit; background: var(--dl-tone); transform: translateX(calc((var(--dl-p) - 1) * 100%)); transition: transform var(--dl-travel); }
+
+  /* A span of time with blocks and a now line; --a, --b and --now are fractions of the span. Blocks are grey unless toned.
+     <div class="dl-timeline"><span class="dl-timeline__block" style="--a: .1; --b: .3"></span><span class="dl-timeline__now" style="--now: .4"></span></div> */
+  .dl-timeline { position: relative; height: 28px; border-radius: 8px; background: var(--dl-surface-2); box-shadow: inset 0 0 0 1px var(--dl-line); }
+  .dl-timeline__block { position: absolute; top: 4px; bottom: 4px; left: calc(var(--a) * 100%); width: max(4px, calc((var(--b) - var(--a)) * 100%)); border-radius: 4px; background: var(--dl-tone); }
+  .dl-timeline__block[data-free] { --dl-tone: var(--dl-ok); background: var(--dl-ok-wash); box-shadow: inset 0 0 0 1px var(--dl-ok); }
+  .dl-timeline__now { position: absolute; top: -4px; bottom: -4px; left: calc(var(--now) * 100%); width: 2px; margin-left: -1px; border-radius: 1px; background: var(--dl-stop); }
+  .dl-timeline__ticks { position: relative; height: 16px; margin-top: 4px; font-size: var(--dl-fs-meta); line-height: 16px; color: var(--dl-text-3); font-variant-numeric: tabular-nums; }
+  .dl-timeline__ticks > span { position: absolute; left: calc(var(--t) * 100%); transform: translateX(-50%); white-space: nowrap; }
+
+  /* A trend line, an inline SVG polyline in currentColor: <svg class="dl-spark" viewBox="0 0 100 32" preserveAspectRatio="none">…</svg> */
+  .dl-spark { display: block; width: 100%; height: 32px; color: var(--dl-tone); }
+
+  /* Forced colours drop shadows and fills; borders and outlines carry the shapes instead. */
+  @media (forced-colors: active) {
+    .dl-panel, .dl-tab, .dl-card, .dl-composer, .dl-steps, .dl-menu, .dl-toast, .dl-tooltip, .dl-dialog, .dl-banner, .dl-chip, .dl-btn, .dl-input, .dl-seg, .dl-tag {
+      border: 1px solid CanvasText;
+    }
+    .dl-nav__item[aria-current="page"], .dl-row[data-current], .dl-seg > :is([aria-pressed="true"], [aria-checked="true"]),
+    .dl-table tbody tr:is([data-current], [aria-selected="true"]), .dl-chip[aria-pressed="true"], .dl-menu__item:is([data-highlighted], :hover) {
+      outline: 2px solid Highlight;
+    }
+    .dl-status { --dl-tone: CanvasText; }
+    .dl-step { --dl-ok: CanvasText; --dl-accent: Highlight; --dl-line-strong: GrayText; }
+    .dl-steps__bar, .dl-meter, .dl-timeline { border: 1px solid CanvasText; }
+    .dl-steps__fill, .dl-meter::after, .dl-timeline__block, .dl-tabs__item:is([aria-selected="true"], [aria-current="page"])::after { background: Highlight; }
+    .dl-status::before, .dl-step::before, .dl-steps__fill, .dl-meter::after, .dl-timeline__block, .dl-switch, .dl-switch::after, .dl-check, .dl-radio { forced-color-adjust: none; }
+  }
+}

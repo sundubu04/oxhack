@@ -1,116 +1,173 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB" data-dl-look="pink" data-dl-density="compact">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Clockwork — arm control</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%236e79d6'/%3E%3C/svg%3E">
-  <meta name="theme-color" content="#0e0e11">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+  <title>Clockwork</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23a34a69'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./ui/kit.css">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="app">
-    <header class="topbar">
-      <div class="brand"><span class="mark"></span> Clockwork <span class="tag">arm control</span></div>
-      <div class="top-actions">
-        <span id="arm-status" class="chip">Arm: offline</span>
-        <button id="settings-btn" class="btn ghost">Settings</button>
-      </div>
+  <a class="dl-skip" href="#main">Skip to content</a>
+  <div class="dl-app cw-app" id="app">
+    <header class="dl-topbar">
+      <button class="dl-icon-btn" id="nav-open" type="button" aria-label="Open the menu"><i data-icon="panel-left"></i></button>
+      <span class="dl-topbar__title">Clockwork</span>
+      <button class="dl-icon-btn" type="button" data-open-palette aria-label="Commands"><i data-icon="command"></i></button>
     </header>
 
-    <main class="layout">
-      <section class="compose">
-        <div class="prompt">
-          <textarea id="prompt" rows="2" placeholder="Describe what to draw…  e.g. a smiling cat"></textarea>
-          <div class="prompt-actions">
-            <button id="mic" class="icon-btn" title="Hold to speak">🎤</button>
-            <button id="draw" class="btn primary">Draw ⏎</button>
+    <nav class="dl-rail cw-rail" aria-label="Clockwork">
+      <div class="cw-brand"><span class="dl-avatar dl-avatar--brand" aria-hidden="true">C</span><span>Clockwork</span></div>
+      <button class="cw-find" type="button" data-open-palette><i data-icon="search"></i><span>Draw or find</span><kbd class="dl-kbd">⌘K</kbd></button>
+      <a class="dl-nav__item" href="#studio" data-page="studio" aria-current="page"><i data-icon="pencil"></i><span class="dl-nav__label">Studio</span></a>
+      <a class="dl-nav__item" href="#arm" data-page="arm"><i data-icon="ruler"></i><span class="dl-nav__label">Arm setup</span></a>
+      <p class="dl-nav__group">Samples</p>
+      <div id="samples" class="cw-navlist"></div>
+      <p class="dl-nav__group" id="recent-head" hidden>Recent</p>
+      <div id="recent" class="cw-navlist"></div>
+      <div class="cw-services" id="services" aria-label="Services"></div>
+    </nav>
+    <button class="dl-scrim" type="button" aria-label="Close the menu"></button>
+
+    <main class="dl-main cw-main" id="main">
+      <!-- Studio: ask, see the arm draw it, send it -->
+      <section class="cw-page" id="page-studio" aria-labelledby="title">
+        <div class="cw-work">
+          <header class="cw-head">
+            <div class="cw-titles">
+              <h1 class="dl-h1 cw-title" id="title">New drawing</h1>
+              <p class="dl-meta" id="subtitle">Describe it, say it, or pick a sample</p>
+            </div>
+            <div class="dl-seg" role="group" aria-label="View" id="views">
+              <button type="button" aria-pressed="true" data-view="board">Board</button>
+              <button type="button" aria-pressed="false" data-view="picture">Picture</button>
+              <button type="button" aria-pressed="false" data-view="angles">Angles</button>
+            </div>
+          </header>
+
+          <form class="cw-ask" id="ask" autocomplete="off">
+            <input class="dl-input cw-ask__input" id="prompt" aria-label="What to draw" placeholder="Describe what to draw, e.g. a cat asleep on a clock" enterkeyhint="go">
+            <button class="dl-icon-btn" type="button" id="mic" aria-pressed="false" aria-label="Say it" title="Say it"><i data-icon="mic"></i></button>
+            <button class="dl-icon-btn" type="button" id="narrate" aria-pressed="false" aria-label="Arm speaks" title="Arm speaks"><i data-icon="volume-x"></i></button>
+            <button class="dl-btn dl-btn--primary" type="submit" id="draw">Draw</button>
+          </form>
+          <div class="dl-banner" data-tone="stop" role="alert" id="error" hidden><i data-icon="circle-alert"></i><p id="error-text"></p></div>
+
+          <div class="cw-stage" id="stage">
+            <canvas class="cw-board" id="board" aria-label="The whiteboard and the arm"></canvas>
+            <p class="cw-empty" id="empty">Describe a drawing or pick a sample, and the arm draws it here first</p>
+            <div class="cw-picture" id="picture" hidden></div>
+            <div class="cw-angles" id="angles" hidden></div>
+          </div>
+
+          <div class="cw-transport" id="transport">
+            <button class="dl-icon-btn" type="button" id="play" aria-label="Play" title="Play"><i data-icon="play"></i></button>
+            <button class="dl-icon-btn" type="button" id="rewind" aria-label="Start again" title="Start again"><i data-icon="rotate-ccw"></i></button>
+            <button class="dl-icon-btn" type="button" id="erase" aria-label="Erase the board" title="Erase the board"><i data-icon="eraser"></i></button>
+            <input class="cw-scrub" type="range" id="scrub" min="0" max="1000" value="0" aria-label="Time">
+            <span class="dl-num cw-time" id="time">0:00 / 0:00</span>
+            <div class="dl-seg" role="group" aria-label="Speed" id="speed">
+              <button type="button" aria-pressed="true" data-speed="1">1×</button>
+              <button type="button" aria-pressed="false" data-speed="2">2×</button>
+              <button type="button" aria-pressed="false" data-speed="5">5×</button>
+            </div>
           </div>
         </div>
-        <div class="chips" id="samples">
-          <button data-s="clock">Clock (now)</button>
-          <button data-s="house">House</button>
-          <button data-s="cat">Cat</button>
-          <button data-s="star">Star</button>
-          <button data-s="flower">Flower</button>
-        </div>
-        <ol class="steps" id="steps">
-          <li data-step="prompt"><span class="dot"></span><span>Understand the ask</span><span class="t"></span></li>
-          <li data-step="image"><span class="dot"></span><span>Draw the picture (Gemini)</span><span class="t"></span></li>
-          <li data-step="path"><span class="dot"></span><span>Plan the most effective path</span><span class="t"></span></li>
-          <li data-step="angles"><span class="dot"></span><span>Solve the joint angles</span><span class="t"></span></li>
-          <li data-step="ready"><span class="dot"></span><span>Ready to draw</span><span class="t"></span></li>
-        </ol>
-        <p class="empty" style="font-size:12px;text-align:left">Pipeline: ask → a line drawing → a deterministic plotter path (shortest pen travel) → base/elbow/tilt angles for the SG92R arm. Add API keys in Settings, or try a sample above with no key.</p>
+
+        <aside class="cw-inspector" aria-label="Plan and arm">
+          <section class="cw-sec">
+            <div class="cw-sec__head"><h2 class="dl-kicker">Plan</h2><span class="dl-status" id="plan-status">Nothing yet</span></div>
+            <div class="cw-stats">
+              <div class="dl-stat dl-stat--hero" data-tone="accent"><b class="dl-stat__n" id="st-time">0 s</b><span class="dl-stat__l">to draw</span></div>
+              <div class="cw-kpis">
+                <div class="dl-stat"><b class="dl-stat__n" id="st-ink">0 mm</b><span class="dl-stat__l">ink</span></div>
+                <div class="dl-stat"><b class="dl-stat__n" id="st-travel">0 mm</b><span class="dl-stat__l">pen up</span></div>
+                <div class="dl-stat"><b class="dl-stat__n" id="st-err">0 mm</b><span class="dl-stat__l">worst wobble</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="dl-steps cw-steps" id="steps" data-state="ready" aria-label="Pipeline">
+            <ol class="dl-steps__list">
+              <li class="dl-step" data-step="picture">Picture<span class="dl-step__time"></span></li>
+              <li class="dl-step" data-step="path">Shortest path<span class="dl-step__time"></span></li>
+              <li class="dl-step" data-step="angles">Joint angles<span class="dl-step__time"></span></li>
+              <li class="dl-step" data-step="sim">Simulated<span class="dl-step__time"></span></li>
+            </ol>
+            <div class="dl-steps__bar"><div class="dl-steps__fill" id="steps-fill"></div></div>
+          </section>
+
+          <section class="cw-sec">
+            <div class="cw-sec__head"><h2 class="dl-kicker">Joints</h2><span class="dl-status" id="pen-status">Pen up</span></div>
+            <div class="cw-joints" id="joints"></div>
+          </section>
+
+          <section class="cw-sec">
+            <h2 class="dl-kicker">Simulation</h2>
+            <div class="cw-switches">
+              <label class="dl-choice cw-choice"><span id="sw-physics-l">Servo limits</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-physics" aria-labelledby="sw-physics-l"></button></label>
+              <label class="dl-choice cw-choice"><span id="sw-reach-l">Show reach</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-reach" aria-labelledby="sw-reach-l"></button></label>
+              <label class="dl-choice cw-choice"><span id="sw-time-l">Keep time</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-time" aria-labelledby="sw-time-l"></button></label>
+            </div>
+          </section>
+
+          <section class="cw-sec">
+            <div class="cw-sec__head"><h2 class="dl-kicker">Arm</h2><span class="dl-status" id="arm-status">Not connected</span></div>
+            <div class="cw-actions">
+              <button class="dl-btn dl-btn--secondary" type="button" id="connect"><i data-icon="usb"></i>Connect</button>
+              <button class="dl-btn dl-btn--secondary" type="button" id="send" disabled><i data-icon="send"></i>Send to arm</button>
+              <button class="dl-icon-btn" type="button" id="download" aria-label="Download the angles" title="Download the angles" disabled><i data-icon="download"></i></button>
+              <button class="dl-icon-btn" type="button" id="copy" aria-label="Copy the angles" title="Copy the angles" disabled><i data-icon="copy"></i></button>
+            </div>
+          </section>
+        </aside>
       </section>
 
-      <section class="preview">
-        <div class="tabs" id="tabs">
-          <button data-t="image" class="active">Image</button>
-          <button data-t="path">Path</button>
-          <button data-t="arm">Arm</button>
+      <!-- Arm setup: the real dimensions, saved to arm.config.json -->
+      <section class="cw-page" id="page-arm" aria-labelledby="arm-title" hidden>
+        <div class="cw-work">
+          <header class="cw-head">
+            <div class="cw-titles">
+              <h1 class="dl-h1" id="arm-title">Arm setup</h1>
+              <p class="dl-meta">Saved to app/arm.config.json</p>
+            </div>
+          </header>
+          <div class="dl-banner" data-tone="warn" role="status" id="placeholder"><i data-icon="triangle-alert"></i><p>Design numbers, not measured. Enter the build's own and save.</p></div>
+          <div class="cw-setup">
+            <form class="cw-form" id="setup" novalidate></form>
+            <div class="cw-preview">
+              <canvas class="cw-board" id="setup-board" aria-label="Preview of the arm with these dimensions"></canvas>
+              <p class="dl-meta">Drag on the board to move the pen</p>
+            </div>
+          </div>
         </div>
-        <div class="stage">
-          <div id="view-image" class="view"><span class="empty">Your drawing appears here.</span></div>
-          <canvas id="view-path" class="view" hidden></canvas>
-          <canvas id="view-arm" class="view" hidden></canvas>
-        </div>
-        <div class="stats" id="stats">
-          <div class="stat"><b id="s-strokes">—</b><span>strokes</span></div>
-          <div class="stat"><b id="s-ink">—</b><span>ink mm</span></div>
-          <div class="stat"><b id="s-travel">—</b><span>travel mm</span></div>
-          <div class="stat"><b id="s-dex">—</b><span>worst dex</span></div>
-          <div class="stat"><b id="s-time">—</b><span>est time</span></div>
-          <div class="stat"><b id="s-reach">—</b><span>out of reach</span></div>
-        </div>
-        <div class="actions">
-          <button id="play" class="btn" disabled>Preview draw</button>
-          <button id="narrate" class="btn ghost">🔊 Narrate</button>
-          <span class="spacer"></span>
-          <button id="copy" class="btn ghost" disabled>Copy angles</button>
-          <button id="download" class="btn ghost" disabled>Download</button>
-          <button id="send" class="btn primary" disabled>Send to arm</button>
-        </div>
+        <aside class="cw-inspector" aria-label="What these dimensions give">
+          <section class="cw-sec">
+            <div class="cw-sec__head"><h2 class="dl-kicker">Reach</h2><span class="dl-status" id="fit-status">Fits</span></div>
+            <dl class="dl-kv" id="derived"></dl>
+          </section>
+          <section class="cw-sec">
+            <h2 class="dl-kicker">Services</h2>
+            <dl class="dl-kv" id="service-kv"></dl>
+          </section>
+          <section class="cw-sec">
+            <div class="cw-actions">
+              <button class="dl-btn dl-btn--primary" type="button" id="save">Save</button>
+              <button class="dl-btn dl-btn--ghost" type="button" id="revert">Undo changes</button>
+            </div>
+            <p class="dl-meta" id="save-note"></p>
+          </section>
+        </aside>
       </section>
     </main>
-
-    <dialog id="settings">
-      <form method="dialog" class="dlg">
-        <div class="dlg-head"><h2>Settings</h2><button class="btn ghost sm" value="close">Close</button></div>
-        <div class="dlg-body">
-          <div class="set">
-            <label for="set-gkey">Gemini API key</label>
-            <input id="set-gkey" type="password" placeholder="AIza… (from Google AI Studio)" autocomplete="off">
-            <span class="hint">Get one free at <a href="https://mlh.link/gemini-aistudio" target="_blank" rel="noopener">mlh.link/gemini-aistudio</a> → AI Studio → API key. Stored only in this browser.</span>
-          </div>
-          <div class="row">
-            <div class="set"><label for="set-gmodel">Gemini model</label><input id="set-gmodel" value="gemini-2.5-flash"></div>
-            <div class="set"><label for="set-route">Drawing route</label><select id="set-route"><option value="svg">SVG (vectors, fast)</option><option value="image">Image → trace</option></select></div>
-            <div class="set"><label for="set-gimg">Image model</label><input id="set-gimg" value="gemini-2.5-flash-image"></div>
-          </div>
-          <div class="set">
-            <label for="set-ekey">ElevenLabs API key (optional, for voice)</label>
-            <input id="set-ekey" type="password" placeholder="xi-… (from your ElevenLabs dashboard)" autocomplete="off">
-            <span class="hint">Promo code arrives in your MLH event email → sign up → API key. Voice input uses the browser (no key).</span>
-          </div>
-          <div class="row">
-            <div class="set"><label for="set-evoice">Voice id</label><input id="set-evoice" value="JBFqnCBsd6RMkjVDRZzb"></div>
-            <div class="set"><label for="set-l1">Link L1 (mm)</label><input id="set-l1" type="number" value="180"></div>
-            <div class="set"><label for="set-l2">Link L2 (mm)</label><input id="set-l2" type="number" value="180"></div>
-          </div>
-          <div class="row">
-            <div class="set"><label for="set-standoff">Standoff (mm)</label><input id="set-standoff" type="number" value="40"></div>
-            <div class="set"><label for="set-half">Draw size (mm)</label><input id="set-half" type="number" value="90"></div>
-            <div class="set" style="align-content:end"><button id="set-connect" class="btn" type="button">Connect arm (serial)</button></div>
-          </div>
-        </div>
-        <div class="dlg-foot"><button class="btn primary" value="save">Save</button></div>
-      </form>
-    </dialog>
   </div>
+
+  <dialog class="dl-dialog cw-palette" id="palette" aria-label="Commands">
+    <div class="cw-palette__find"><i data-icon="search"></i><input id="palette-input" placeholder="Type a command, or what to draw" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="Command or drawing"></div>
+    <ul class="cw-palette__list" id="palette-list" role="listbox" aria-label="Commands"></ul>
+  </dialog>
+  <div class="dl-toasts" id="toasts" role="region" aria-live="polite" aria-label="Notices"></div>
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>

@@ -24,3 +24,19 @@ const W=40,H=40,data=new Uint8ClampedArray(W*H*4).fill(255);
 for(let y=0;y<H;y++)for(let x=0;x<W;x++){const ink=(x>=8&&x<32&&y>=8&&y<32);const i=(y*W+x)*4;if(ink){data[i]=data[i+1]=data[i+2]=0;}data[i+3]=255;}
 const rs = imageToStrokes({data,width:W,height:H},{threshold:128,minLen:8});
 console.log("vectorize square:", rs.length, "contour(s),", rs[0]?.length, "pts (expect ~4-5 corners)");
+
+// 5) the live sim: ideal servos lay the planned ink; SG92R limits add a wobble of a few mm, never a stray line
+import { geomFrom, DEFAULT_CONFIG } from "./src/config.js";
+import { makeJob, Sim } from "./src/sim.js";
+import { erasePlan } from "./src/pathplan.js";
+const G = geomFrom(DEFAULT_CONFIG);
+const face = [Array.from({ length: 73 }, (_, k) => ({ x: 50 + 44 * Math.cos(k / 72 * 2 * Math.PI), y: 50 + 44 * Math.sin(k / 72 * 2 * Math.PI) }))];
+for (let h = 0; h < 12; h++) { const a = h / 12 * 2 * Math.PI; face.push([{ x: 50 + 39.6 * Math.sin(a), y: 50 - 39.6 * Math.cos(a) }, { x: 50 + 42.7 * Math.sin(a), y: 50 - 42.7 * Math.cos(a) }]); }
+const fp = plan(face, G, { half: G.half }), fa = toAngles(fp.toolpath, G), job = makeJob(fp.toolpath, fa, G);
+for (const physics of [false, true]) {
+  const s = new Sim(G); s.physics = physics; s.load(job); let ink = 0;
+  s.advance(job.total + 0.5, (a, b, m) => { if (m === "draw") ink += Math.hypot(b.x - a.x, b.y - a.y); });
+  console.log(`sim ${physics ? "SG92R" : "ideal"}: ${job.total.toFixed(1)} s, plan ink ${fp.ink} mm, sim ink ${Math.round(ink)} mm, wobble max ${s.dev.max.toFixed(2)} mm, mean ${(s.dev.sum / s.dev.n).toFixed(2)} mm`);
+}
+const ep = erasePlan(G), ea = toAngles(ep.toolpath, G);
+console.log(`erase pass: ${ep.toolpath.length} pts, ${makeJob(ep.toolpath, ea, G).total.toFixed(1)} s, ${ea.outOfRange} past servo limits`);

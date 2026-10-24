@@ -7,5 +7,10 @@
   "scripts": {
     "dev": "node server.mjs",
     "test": "node test.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.3",
+    "impeccable": "^3.6.1",
+    "playwright": "^1.56.1"
   }
 }

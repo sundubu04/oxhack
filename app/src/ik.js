@@ -26,19 +26,20 @@ export const GEOM = {
 // where the drawing sits, in arm coords: centred on the board, base `standoff` below it.
 export function drawCentre(g = GEOM) { return { cx: 0, cy: g.standoff + g.board / 2 }; }
 
-// toolpath [{x,y,pen}] (mm, arm frame) -> angle stream for the Pi.
+// toolpath [{x,y,pen,tool?}] (mm, arm frame) -> angle stream for the Pi. tool is draw, lift or erase;
+// without one, pen 1 draws and pen 0 lifts. outOfRange counts waypoints past a servo's limits, when the
+// geometry carries servo calibration (see config.js).
 export function toAngles(toolpath, g = GEOM) {
-  let unreachable = 0, worstDex = 1;
+  let unreachable = 0, worstDex = 1, outOfRange = 0;
+  const lim = (j, a) => { const s = g.servo?.[j]; if (!s) return true; const v = +s.offset + +s.dir * a; return v >= +s.min - 1e-6 && v <= +s.max + 1e-6; };
   const path = toolpath.map((p) => {
     const s = ik(p.x, p.y, g.L1, g.L2, g.elbowUp);
     if (!s) { unreachable++; return { out_of_reach: true }; }
     worstDex = Math.min(worstDex, s.dex);
-    return {
-      base: +(((s.t1 * R2D) % 360 + 360) % 360).toFixed(2),
-      elbow: +(s.t2 * R2D).toFixed(2),
-      tilt: p.pen ? g.tilt.draw : g.tilt.lift,
-      pressure: p.pen ? g.pressure : 0,
-    };
+    const tool = p.tool || (p.pen ? "draw" : "lift");
+    const base = +((((s.t1 * R2D + 180) % 360) + 360) % 360 - 180).toFixed(2), elbow = +(s.t2 * R2D).toFixed(2);
+    if (!lim("base", base) || !lim("elbow", elbow)) outOfRange++;
+    return { base, elbow, tilt: g.tilt[tool], pressure: tool === "lift" ? 0 : g.pressure };
   });
-  return { path, unreachable, worstDex: +worstDex.toFixed(3) };
+  return { path, unreachable, outOfRange, worstDex: +worstDex.toFixed(3) };
 }
