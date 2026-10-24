@@ -12,11 +12,8 @@
 // While running it reports T <t_ms> <free> whenever slots free up (at most every 100 ms), and LATE if the
 // buffer runs dry. The app counts its unanswered K lines against <free>, so the buffer never overfills.
 #include <Servo.h>
+#include "arm_config.h"                          // pins, pulse widths and the park pose, from app/arm.config.json
 
-const uint8_t PIN[3] = {9, 10, 11};             // base, elbow, tilt signal pins
-const int US_MIN[3] = {544, 544, 544};           // pulse at 0 deg: the Servo library's default; calibrate per servo
-const int US_MAX[3] = {2400, 2400, 2400};        // pulse at 180 deg
-const int16_t PARK[3] = {8520, 5600, 3760};      // centi-degrees of servo travel: the app's park pose with its default offsets, pen lifted
 const uint8_t SLOTS = 48;                        // keyframes held (10 bytes each)
 const uint16_t FRAME_MS = 20;                    // a hobby servo reads one pulse every 20 ms
 

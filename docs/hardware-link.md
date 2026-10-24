@@ -61,6 +61,8 @@ A board that doesn't answer `?` gets protocol 1: plain `base,elbow,tilt,pressure
 
 ## Bring-up
 
+To test the motors without the app (a motor test you drive from the Serial Monitor, and drawings baked into the board), see [firmware/README.md](../firmware/README.md): `./firmware/arm test`, then `./firmware/arm draw calibrate`. With the app:
+
 ```
 arduino-cli compile --fqbn arduino:avr:uno firmware/clockedin        # arduino:avr:nano for a Nano
 arduino-cli board list                                                # find the port, e.g. /dev/cu.usbmodem1101
@@ -70,7 +72,7 @@ arduino-cli upload -p /dev/cu.usbmodem1101 --fqbn arduino:avr:uno firmware/clock
 1. Open the Serial Monitor at 115200, type `?`: it should answer `CLOCKEDIN 2 48`.
 2. `J 9000 9000 9000` puts every servo at the middle of its travel. Note where each link points.
 3. In Clockedin's Arm setup, set each servo's zero offset and direction so the sim's pose matches the real one; set the real link lengths and board position. Save.
-4. If a servo doesn't reach its ends, change its `US_MIN` / `US_MAX` pulse widths at the top of the sketch (the defaults are the Servo library's, 544 to 2400 µs).
+4. If a servo doesn't reach its ends, change its pulse widths in `arduino.usMin` / `usMax` in `app/arm.config.json` (the defaults are the Servo library's, 544 to 2400 µs), run `./firmware/arm config` and upload again. The motor test's `us` command finds them.
 5. In Studio, Connect arm, then drag the pen on the board: the real arm should follow. Then draw a sample and Send to arm.
 
 ## Smoothing the line

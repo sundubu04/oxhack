@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Run the arm straight from a terminal, without the app (macOS or the Raspberry Pi; needs arduino-cli and node).
+#   ./firmware/arm ports                      the boards plugged in
+#   ./firmware/arm test                       upload the motor test and open the Serial Monitor (type help)
+#   ./firmware/arm draw <what> [--speed 0.5] [--wipe]
+#                                             plan a drawing, upload it with the playback sketch, open the monitor
+#                                             (type go). what: square, circle, calibrate, house, cat, star, flower,
+#                                             clock, "text:Hello|line two", a file.svg, or anything else (asks GPT)
+#   ./firmware/arm app                        upload the firmware the Clockedin app talks to
+#   ./firmware/arm monitor                    open the Serial Monitor (115200 baud); Ctrl-C leaves it
+#   ./firmware/arm config                     rewrite every sketch's arm_config.h from app/arm.config.json
+# BOARD=arduino:avr:nano:cpu=atmega328old for an older or clone Nano; PORT=/dev/ttyACM0 to choose the port.
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+app="$here/../app"
+BOARD="${BOARD:-$(node -e 'const c=require(process.argv[1]);console.log((c.arduino&&c.arduino.board)||"arduino:avr:uno")' "$app/arm.config.json")}"
+
+port() {
+  if [ -n "${PORT:-}" ]; then echo "$PORT"; return; fi
+  for p in /dev/cu.usbmodem* /dev/cu.usbserial* /dev/cu.wchusbserial* /dev/ttyACM* /dev/ttyUSB*; do
+    [ -e "$p" ] && { echo "$p"; return; }
+  done
+  echo "No Arduino found. Plug it in, or set PORT=… (./firmware/arm ports lists them)." >&2; exit 1
+}
+compile() { arduino-cli compile --fqbn "$BOARD" "$here/$1"; }
+upload() {
+  local p; p="$(port)"
+  compile "$1"
+  echo "Uploading $1 to $p ($BOARD)…"
+  arduino-cli upload --fqbn "$BOARD" -p "$p" "$here/$1"
+}
+monitor() { local p; p="$(port)"; echo "Serial Monitor on $p. Type a command and press Enter; Ctrl-C to leave."; arduino-cli monitor -p "$p" --config baudrate=115200; }
+config() { node "$app/tools/arduino-export.mjs"; }
+
+case "${1:-help}" in
+  ports)   arduino-cli board list ;;
+  test)    config; upload servo-test; monitor ;;
+  draw)    shift; [ $# -gt 0 ] || { echo "Draw what? e.g. ./firmware/arm draw calibrate" >&2; exit 1; }
+           node "$app/tools/arduino-export.mjs" "$@"; upload playback; monitor ;;
+  app)     config; upload clockedin ;;
+  monitor) monitor ;;
+  config)  config ;;
+  check)   config; for s in clockedin servo-test playback; do compile "$s" >/dev/null && echo "$s compiles"; done ;;
+  *)       sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

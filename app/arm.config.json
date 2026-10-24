@@ -57,5 +57,23 @@
       "dir": 1,
       "ratio": 1
     }
+  },
+  "arduino": {
+    "board": "arduino:avr:uno",
+    "pins": [
+      9,
+      10,
+      11
+    ],
+    "usMin": [
+      544,
+      544,
+      544
+    ],
+    "usMax": [
+      2400,
+      2400,
+      2400
+    ]
   }
 }

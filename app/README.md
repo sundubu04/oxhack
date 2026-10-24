@@ -99,6 +99,7 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `server.mjs`, `lib/openai.mjs`, `lib/gemini.mjs` | dev server holding the keys; GPT chat and voice, Gemini as the backup |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |
 | `src/font.js` | the pen font, text fitted to a box, and the layout of lists and signs |
+| `tools/arduino-export.mjs` | `arm_config.h` for every sketch and `drawing.h` for `firmware/playback`, planned as the app plans (see firmware/README.md) |
 | `tools/model-bench.mjs` | the GPT models timed on a few drawings (spends credits) |
 | `tools/compare-servos.mjs` | the clock under each servo model, side by side |
 | `tools/optimize-test.mjs`, `tools/verify-motors.mjs` | planner optimality and correctness; sim against the firmware |

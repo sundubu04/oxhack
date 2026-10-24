@@ -27,6 +27,10 @@ export const DEFAULT_CONFIG = {
     elbow: { min: 0, max: 180, offset: -10, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
+  // The Arduino: signal pins for base, elbow and tilt, each servo's pulse width at 0 and 180 deg (the Servo
+  // library's defaults until calibrated with the motor test's "us" command), and the board for arduino-cli.
+  // tools/arduino-export.mjs writes these into every sketch's arm_config.h.
+  arduino: { board: "arduino:avr:uno", pins: [9, 10, 11], usMin: [544, 544, 544], usMax: [2400, 2400, 2400] },
 };
 
 // Deep merge so a config file missing a key still gets the default for it.

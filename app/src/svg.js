@@ -1,6 +1,6 @@
 // Parse an SVG (or a JSON point list) into polylines: strokes = [[{x,y}, ...], ...].
-// Handles the shapes Gemini reliably emits for line art: path (M/L/H/V/C/Q/Z), polyline, polygon,
-// line, rect, circle, ellipse. Curves are sampled; arcs (A) are skipped.
+// Handles the shapes models emit for line art: path (M/L/H/V/C/S/Q/A/Z), polyline, polygon, line, rect,
+// circle, ellipse. Curves and arcs are sampled. Without a DOM (node) the elements are found by pattern.
 
 function samplePathD(d) {
   const strokes = [];
@@ -10,6 +10,20 @@ function samplePathD(d) {
   const num = () => parseFloat(toks[i++]);
   const push = () => { if (cur.length > 1) strokes.push(cur); };
   const bez = (p0, p1, p2, p3) => { for (let t = 1; t <= 16; t++) { const u = t / 16, m = 1 - u; cur.push({ x: m*m*m*p0.x + 3*m*m*u*p1.x + 3*m*u*u*p2.x + u*u*u*p3.x, y: m*m*m*p0.y + 3*m*m*u*p1.y + 3*m*u*u*p2.y + u*u*u*p3.y }); } };
+  // an SVG arc, from its endpoints to its centre and angles (SVG spec, appendix F.6.5), then sampled
+  const arc = (x1, y1, rx, ry, phi, fa, fs, x2, y2) => {
+    rx = Math.abs(rx); ry = Math.abs(ry);
+    if (!rx || !ry) { cur.push({ x: x2, y: y2 }); return; }
+    const r = (phi * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r), dx = (x1 - x2) / 2, dy = (y1 - y2) / 2, xp = c * dx + s * dy, yp = -s * dx + c * dy;
+    const lam = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry); if (lam > 1) { rx *= Math.sqrt(lam); ry *= Math.sqrt(lam); }
+    const k = (fa === fs ? -1 : 1) * Math.sqrt(Math.max(0, (rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp) / (rx * rx * yp * yp + ry * ry * xp * xp)));
+    const cxp = (k * rx * yp) / ry, cyp = (-k * ry * xp) / rx, cx = c * cxp - s * cyp + (x1 + x2) / 2, cy = s * cxp + c * cyp + (y1 + y2) / 2;
+    const ang = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    const t1 = ang(1, 0, (xp - cxp) / rx, (yp - cyp) / ry); let dt = ang((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+    if (!fs && dt > 0) dt -= 2 * Math.PI; else if (fs && dt < 0) dt += 2 * Math.PI;
+    const n = Math.max(4, Math.ceil(Math.abs(dt) / (Math.PI / 16)));
+    for (let j = 1; j <= n; j++) { const t = t1 + (dt * j) / n; cur.push({ x: cx + rx * Math.cos(t) * c - ry * Math.sin(t) * s, y: cy + rx * Math.cos(t) * s + ry * Math.sin(t) * c }); }
+  };
   const quad = (p0, p1, p2) => { for (let t = 1; t <= 12; t++) { const u = t / 12, m = 1 - u; cur.push({ x: m*m*p0.x + 2*m*u*p1.x + u*u*p2.x, y: m*m*p0.y + 2*m*u*p1.y + u*u*p2.y }); } };
   while (i < toks.length) {
     let t = toks[i];
@@ -22,11 +36,21 @@ function samplePathD(d) {
     else if (C === "C") { let p1 = { x: num(), y: num() }, p2 = { x: num(), y: num() }, p3 = { x: num(), y: num() }; if (rel) { p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;p3.x+=x;p3.y+=y; } bez({ x, y }, p1, p2, p3); x = p3.x; y = p3.y; }
     else if (C === "S") { let p2 = { x: num(), y: num() }, p3 = { x: num(), y: num() }; if (rel) { p2.x+=x;p2.y+=y;p3.x+=x;p3.y+=y; } bez({ x, y }, { x, y }, p2, p3); x = p3.x; y = p3.y; }
     else if (C === "Q") { let p1 = { x: num(), y: num() }, p2 = { x: num(), y: num() }; if (rel) { p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y; } quad({ x, y }, p1, p2); x = p2.x; y = p2.y; }
+    else if (C === "A") { const rx = num(), ry = num(), phi = num(), fa = num(), fs = num(); let nx = num(), ny = num(); if (rel) { nx += x; ny += y; } arc(x, y, rx, ry, phi, fa, fs, nx, ny); x = nx; y = ny; }
     else if (C === "Z") { cur.push({ x: sx, y: sy }); x = sx; y = sy; push(); cur = []; }
     else { i++; }
   }
   push();
   return strokes;
+}
+
+// Without a DOM (node): the same shapes found by pattern, with just enough of an element for parseSVG.
+function textDoc(text) {
+  const els = [...text.matchAll(/<(path|polyline|polygon|line|rect|circle|ellipse)\b([^>]*)>/gi)].map((m) => {
+    const a = {}; for (const x of m[2].matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) a[x[1]] = x[2] ?? x[3];
+    return { tag: m[1].toLowerCase(), getAttribute: (k) => a[k] ?? null };
+  });
+  return { querySelectorAll: (sel) => els.filter((e) => sel.split(",").map((s) => s.trim()).includes(e.tag)) };
 }
 
 function circleStroke(cx, cy, rx, ry, n = 48) {
@@ -43,7 +67,8 @@ export function parseSVG(text) {
   // a bare path string
   if (!text.includes("<")) return samplePathD(text);
   let doc;
-  try { doc = new DOMParser().parseFromString(text, "image/svg+xml"); } catch (e) { return samplePathD(text); }
+  if (typeof DOMParser === "undefined") doc = textDoc(text);
+  else try { doc = new DOMParser().parseFromString(text, "image/svg+xml"); } catch (e) { return samplePathD(text); }
   const strokes = [];
   const num = (el, a, d = 0) => parseFloat(el.getAttribute(a) ?? d) || 0;
   doc.querySelectorAll("path").forEach(p => strokes.push(...samplePathD(p.getAttribute("d") || "")));
