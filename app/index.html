@@ -161,11 +161,47 @@
             <form class="cw-form" id="setup" novalidate></form>
             <div class="cw-preview">
               <canvas class="cw-board" id="setup-board" aria-label="Preview of the arm with these dimensions"></canvas>
-              <p class="dl-meta">Drag on the board to move the pen</p>
+              <p class="dl-meta" id="setup-hint">Drag on the board to move the pen</p>
             </div>
           </div>
         </div>
         <aside class="cw-inspector" aria-label="What these dimensions give">
+          <!-- the real arm, through the server's USB port: move each servo, calibrate from it, draw on the board live -->
+          <section class="cw-sec" aria-labelledby="live-title">
+            <div class="cw-sec__head"><h2 class="dl-kicker" id="live-title">Live arm</h2><span class="dl-status" id="live-status">Not connected</span></div>
+            <div class="cw-live__port">
+              <span class="dl-select"><select class="dl-input" id="live-port" aria-label="USB port"></select><i data-icon="chevron-down"></i></span>
+              <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="live-connect">Connect</button>
+            </div>
+            <div class="cw-live__servos" id="live-servos">
+              <label class="cw-live__servo"><span>Base</span><input class="cw-range" type="range" min="0" max="180" step="0.5" data-servo="0" aria-label="Base servo, degrees"><input class="dl-input dl-num" type="number" min="0" max="180" step="0.5" data-servo-n="0" aria-label="Base servo, degrees"></label>
+              <label class="cw-live__servo"><span>Elbow</span><input class="cw-range" type="range" min="0" max="180" step="0.5" data-servo="1" aria-label="Elbow servo, degrees"><input class="dl-input dl-num" type="number" min="0" max="180" step="0.5" data-servo-n="1" aria-label="Elbow servo, degrees"></label>
+              <label class="cw-live__servo"><span>Pen</span><input class="cw-range" type="range" min="0" max="180" step="0.5" data-servo="2" aria-label="Pen servo, degrees"><input class="dl-input dl-num" type="number" min="0" max="180" step="0.5" data-servo-n="2" aria-label="Pen servo, degrees"></label>
+            </div>
+            <p class="dl-meta" id="live-where">Connect to move the arm</p>
+            <div class="cw-actions">
+              <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="live-home">Home</button>
+              <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="live-stop">Stop</button>
+            </div>
+            <label class="dl-choice cw-choice"><span id="sw-livedraw-l">Draw on the board with the arm</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-livedraw" aria-labelledby="sw-livedraw-l"></button></label>
+            <div class="cw-actions">
+              <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="sketch-draw" disabled>Draw it again, planned</button>
+              <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="sketch-clear" disabled>Clear</button>
+            </div>
+            <details class="cw-live__cal">
+              <summary>Calibrate from the sliders</summary>
+              <div class="cw-live__cal-list">
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="base">The upper arm points straight up the board</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="elbow">The two links make one straight line</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="home">This is home</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="draw">The nib just touches the board</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="lift">The pen is lifted clear</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-cal="erase">The eraser touches the board</button>
+              </div>
+              <p class="dl-meta">Each one copies the sliders into the fields on the left. Save keeps them.</p>
+            </details>
+            <pre class="cw-live__log" id="live-log" aria-label="What the board said last"></pre>
+          </section>
           <section class="cw-sec">
             <div class="cw-sec__head"><h2 class="dl-kicker">Reach</h2><span class="dl-status" id="fit-status">Fits</span></div>
             <dl class="dl-kv" id="derived"></dl>

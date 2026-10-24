@@ -8,12 +8,33 @@
   "board": {
     "width": 350,
     "height": 350,
-    "standoff": 40
+    "standoff": 40,
+    "base": "corner"
   },
   "drawing": {
-    "size": 180
+    "size": 160,
+    "reach": 220
   },
   "elbow": "down",
+  "park": {
+    "base": 160,
+    "elbow": 10
+  },
+  "penServo": {
+    "draw": 4,
+    "lift": 40,
+    "erase": 150
+  },
+  "tool": {
+    "nib": {
+      "along": 0,
+      "side": 0
+    },
+    "eraser": {
+      "along": 14,
+      "side": -42
+    }
+  },
   "pen": {
     "length": 165,
     "barrel": 17,
@@ -26,8 +47,8 @@
     "eraserWidth": 20
   },
   "motion": {
-    "drawSpeed": 150,
-    "travelSpeed": 300,
+    "drawSpeed": 40,
+    "travelSpeed": 120,
     "leadIn": 3,
     "accel": 1000,
     "cornerSpeed": 15
@@ -42,14 +63,14 @@
     "base": {
       "min": 0,
       "max": 180,
-      "offset": -77,
+      "offset": -15,
       "dir": 1,
       "ratio": 1
     },
     "elbow": {
       "min": 0,
       "max": 180,
-      "offset": 193,
+      "offset": 175,
       "dir": 1,
       "ratio": 1
     },
@@ -61,8 +82,13 @@
       "ratio": 1
     }
   },
+  "live": {
+    "interval": 40,
+    "minStep": 0.2,
+    "speed": 120
+  },
   "arduino": {
-    "board": "arduino:avr:uno",
+    "board": "arduino:avr:mega",
     "pins": [
       9,
       10,

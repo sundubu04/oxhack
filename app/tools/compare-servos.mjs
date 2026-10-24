@@ -17,9 +17,9 @@ face.push([{ x: 50, y: 50 }, { x: 50 + 22 * Math.sin(ah), y: 50 - 22 * Math.cos(
 
 // joint travel the drawing square needs
 let bmin = 1e9, bmax = -1e9, emin = 1e9, emax = -1e9;
-const cy = base.standoff + base.board / 2;
+const { cx, cy } = base;
 for (let i = 0; i <= 40; i++) for (let k = 0; k <= 40; k++) {
-  const s = ik(-base.half + i / 40 * 2 * base.half, cy - base.half + k / 40 * 2 * base.half, base.L1, base.L2, base.elbowUp); if (!s) continue;
+  const s = ik(cx - base.half + i / 40 * 2 * base.half, cy - base.half + k / 40 * 2 * base.half, base.L1, base.L2, base.elbowUp); if (!s) continue;
   bmin = Math.min(bmin, s.t1 * R2D); bmax = Math.max(bmax, s.t1 * R2D); emin = Math.min(emin, s.t2 * R2D); emax = Math.max(emax, s.t2 * R2D);
 }
 console.log(`drawing square needs: base ${bmin.toFixed(1)}..${bmax.toFixed(1)} deg (${(bmax - bmin).toFixed(0)}), elbow ${emin.toFixed(1)}..${emax.toFixed(1)} deg (${(emax - emin).toFixed(0)})`);
@@ -49,7 +49,7 @@ for (const [id, label, o] of variants) {
   const r = { id, label, mean: sim.dev.sum / sim.dev.n, max: sim.dev.max, extra: (ink / p.ink - 1) * 100 };
   console.log(`${id} ${label.padEnd(72)} mean ${r.mean.toFixed(2)} mm  worst ${r.max.toFixed(2)} mm  ink ${r.extra >= 0 ? "+" : ""}${r.extra.toFixed(0)}%`);
   // draw: plan faint, sim ink black, 2 mm marker, around the drawing
-  const x0 = -100, y1 = cy + 100, S = 3;
+  const x0 = cx - 100, y1 = cy + 100, S = 3;
   const P = (x, y) => `${((x - x0) * S).toFixed(1)},${((y1 - y) * S).toFixed(1)}`;
   const planPath = p.toolpath.map((q, i) => (i && (q.pen) ? `L${P(q.x, q.y)}` : `M${P(q.x, q.y)}`)).join("");
   const inkPath = segs.map(([a, b, c, d]) => `M${P(a, b)}L${P(c, d)}`).join("");

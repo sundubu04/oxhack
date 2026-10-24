@@ -111,10 +111,12 @@ export function compensate(path, g) {
   return out;
 }
 
-// The pose the arm parks in: pen up, beside the drawing on the elbow's side, so neither link crosses it.
+// The pose the arm parks in, pen up: the one measured on the arm, or beside the drawing on the elbow's side, so
+// neither link crosses it.
 export function homePose(g) {
-  const x = (g.elbowUp ? 1 : -1) * Math.min(g.half + 25, g.boardW / 2 - 10), y = g.standoff + g.board / 2 + g.half / 2;
-  const s = ikTool(x, y, g) || ikTool(0, g.standoff + g.board / 2, g) || { t1: Math.PI / 2, t2: 0 };
+  if (g.park && isFinite(g.park.base) && isFinite(g.park.elbow)) return { base: g.park.base, elbow: g.park.elbow, tilt: g.tilt.lift };   // measured on the arm
+  const x = (g.cx ?? 0) + (g.elbowUp ? 1 : -1) * (g.half + 25), y = (g.cy ?? g.standoff + g.board / 2) + g.half / 2;
+  const s = ikTool(x, y, g) || ikTool(g.cx ?? 0, g.cy ?? g.standoff + g.board / 2, g) || { t1: Math.PI / 2, t2: 0 };
   return { base: s.t1 * R2D, elbow: s.t2 * R2D, tilt: g.tilt.lift };
 }
 

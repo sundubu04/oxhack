@@ -150,3 +150,14 @@
   .cw-stage { height: min(70vh, 480px); }
   .cw-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* live arm (Arm setup) */
+.cw-live__port { display: flex; gap: 8px; }
+.cw-live__port .dl-select { flex: 1; min-width: 0; }
+.cw-live__servos { display: grid; gap: 8px; }
+.cw-live__servo { display: grid; grid-template-columns: 44px minmax(0, 1fr) 72px; align-items: center; gap: 8px; font-size: var(--dl-fs-sm); }
+.cw-range { width: 100%; min-width: 0; accent-color: var(--dl-accent); }
+.cw-live__cal summary { cursor: pointer; font-size: var(--dl-fs-sm); }
+.cw-live__cal-list { display: grid; justify-items: start; gap: 2px; margin-block: 8px; }
+.cw-live__log { margin: 0; max-height: 132px; overflow: auto; font: var(--dl-fs-xs)/1.5 var(--dl-mono); color: var(--dl-text-3); white-space: pre-wrap; }
+.cw-live__log:empty { display: none; }

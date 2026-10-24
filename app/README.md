@@ -11,7 +11,7 @@ words or voice
   → the shortest pen path (fit to the board, order strokes, resample every 2 mm)
   → base, elbow and tilt angles for every waypoint (inverse kinematics)
   → live sim: SG92R top speed and 1° steps, so the line wobbles like the real one
-  → the arm over USB (Web Serial), or the angles as a file
+  → the arm over USB, through the server (/api/arm), or the angles as a file
 ```
 
 Everything after the picture is deterministic: the same picture always gives the same path and angles.
@@ -97,7 +97,8 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `src/ik.js` | two-link inverse kinematics and the angle stream |
 | `src/pathplan.js` | fit, order, resample; the eraser's zigzag |
 | `src/svg.js`, `src/vectorize.js` | SVG to polylines; raster to polylines |
-| `src/voice.js`, `src/arm.js` | speech in and out; Web Serial, keyframes and flow control (protocol 2) |
+| `src/voice.js`, `src/arm.js` | speech in and out; the arm through the server: keyframes, thinning, live moves |
+| `lib/arm.mjs` | the server's hold on the USB port: handshake, live moves (newest wins, rate-limited), jobs with flow control |
 | `../firmware/clockedin` | the Arduino sketch (Uno or Nano) |
 | `server.mjs`, `lib/openai.mjs`, `lib/gemini.mjs` | dev server holding the keys; GPT chat and voice, Gemini as the backup |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |

@@ -7,17 +7,26 @@ export const DEFAULT_CONFIG = {
   name: "Clockedin arm",
   measured: false,
   links: { L1: 160, L2: 200 },   // the build: upper arm 16 cm, forearm 20 cm
-  board: { width: 350, height: 350, standoff: 40 },
-  drawing: { size: 180 },
+  // base "corner": the base shaft sits at the board's bottom-left corner and the arm reaches in along the
+  // diagonal, the drawing's middle `drawing.reach` mm from the base (the build, 25 Oct). base "below": centred
+  // `standoff` mm below the board's bottom edge, the drawing in the board's middle.
+  board: { width: 350, height: 350, standoff: 40, base: "corner" },
+  drawing: { size: 160, reach: 220 },
   elbow: "down",   // the build's elbow sits to the left of the line from base to pen ("up" would put it on the right)
+  // Measured on the build with the team's jog sketch (firmware/jog), in servo degrees: home, and the pen servo with
+  // the nib on the board, lifted, and the eraser on the board. Where each end of the marker touches, in mm from
+  // the forearm's tip: along the forearm (+ further out) and across it (+ to the left, looking from the elbow).
+  park: { base: 160, elbow: 10 },
+  penServo: { draw: 4, lift: 40, erase: 150 },
+  tool: { nib: { along: 0, side: 0 }, eraser: { along: 14, side: -42 } },
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
   pen: { length: 165, barrel: 17, nib: 12, angle: 0, margin: 5, press: 1, lift: 3, pressure: 60, eraserWidth: 20 },
-  // leadIn: mm of pen-up glide onto each stroke. A hobby servo told to stop dead overshoots, so the pen speeds up
-  // and slows down at accel (mm/s²: 150 mm/s to a stop in 11 mm) and takes a right-angle corner at cornerSpeed
-  // (mm/s; sharper corners slower). Starting points to tune on the arm: lower accel if lines end in a hook.
-  motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3, accel: 1000, cornerSpeed: 15 },
+  // leadIn: mm of pen-up glide onto each stroke. Draw speed is the jog sketch's (1 mm per 25 ms). A hobby servo
+  // told to stop dead overshoots, so the pen speeds up and slows down at accel (mm/s²) and takes a right-angle
+  // corner at cornerSpeed (mm/s; sharper corners slower). Lower accel if lines end in a hook.
+  motion: { drawSpeed: 40, travelSpeed: 120, leadIn: 3, accel: 1000, cornerSpeed: 15 },
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
   // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both. accel caps
   // how fast any joint speeds up or slows down, in deg/s²: well under what an SG92R can give the loaded arm, so it
@@ -25,18 +34,22 @@ export const DEFAULT_CONFIG = {
   servos: {
     model: "TowerPro SG92R", speed: 600, accel: 1500, resolution: 1, backlash: 0, compensate: true,
     // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
-    // zero offsets: each servo turns 180 deg and the joints need more for the whole board, so the zeros keep the most
-    // of it (99%) with the drawing, the wipe and the park pose inside (zeros.js, Best zeros in Arm setup). Mount the
-    // base so servo 90 points the upper arm 167 deg round from +x (left, 13 deg above level), and the elbow so servo
-    // 90 turns the forearm 103 deg clockwise from the upper arm's line
-    base: { min: 0, max: 180, offset: -77, dir: 1, ratio: 1 },
-    elbow: { min: 0, max: 180, offset: 193, dir: 1, ratio: 1 },
+    // zero offsets, servo deg = offset + joint deg (joints from the board's bottom edge, the elbow from the upper
+    // arm, + anticlockwise), from the jog sketch: base servo 0 points 60 deg round from its +x, which is the board's
+    // diagonal turned back 45 deg, so 15 deg in the board's frame; elbow servo 175 with the links straight.
+    // Calibrate live in Arm setup (Live). Best zeros there is for mounting horns afresh.
+    base: { min: 0, max: 180, offset: -15, dir: 1, ratio: 1 },
+    elbow: { min: 0, max: 180, offset: 175, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
+  // Live moves from Arm setup or /api/arm (lib/arm.mjs): the newest target goes out at most every `interval` ms,
+  // only if some servo moves `minStep` deg or more, and the board glides to it at up to `speed` deg/s, speeding up
+  // and slowing down at servos.accel. Raise interval or lower speed if the arm shakes.
+  live: { interval: 40, minStep: 0.2, speed: 120 },
   // The Arduino: signal pins for base, elbow and tilt, each servo's pulse width at 0 and 180 deg (the Servo
   // library's defaults until calibrated with the motor test's "us" command), and the board for arduino-cli.
   // tools/arduino-export.mjs writes these into every sketch's arm_config.h.
-  arduino: { board: "arduino:avr:uno", pins: [9, 10, 11], usMin: [544, 544, 544], usMax: [2400, 2400, 2400] },
+  arduino: { board: "arduino:avr:mega", pins: [9, 10, 11], usMin: [544, 544, 544], usMax: [2400, 2400, 2400] },
 };
 
 // Deep merge so a config file missing a key still gets the default for it.
@@ -49,14 +62,23 @@ export function withDefaults(cfg = {}, def = DEFAULT_CONFIG) {
   return out;
 }
 
-// The flat geometry the planner, IK and sim use. Base axis at the origin, board above it, x right, y up.
+// The flat geometry the planner, IK and sim use. Base axis at the origin, x along the board's bottom edge, y up
+// it. The board's bottom-left corner is (bx, by), the drawing's middle (cx, cy).
 export function geomFrom(cfg) {
-  const c = withDefaults(cfg);
+  const c = withDefaults(cfg), W = +c.board.width, H = +c.board.height, corner = c.board.base === "corner";
+  const reach = +c.drawing.reach || +c.board.standoff + H / 2;
+  const s = c.servos, joint = (j, v) => (+v - +s[j].offset) / (+s[j].dir * (+s[j].ratio || 1));
   return {
     L1: +c.links.L1, L2: +c.links.L2,
-    standoff: +c.board.standoff, board: +c.board.height, boardW: +c.board.width,
+    standoff: +c.board.standoff, board: H, boardW: W, corner,
+    bx: corner ? 0 : -W / 2, by: corner ? 0 : +c.board.standoff,
+    cx: corner ? reach / Math.SQRT2 : 0, cy: corner ? reach / Math.SQRT2 : +c.board.standoff + H / 2,
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     ...penFields(c.pen),
+    // what was measured on the arm wins over what pen.js works out from the marker's size
+    tilt: { draw: joint("tilt", c.penServo.draw), lift: joint("tilt", c.penServo.lift), erase: joint("tilt", c.penServo.erase), liftErase: joint("tilt", c.penServo.lift) },
+    nibAlong: +c.tool.nib.along, nibSide: +c.tool.nib.side, eraserAlong: +c.tool.eraser.along, eraserSide: +c.tool.eraser.side,
+    park: { base: joint("base", c.park.base), elbow: joint("elbow", c.park.elbow) },
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,
     servo: { speed: +c.servos.speed, accel: +c.servos.accel, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },

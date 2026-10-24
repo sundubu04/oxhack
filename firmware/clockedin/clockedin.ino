@@ -2,13 +2,16 @@
 // The Clockedin app streams timed keyframes over USB; this board buffers them and moves the servos between
 // them on its own clock, once per servo frame (20 ms), so the laptop's timing never shows in the line.
 // Protocol (115200 baud, one line each, angles in centi-degrees of servo travel, 0 to 18000):
-//   ?                      -> CLOCKEDIN 2 <slots>
+//   ?                      -> CLOCKEDIN 3 <slots>
 //   K <t_ms> <b> <e> <w>   keyframe at t ms after G      -> F <free slots> (one reply per K, in order)
 //   G                      glide to the first keyframe, then start the clock -> RUN
 //   E                      no more keyframes; finish     -> DONE when the last one is reached
 //   S                      ease to a stop along the path, drop the buffer -> STOPPED
 //   J <b> <e> <w>          glide there (jog)             -> F <free slots>
 //   P                      glide to the park pose        -> F <free slots>
+//   A <deg/s2> <deg/s>     glides' acceleration and top speed, live -> A <accel> <speed>
+//   W                      where the servos are          -> POS <b> <e> <w>
+// A glide that has arrived says AT, so a server can wait for it before putting the pen down.
 // While running it reports T <t_ms> <free> whenever slots free up (at most every 100 ms), and LATE if the
 // buffer runs dry. The app counts its unanswered K lines against <free>, so the buffer never overfills.
 // A hobby servo told to stop dead overshoots, so nothing here starts or stops at once: the app's keyframes speed up
@@ -18,7 +21,8 @@
 
 const uint8_t SLOTS = 48;                        // keyframes held (10 bytes each)
 const uint16_t FRAME_MS = 20;                    // a hobby servo reads one pulse every 20 ms
-const float GLIDE_SPEED = 120;                   // deg/s for glides
+float glideSpeed = 120, glideAccel = SERVO_ACCEL;   // deg/s and deg/s² for glides; A changes them
+bool gliding = false;
 
 struct Key { uint32_t t; int16_t a[3]; };
 Key buf[SLOTS];
@@ -45,7 +49,7 @@ float braking(float d, float a, float dt) { return a * dt * (sqrt(0.25 + 2 * fab
 
 // One frame of a glide: each servo speeds up toward its aim and slows down in time to stop on it.
 bool follow(float dt) {
-  const float A = SERVO_ACCEL * 100, V = GLIDE_SPEED * 100;
+  const float A = glideAccel * 100, V = glideSpeed * 100;
   bool still = true;
   for (uint8_t j = 0; j < 3; j++) {
     float d = aim[j] - pos[j], want = min(V, braking(d, A, dt));
@@ -54,6 +58,8 @@ bool follow(float dt) {
     if (fabs(d) < 1 || (d > 0 && step >= d) || (d < 0 && step <= d)) { vel[j] = 0; put(j, aim[j]); }
     else { put(j, pos[j] + step); still = false; }
   }
+  if (gliding && still) Serial.println(F("AT"));
+  gliding = !still;
   return still;
 }
 uint8_t freeSlots() { return SLOTS - count; }
@@ -82,7 +88,7 @@ void handle(char *s) {
   char *p = s + 1;
   for (uint8_t i = 0; i < 4 && *p; i++) v[i] = strtol(p, &p, 10);
   switch (cmd) {
-    case '?': Serial.print(F("CLOCKEDIN 2 ")); Serial.println(SLOTS); break;
+    case '?': Serial.print(F("CLOCKEDIN 3 ")); Serial.println(SLOTS); break;
     case 'K':
       if (count < SLOTS) {
         Key &k = buf[(head + count) % SLOTS];
@@ -96,10 +102,13 @@ void handle(char *s) {
     case 'S':
       if (running) { stopping = true; break; }   // STOPPED once the clock has eased to a halt
       approaching = false; count = 0; head = 0;
-      for (uint8_t j = 0; j < 3; j++) aim[j] = pos[j] + vel[j] * fabs(vel[j]) / (2 * SERVO_ACCEL * 100);   // where a glide can stop
+      for (uint8_t j = 0; j < 3; j++) aim[j] = pos[j] + vel[j] * fabs(vel[j]) / (2 * glideAccel * 100);   // where a glide can stop
       Serial.println(F("STOPPED")); break;
     case 'J': { int16_t a[3] = {(int16_t)v[0], (int16_t)v[1], (int16_t)v[2]}; if (!running) glideTo(a); credit(); break; }
     case 'P': if (!running) glideTo(PARK); credit(); break;
+    case 'A': glideAccel = constrain(v[0], 50, 20000); glideSpeed = constrain(v[1], 5, 600);
+      Serial.print(F("A ")); Serial.print((int)glideAccel); Serial.print(' '); Serial.println((int)glideSpeed); break;
+    case 'W': Serial.print(F("POS ")); Serial.print((long)pos[0]); Serial.print(' '); Serial.print((long)pos[1]); Serial.print(' '); Serial.println((long)pos[2]); break;
   }
 }
 

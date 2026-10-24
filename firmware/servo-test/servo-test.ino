@@ -56,7 +56,7 @@ void aim(uint8_t j, float deg, bool say = true) {
 // The app's geometry: joint angles -> servo degrees, and a board point -> joint angles for the nib.
 float servoDeg(uint8_t j, float joint) { return OFFSET[j] + DIR[j] * RATIO[j] * joint; }
 bool solve(float x, float y, float &base, float &elbow) {
-  float L = sqrt(L2 * L2 + NIB_SIDE * NIB_SIDE), gamma = atan2(NIB_SIDE, L2);
+  float L = sqrt((L2 + NIB_ALONG) * (L2 + NIB_ALONG) + NIB_SIDE * NIB_SIDE), gamma = atan2(NIB_SIDE, L2 + NIB_ALONG);
   float r2 = x * x + y * y, r = sqrt(r2);
   if (r > L1 + L || r < fabs(L1 - L)) return false;
   float c2 = constrain((r2 - L1 * L1 - L * L) / (2 * L1 * L), -1, 1), s2 = sqrt(1 - c2 * c2) * (ELBOW_UP ? 1 : -1);

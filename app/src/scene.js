@@ -4,6 +4,7 @@
 // Boxes are in the drawing area's own units, 0 to 100 both ways with y down, the way the chat model sees the board.
 import { parseSVG, parseSVGDom } from "./svg.js";
 import { toBox } from "./pathplan.js";
+import { drawCentre } from "./ik.js";
 import * as ttt from "./games/tictactoe.js";
 import { fitText, writeStrokes, writeSize } from "./font.js";
 
@@ -12,8 +13,8 @@ export const emptyScene = () => ({ items: [], game: null });
 
 // a box in drawing units -> board mm (y up)
 export function boxMm(box, g) {
-  const s = (2 * g.half) / 100, cy = g.standoff + g.board / 2;
-  return { x: -g.half + box.x * s, y: cy + g.half - (box.y + box.h) * s, w: box.w * s, h: box.h * s };
+  const s = (2 * g.half) / 100, { cx, cy } = drawCentre(g);
+  return { x: cx - g.half + box.x * s, y: cy + g.half - (box.y + box.h) * s, w: box.w * s, h: box.h * s };
 }
 
 const traced = new Map();   // svg text -> { strokes, vb }, so a drawing is only traced once
@@ -145,8 +146,8 @@ export function sceneSVG(scene, g) {
   const line = (st) => `<polyline points="${st.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")}"/>`;
   const parts = scene.items.map((it) => { const b = it.box || FULL, { strokes, vb } = itemLocal(it); return `<svg x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" viewBox="${vb.x} ${vb.y} ${vb.w} ${vb.h}">${strokes.map(line).join("")}</svg>`; });
   if (scene.game) {
-    const s = (2 * g.half) / 100, cy = g.standoff + g.board / 2;
-    const toUnits = (p) => `${((p.x + g.half) / s).toFixed(2)},${((cy + g.half - p.y) / s).toFixed(2)}`;
+    const s = (2 * g.half) / 100, { cx, cy } = drawCentre(g);
+    const toUnits = (p) => `${((p.x - cx + g.half) / s).toFixed(2)},${((cy + g.half - p.y) / s).toFixed(2)}`;
     parts.push(...gameStrokes(scene.game, g).map((st) => `<polyline points="${st.map(toUnits).join(" ")}"/>`));
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="black" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round">${parts.join("")}</svg>`;

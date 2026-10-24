@@ -67,12 +67,12 @@ export function createView3d(host, inkCanvas) {
 
   let g = null, built = "";
   function build(geom) {
-    g = geom; const key = JSON.stringify([g.boardW, g.board, g.standoff, g.L1, g.L2, g.pen.half, g.pen.height]);
+    g = geom; const key = JSON.stringify([g.boardW, g.board, g.bx, g.by, g.L1, g.L2, g.pen.half, g.pen.height]);
     if (key === built) return; built = key;
-    const cy = g.standoff + g.board / 2;
+    const mx = g.bx + g.boardW / 2, my = g.by + g.board / 2;   // the board's middle
     paint.width = Math.round(g.boardW * 3); paint.height = Math.round(g.board * 3);
-    board.scale.set(g.boardW, g.board, 1); board.position.set(0, cy, 0);
-    frame.scale.set(g.boardW + 24, g.board + 24, 10); frame.position.set(0, cy, -5.2);
+    board.scale.set(g.boardW, g.board, 1); board.position.set(mx, my, 0);
+    frame.scale.set(g.boardW + 24, g.board + 24, 10); frame.position.set(mx, my, -5.2);
     // the base sits below the board, on a block as tall as the arm's plane
     stand.scale.set(60, 44, g.pen.height - 14); stand.position.set(0, 0, (g.pen.height - 14) / 2 - 10);
     baseServo.scale.set(23, 12.5, 27); elbowServo.scale.set(23, 12.5, 27); tiltServo.scale.set(27, 12.5, 23);
@@ -82,7 +82,7 @@ export function createView3d(host, inkCanvas) {
     barrel.scale.set(r, 2 * h - t - 6, r); barrel.position.y = (-(h - t) + (h - 6)) / 2;
     nib.geometry.dispose(); nib.geometry = new THREE.CylinderGeometry(r * 0.45, r * 0.12, t, 20); nib.position.y = -h + t / 2;
     felt.scale.set(r, 6, r); felt.position.y = h - 3;
-    sun.target.position.set(0, cy, 0);
+    sun.target.position.set(mx, my, 0);
     frameView("three-quarter");
   }
 
@@ -119,7 +119,7 @@ export function createView3d(host, inkCanvas) {
   let lastJ = null;
   function frameView(kind, j = lastJ) {
     if (!g) return;
-    const cy = g.standoff + g.board / 2, span = Math.max(g.board, g.boardW);
+    const cx = g.bx + g.boardW / 2, cy = g.by + g.board / 2, span = Math.max(g.board, g.boardW);   // the board's middle
     if (kind === "along" && j) {
       // from just past the forearm's tip, looking back along it, with the board as the floor: the pen's swing
       // is square to the view, like the side view in the pen mount study
@@ -129,11 +129,11 @@ export function createView3d(host, inkCanvas) {
       camera.position.set(f.px + Math.cos(t12) * 520, f.py + Math.sin(t12) * 520, g.pen.height * 0.7 + 20);
     } else {
       orbit(new THREE.Vector3(0, 1, 0));
-      controls.target.set(0, cy - 20, 40);
+      controls.target.set(cx, cy - 20, 40);
       const d = span * 2.6;
-      if (kind === "front") camera.position.set(0, cy - 20, d);
-      else if (kind === "side") camera.position.set(d, cy - 20, 90);
-      else camera.position.set(d * 0.5, cy + d * 0.12, d * 0.85);
+      if (kind === "front") camera.position.set(cx, cy - 20, d);
+      else if (kind === "side") camera.position.set(cx + d, cy - 20, 90);
+      else camera.position.set(cx + d * 0.5, cy + d * 0.12, d * 0.85);
     }
     camera.lookAt(controls.target); controls.update();
   }

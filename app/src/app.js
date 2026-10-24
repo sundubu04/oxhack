@@ -2,7 +2,7 @@
 // edit, or a game. Every change is planned as the difference from what is already on the board (optimize.js):
 // only what changed is wiped and drawn, in the order the sim times as fastest. The sim plays it to scale through
 // the servos' limits, and the real arm gets the same commands.
-import { toAngles } from "./ik.js";
+import { toAngles, toolPoint } from "./ik.js";
 import { parseSVG } from "./svg.js";
 import { plan } from "./pathplan.js";
 import { planChange } from "./optimize.js";
@@ -540,8 +540,8 @@ function syncSend() {
   b.classList.toggle("dl-btn--primary", next); b.classList.toggle("dl-btn--secondary", !next);
 }
 async function connectArm() {
-  try { await arm.connect(); setArm(true); toast(arm.version() >= 2 ? "Arm connected" : "Arm connected, but it didn't answer as Clockedin firmware"); arm.jog(homePose(g), g); }
-  catch (e) { if (e.name !== "NotFoundError") toast(e.message, "circle-alert"); }
+  try { await arm.connect(); setArm(true); toast("Arm connected"); renderLive(); }
+  catch (e) { toast(e.message, "circle-alert"); renderLive(); }
 }
 // the arm runs exactly the job the sim is running
 async function sendToArm(job = active) {
@@ -617,22 +617,26 @@ function showPage(page) {
   $("#app").removeAttribute("data-nav-open");
   if (page === "arm") { fillSetup(cfg); requestAnimationFrame(renderSetup); }
   else requestAnimationFrame(draw);
+  watchLive(page === "arm");
 }
 
 // ---------- arm setup ----------
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
-  ["Board", [["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["board.standoff", "Base below board", "mm"], ["drawing.size", "Drawing size", "mm"]]],
-  ["Pen", [["pen.length", "Length, nib to eraser", "mm"], ["pen.barrel", "Barrel width", "mm"], ["pen.nib", "Nib sticks out", "mm"], ["pen.angle", "Meets the board at (0 = best)", "°"], ["pen.margin", "Barrel kept off the board", "mm"], ["pen.press", "Press in", "mm"], ["pen.lift", "Lift clear", "mm"], ["pen.eraserWidth", "Eraser width", "mm"]]],
+  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom-left corner"], ["below", "Below the middle"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
+  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["penServo.draw", "Pen servo, nib down", "°"], ["penServo.lift", "Pen servo, lifted", "°"], ["penServo.erase", "Pen servo, eraser down", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
+  ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
 const put = (o, path, v) => { const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k) => { a = a[k] ??= {}; }); a[ks.at(-1)] = v; };
 function buildSetup() {
   const id = (p) => `f-${p.replace(/\./g, "-")}`;
-  $("#setup").innerHTML = FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="g-${legend}"><h2 class="dl-kicker" id="g-${legend}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit]) =>
-    `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id(p)}" data-path="${p}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`).join("")}</div></div>`).join("") +
+  const gid = (legend) => `g-${legend.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  $("#setup").innerHTML = FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="${gid(legend)}"><h2 class="dl-kicker" id="${gid(legend)}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit, options]) => options
+    ? `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="dl-select"><select class="dl-input" id="${id(p)}" data-path="${p}" data-text>${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>${icon("chevron-down")}</span></div>`
+    : `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id(p)}" data-path="${p}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`).join("")}</div></div>`).join("") +
     `<div class="cw-group" role="group" aria-labelledby="g-servos"><h2 class="dl-kicker" id="g-servos">Servos</h2><div class="cw-fields">
       <div class="dl-field"><label class="dl-label" for="f-model">Model</label><input class="dl-input" id="f-model" data-path="servos.model" data-text></div>
       <table class="dl-table cw-servos"><colgroup><col><col><col><col><col><col class="cw-dir"></colgroup><thead><tr><th>Joint</th><th>Min °</th><th>Max °</th><th>Zero °</th><th>Ratio</th><th>Direction</th></tr></thead><tbody>${["base", "elbow", "tilt"].map((j) =>
@@ -657,11 +661,12 @@ function renderSetup() {
   setupBoard.setGeom(gg); setupSim.setGeom(gg); if (!setupSim.manual) setupSim.reset();
   clockStrokes ??= parseSVG(clockSVG(now()));
   const p = plan(clockStrokes, gg, { half: gg.half, leadIn: gg.leadIn }), an = toAngles(p.toolpath, gg), job = makeJob(p.toolpath, an, gg);
-  setupBoard.render({ toolpath: p.toolpath, joints: setupSim.j, mode: null, showReach: true, hover: setupHover });
+  const drawn = liveStrokes().flatMap((st) => st.map((q, i) => ({ x: q.x, y: q.y, pen: i ? 1 : 0 })));
+  setupBoard.render({ toolpath: drawn.length ? drawn : p.toolpath, joints: setupSim.j, mode: null, showReach: true, hover: setupHover });
   let ok = 0, n = 0, worst = 1;
-  const cy = gg.standoff + gg.board / 2;
+  const { cx, cy } = gg;
   for (let i = 0; i <= 20; i++) for (let k = 0; k <= 20; k++) {
-    const x = -gg.half + (i / 20) * 2 * gg.half, y = cy - gg.half + (k / 20) * 2 * gg.half; n++;
+    const x = cx - gg.half + (i / 20) * 2 * gg.half, y = cy - gg.half + (k / 20) * 2 * gg.half; n++;
     const a = toAngles([{ x, y, pen: 1 }], gg); if (a.unreachable || a.outOfRange) continue;
     ok++; const r2 = x * x + y * y, c2 = (r2 - gg.L1 ** 2 - gg.L2 ** 2) / (2 * gg.L1 * gg.L2); worst = Math.min(worst, Math.sqrt(Math.max(0, 1 - c2 * c2)));
   }
@@ -673,11 +678,7 @@ function renderSetup() {
     `<dt>Worst dexterity</dt><dd>${ok ? worst.toFixed(2) : "none reachable"}</dd>` +
     `<dt>Servo step at the tip</dt><dd>${stepMm.toFixed(1)} mm at full stretch</dd>` +
     `<dt>Clock takes</dt><dd>${secs(job.total)}${an.unreachable ? `, ${an.unreachable} points out of reach` : ""}</dd>` +
-    `<dt>Pen meets the board at</dt><dd>${gg.pen.beta.toFixed(0)}°${+c.pen.angle > 0 ? `, best is ${Math.ceil(gg.pen.best)}°` : ", the best for this pen"}</dd>` +
-    `<dt>Tilt shaft above the board</dt><dd>${gg.pen.height.toFixed(1)} mm</dd>` +
-    `<dt>Tilts from flat</dt><dd>draw ${gg.pen.draw.toFixed(1)}°, lift ${gg.pen.lift.toFixed(1)}°, erase +${gg.pen.erase.toFixed(1)}°</dd>` +
-    `<dt>Nib and eraser</dt><dd>${gg.pen.side.toFixed(0)} mm either side of the forearm's tip; reach to the nib ${mm(Math.hypot(gg.L2, gg.pen.side))}</dd>` +
-    `<dt>Barrel edge while drawing</dt><dd>${gg.pen.clearance >= 0 ? `${gg.pen.clearance.toFixed(1)} mm off the board` : `hits the board by ${(-gg.pen.clearance).toFixed(1)} mm`}</dd>`;
+    `<dt>Drawing's middle</dt><dd>${gg.cx.toFixed(0)}, ${gg.cy.toFixed(0)} mm from the base</dd>`;
   const fs = $("#fit-status");
   fs.textContent = cover === 100 ? "Fits" : `${cover}% fits`; fs.dataset.tone = cover === 100 ? "ok" : cover > 80 ? "warn" : "stop";
   $("#save").disabled = !dirty(); $("#revert").disabled = !dirty();
@@ -686,7 +687,7 @@ let setupHover = null;
 async function save() {
   const c = readSetup(); c.measured = true;
   const b = $("#save"); b.setAttribute("aria-busy", "true"); b.innerHTML = `<span class="dl-spinner" aria-hidden="true"></span>Save`;
-  try { cfg = await saveConfig(c); applyConfig(); fillSetup(cfg); renderSetup(); toast("Saved to arm.config.json"); }
+  try { cfg = await saveConfig(c); applyConfig(); fillSetup(cfg); renderSetup(); toast("Saved to arm.config.json"); if (arm.connected()) arm.tune({ ...cfg.live, accel: cfg.servos.accel }).catch(() => {}); }
   catch (e) { $("#save-note").textContent = e.message; }
   finally { b.removeAttribute("aria-busy"); b.textContent = "Save"; renderSetup(); }
 }
@@ -849,6 +850,90 @@ function wire() {
   });
   new ResizeObserver(() => { draw(); renderSetup(); }).observe($("#main"));
 }
+// ---------- live arm (Arm setup) ----------
+// The real arm through the server: three sliders in servo degrees, calibration copied from them into the form,
+// and drawing on the preview board with the arm following. Strokes drawn by hand are kept, to draw again planned.
+let sketch = [], liveDraw = false, sliding = 0, liveTimer = 0;
+const sliders = () => [0, 1, 2].map((j) => +$(`[data-servo="${j}"]`).value);
+function setSliders(a) { a.forEach((v, j) => { $(`[data-servo="${j}"]`).value = v; $(`[data-servo-n="${j}"]`).value = (+v).toFixed(1); }); }
+// servo degrees -> the pose the preview shows, through the calibration on the form
+function showServos(a) {
+  const gg = geomFrom(readSetup()), p = Object.fromEntries(JOINTS.map(([k], j) => { const s = gg.servo[k]; return [k, (a[j] - +s.offset) / (+s.dir * (+s.ratio || 1))]; }));
+  const tip = toolPoint(p.base * Math.PI / 180, p.elbow * Math.PI / 180, gg);
+  setupSim.manual = p; renderSetup(); kickSetup();
+  $("#live-where").textContent = `Joints ${p.base.toFixed(0)}° and ${p.elbow.toFixed(0)}°: the nib should be at ${tip.x.toFixed(0)}, ${tip.y.toFixed(0)} mm from the base`;
+}
+function slide(j, v) {
+  const a = sliders(); a[j] = Math.max(0, Math.min(180, +v)); setSliders(a); showServos(a); arm.servos(...a);
+  clearTimeout(sliding); sliding = setTimeout(() => { sliding = 0; }, 1500);   // the server's echo doesn't move a slider in use
+}
+function renderLive() {
+  const s = arm.state(); if (!s) return;
+  const sel = $("#live-port"), list = [...new Set([...(s.port ? [s.port] : []), ...(s.ports || [])])];
+  if (sel.dataset.list !== list.join()) { sel.innerHTML = list.length ? list.map((p) => `<option>${esc(p)}</option>`).join("") : `<option value="">No Arduino plugged in</option>`; sel.dataset.list = list.join(); }
+  if (s.port && document.activeElement !== sel) sel.value = s.port;
+  const on = !!s.firmware;
+  status($("#live-status"), on ? (s.job?.state === "running" ? "Drawing" : "Connected") : s.open ? "Other sketch" : "Not connected", { mark: on ? "dot" : "", tone: s.open && !on ? "warn" : "" });
+  $("#live-connect").textContent = s.open ? "Disconnect" : "Connect";
+  $$("#live-servos input, #live-home, #live-stop").forEach((el) => { el.disabled = !on; });
+  $("#sketch-draw").disabled = !on || !sketch.length || s.job?.state === "running"; $("#sketch-clear").disabled = !sketch.length;
+  if (on && s.sent && !sliding) { setSliders(s.sent); if (!liveDraw && !setupSim.manual) showServos(s.sent); }
+  if (!on) $("#live-where").textContent = s.open ? "The board isn't running the Clockedin firmware: upload firmware/clockedin" : "Connect to move the arm";
+  $("#live-log").textContent = [s.error, ...(s.log || []).slice(-8)].filter(Boolean).join("\n");
+  syncSend();
+}
+async function refreshLive() { try { await arm.refresh(); } catch (e) {} renderLive(); }
+function watchLive(on) { clearInterval(liveTimer); liveTimer = on ? setInterval(refreshLive, 800) : 0; if (on) refreshLive(); }
+// copy what the sliders show into the form: a zero, home, or one of the pen servo's angles
+function calibrate(what) {
+  const [b, e, p] = sliders(), c = readSetup(), set = (path, v) => { const el = $(`[data-path="${path}"]`); el.value = +(+v).toFixed(1); };
+  const s = c.servos;
+  if (what === "base") set("servos.base.offset", b - +s.base.dir * (+s.base.ratio || 1) * 90);   // the upper arm at 90 deg, up the board
+  if (what === "elbow") set("servos.elbow.offset", e);                                          // links in line: elbow joint 0
+  if (what === "home") { set("park.base", b); set("park.elbow", e); }
+  if (what === "draw" || what === "lift" || what === "erase") set(`penServo.${what}`, p);
+  $("#setup").dispatchEvent(new Event("input")); toast("Copied: Save to keep it");
+}
+// drawing on the preview board with the real arm: pen down while the pointer is down, lifted when it comes up
+function liveBoard() {
+  const cv = $("#setup-board"); let stroke = null;
+  const at = (e) => setupBoard.toWorld(e.clientX, e.clientY);
+  cv.addEventListener("pointerdown", (e) => { if (!liveDraw || !arm.connected()) return; const p = at(e); stroke = [p]; arm.point(p.x, p.y, "draw", true); });
+  cv.addEventListener("pointermove", (e) => {
+    if (!stroke) return; const p = at(e), q = stroke.at(-1);
+    if (Math.hypot(p.x - q.x, p.y - q.y) < 1) return;   // 1 mm is the finest a marker shows
+    stroke.push(p); arm.point(p.x, p.y, "draw"); renderSetup();
+  });
+  const up = () => { if (!stroke) return; const q = stroke.at(-1); arm.point(q.x, q.y, "lift"); if (stroke.length > 1) sketch.push(stroke); stroke = null; renderSetup(); renderLive(); };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  return () => (stroke ? [...sketch, stroke] : sketch);
+}
+let liveStrokes = () => sketch;
+function wireLive() {
+  liveStrokes = liveBoard();
+  $("#live-connect").addEventListener("click", async () => {
+    const s = arm.state();
+    try { if (s?.open) await arm.disconnect(); else { await arm.connect($("#live-port").value || undefined); toast("Arm connected"); } }
+    catch (e) { toast(e.message, "circle-alert"); }
+    setArm(arm.connected()); renderLive();
+  });
+  $("#live-servos").addEventListener("input", (e) => { const j = e.target.dataset.servo ?? e.target.dataset.servoN; if (j != null) slide(+j, e.target.value); });
+  $("#live-home").addEventListener("click", () => arm.park().then(() => { setupSim.manual = null; refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
+  $("#live-stop").addEventListener("click", () => arm.stop().then(refreshLive));
+  $("#sw-livedraw").addEventListener("click", () => {
+    liveDraw = !liveDraw; $("#sw-livedraw").setAttribute("aria-checked", String(liveDraw));
+    $("#setup-hint").textContent = liveDraw ? "Draw on the board: the arm draws it as you go" : "Drag on the board to move the pen";
+  });
+  $("#sketch-clear").addEventListener("click", () => { sketch = []; renderSetup(); renderLive(); });
+  $("#sketch-draw").addEventListener("click", () => arm.draw(sketch).then(() => { toast("Drawing it again, in the shortest order"); refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
+  $$("[data-cal]").forEach((b) => b.addEventListener("click", () => calibrate(b.dataset.cal)));
+  // live settings change on the board as they are typed, saved or not
+  $("#setup").addEventListener("input", (e) => {
+    if (!/^(live\.|servos\.accel)/.test(e.target.dataset.path || "") || !arm.connected()) return;
+    const c = readSetup(); arm.tune({ ...c.live, accel: c.servos.accel }).catch(() => {});
+  });
+}
+
 let setupRaf = 0, setupTs = 0;
 function kickSetup() {
   if (setupRaf) return; setupTs = performance.now();
@@ -869,7 +954,7 @@ async function start() {
   buildJoints(); buildSetup();
   $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  wire(); renderServices(); refreshStatus(); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
+  wire(); wireLive(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
   await listSims();
   let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];

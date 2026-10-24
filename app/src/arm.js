@@ -1,64 +1,55 @@
-// Talk to the arm over USB (Web Serial, Chrome on localhost). The Arduino firmware in firmware/clockedin speaks
-// protocol 2: the app streams timed keyframes ahead of time and the board moves the servos between them on its
-// own 20 ms frame, so browser timing never reaches the line. A board that doesn't answer the handshake gets
-// protocol 1: one "base,elbow,tilt,pressure" line per waypoint, paced by the app.
+// Talk to the arm through the dev server, which holds its USB port (lib/arm.mjs): any browser works, and curl or a
+// script can drive the same arm. The board runs firmware/clockedin. A job goes out as keyframes the board plays
+// on its own 20 ms clock, so browser and network timing never reach the line; live moves (servo degrees, a board
+// point) go out as the newest target, no more often than the server's interval, and the board glides to each.
 import { servoAngle } from "./config.js";
 import { ease, homePose } from "./sim.js";
 
-let port = null, writer = null, protocol = 0, slots = 0;
-const listeners = new Set();
-const enc = new TextEncoder();
+let last = null;   // the server's last word on the arm
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function supported() { return "serial" in navigator; }
-export function connected() { return !!writer; }
-export function version() { return protocol; }
-export function onLine(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-
-const write = (s) => writer.write(enc.encode(s + "\n"));
-
-// Wait for the first line that matches, or give up after ms.
-function expect(test, ms) {
-  return new Promise((resolve) => {
-    const off = onLine((l) => { if (test(l)) { off(); clearTimeout(timer); resolve(l); } });
-    const timer = setTimeout(() => { off(); resolve(null); }, ms);
-  });
+async function call(path, body) {
+  const r = await fetch(`./api/arm${path}`, body === undefined ? { cache: "no-store" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const s = await r.json().catch(() => ({ error: `The server answered ${r.status}` }));
+  if ("open" in s) last = s;
+  if (!r.ok) throw new Error(s.error || `The server answered ${r.status}`);
+  return s;
 }
 
-async function readLines() {
-  const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
-  let rest = "";
-  try {
-    for (;;) {
-      const { value, done } = await reader.read(); if (done) break;
-      rest += value; const lines = rest.split(/\r?\n/); rest = lines.pop();
-      for (const l of lines) if (l.trim()) listeners.forEach((fn) => fn(l.trim()));
-    }
-  } catch (e) {} finally { reader.releaseLock(); }
+export function supported() { return true; }
+export function state() { return last; }
+export function connected() { return !!last?.firmware; }
+export function version() { return last?.firmware?.protocol || 0; }
+export const refresh = () => call("");
+export async function connect(port) {
+  const s = await call("/connect", port ? { port } : {});
+  if (!s.firmware) throw new Error(s.error || "The board didn't answer");
+  return s;
 }
+export const disconnect = () => call("/disconnect", {});
+export const park = () => call("/park", {});
+export const stop = () => call("/stop", {});
+export const tune = (settings) => call("/tune", settings);
 
-export async function connect(baud = 115200) {
-  if (!supported()) throw new Error("Connecting needs Chrome on localhost (Web Serial)");
-  port = await navigator.serial.requestPort();
-  await port.open({ baudRate: baud });
-  writer = port.writable.getWriter();
-  readLines();
-  // an Uno resets when the port opens; give it time to boot before the handshake
-  await new Promise((r) => setTimeout(r, 1800));
-  await write("?");
-  const hello = await expect((l) => l.startsWith("CLOCKEDIN"), 1500);
-  protocol = hello ? Number(hello.split(" ")[1]) || 2 : 1;
-  slots = hello ? Number(hello.split(" ")[2]) || 48 : 0;
-  return protocol;
+// Live moves: one request in flight at a time, and only the newest waiting, so a fast hand never queues a backlog.
+let busy = false, next = null;
+function live(path, body) {
+  next = { path, body };
+  if (busy) return;
+  (async () => {
+    busy = true;
+    try { while (next) { const n = next; next = null; await call(n.path, n.body).catch(() => {}); } }
+    finally { busy = false; }
+  })();
 }
+export function servos(base, elbow, pen) { if (connected()) live("/servos", { base, elbow, pen }); }
+export function point(x, y, tool = "draw", start = false) { if (connected()) live("/point", { x, y, tool, start }); }
+// joint angles (as the app counts them) -> servo degrees through the calibration
+export function jog(j, g) { if (connected()) servos(...["base", "elbow", "tilt"].map((k) => Math.max(0, Math.min(180, servoAngle(k, j[k], g))))); }
 
-export async function disconnect() {
-  try { writer && writer.releaseLock(); await port?.close(); } catch (e) {}
-  port = writer = null; protocol = 0;
-}
-
-// Keyframes for protocol 2, from the sim's schedule: the job starts from the park pose, the arm holds still while
+// Keyframes for the board, from the sim's schedule: the job starts from the park pose, the arm holds still while
 // the tilt changes, then moves to each waypoint by the time it should arrive. Angles go out in the servo's own
-// frame, after calibration.
+// frame, after calibration, in centi-degrees; t in ms.
 export function keyframes(job, g) {
   const cd = (j, a) => Math.round(Math.max(0, Math.min(180, servoAngle(j, a, g))) * 100);
   const h = homePose(g);
@@ -79,56 +70,38 @@ export function keyframes(job, g) {
   return out.map((k) => ({ t: Math.round(k.t * 1000), a: k.a }));
 }
 
-// Send a job. Protocol 2: prime the board's buffer, start its clock, keep it topped up as it frees slots.
-// onProgress(fraction) as keyframes go out (2) or waypoints (1). signal aborts and stops the arm.
-export async function send(job, g, { onProgress, signal } = {}) {
-  if (!writer) throw new Error("Arm not connected");
-  if (protocol >= 2) {
-    const keys = keyframes(job, g);
-    // free: slots the board last reported, less the K lines it hasn't answered yet (a safe undercount)
-    let free = slots, inflight = 0, started = false, i = 0;
-    const off = onLine((l) => {
-      if (l.startsWith("F ")) { inflight = Math.max(0, inflight - 1); free = Number(l.slice(2)) - inflight; }
-      else if (l.startsWith("T ")) free = Number(l.split(" ")[2]) - inflight;
-    });
-    try {
-      while (i < keys.length) {
-        if (signal?.aborted) { await write("S"); return; }
-        if (free <= 0) { await new Promise((r) => setTimeout(r, 10)); continue; }
-        const k = keys[i++]; free--; inflight++;
-        await write(`K ${k.t} ${k.a[0]} ${k.a[1]} ${k.a[2]}`);
-        // start once a quarter of the buffer is full: enough lead for USB hiccups, little wait
-        if (!started && (i >= slots / 4 || i === keys.length)) { await write("G"); started = true; }
-        onProgress && onProgress(i / keys.length);
-      }
-      await write("E");
-      const done = expect((l) => l === "DONE" || l === "STOPPED", (keys.at(-1)?.t || 0) + 10000);
-      const stop = new Promise((r) => signal?.addEventListener("abort", () => { write("S"); r(); }, { once: true }));
-      await Promise.race([done, stop]);
-    } finally { off(); }
-    return;
-  }
-  // protocol 1: one line per waypoint, sent when the arm should set off for it
-  const t0 = performance.now();
-  for (let i = 0; i < job.n; i++) {
-    if (signal?.aborted) break;
-    const wait = job.tTilt[i] * 1000 - (performance.now() - t0); if (wait > 2) await new Promise((r) => setTimeout(r, wait));
-    // the same commands as protocol 2: compensated, in each servo's own frame
-    const p = (job.cmd || job.path)[i], sv = (j, a) => Math.max(0, Math.min(180, servoAngle(j, a, g))).toFixed(2);
-    await write(p.out_of_reach ? "SKIP" : `${sv("base", p.base)},${sv("elbow", p.elbow)},${sv("tilt", p.tilt)},${p.pressure}`);
-    onProgress && onProgress((i + 1) / job.n);
-  }
-  await write("HOME");
+// Drop the keyframes the board would rebuild anyway (it moves in straight lines between them): from each one kept,
+// reach as far ahead as every keyframe in between stays within tol centi-degrees of the line and the pen doesn't
+// change. A third to a half as many lines down the USB cable, for 0.15 deg.
+export function thin(keys, tol = 15) {
+  const fits = (a, b) => {
+    for (let i = a + 1; i < b; i++) {
+      const k = keys[i], u = (k.t - keys[a].t) / (keys[b].t - keys[a].t || 1);
+      if (k.a[2] !== keys[a].a[2] || k.a.some((v, j) => Math.abs(keys[a].a[j] + (keys[b].a[j] - keys[a].a[j]) * u - v) > tol)) return false;
+    }
+    return keys[a].a[2] === keys[b].a[2] || b === a + 1;
+  };
+  const kept = [keys[0]];
+  for (let a = 0; a < keys.length - 1;) { let b = a + 1; while (b + 1 < keys.length && fits(a, b + 1)) b++; kept.push(keys[b]); a = b; }
+  return kept;
 }
 
-// Move the real arm now (protocol 2 only), e.g. while dragging the pen on the board. Called often; sends at
-// most one line per servo frame.
-let lastJog = 0;
-export function jog(j, g) {
-  if (!writer || protocol < 2) return;
-  const now = performance.now(); if (now - lastJog < 20) return; lastJog = now;
-  const cd = (k, a) => Math.round(Math.max(0, Math.min(180, servoAngle(k, a, g))) * 100);
-  write(`J ${cd("base", j.base)} ${cd("elbow", j.elbow)} ${cd("tilt", j.tilt)}`);
+// Run a job on the arm and follow it to the end. onProgress(fraction of its time); signal stops the arm, which
+// eases to a halt along its path.
+export async function send(job, g, { onProgress, signal } = {}) {
+  if (!connected()) throw new Error("Arm not connected");
+  await call("/run", { keys: thin(keyframes(job, g)) });
+  const halt = () => call("/stop", {}).catch(() => {});
+  signal?.addEventListener("abort", halt, { once: true });
+  try {
+    for (;;) {
+      await sleep(200);
+      const j = (await call("")).job;
+      if (!j) return;
+      onProgress && onProgress(Math.min(1, j.t / (j.ms || 1)));
+      if (j.state !== "running") { if (j.state === "failed") throw new Error("The arm stopped: the USB link dropped"); return; }
+    }
+  } finally { signal?.removeEventListener("abort", halt); }
 }
 
 export function download(streamObj, name = "clockedin-angles.json") {
@@ -137,3 +110,6 @@ export function download(streamObj, name = "clockedin-angles.json") {
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+// Strokes in board mm, drawn by the server in the shortest order, solved and timed like any job.
+export const draw = (strokes) => call("/draw", { strokes });

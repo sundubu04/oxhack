@@ -18,12 +18,12 @@ export function ik(x, y, L1, L2, up = true) {
   return { t1, t2, dex: Math.sqrt(1 - c2 * c2) };
 }
 
-// The pen lies across the forearm's tip (docs/pages/pen-mount.html): the nib touches `nibSide` mm to one side
-// of the tip and the eraser `eraserSide` mm to the other (+ is the counter-clockwise side). Seen as a link, the
+// Each end of the marker touches the board near the forearm's tip: `nibAlong` mm further out along the forearm and
+// `nibSide` mm across it (+ is the counter-clockwise side), and the same for the eraser. Seen as a link, the
 // forearm out to either end is a little longer and turned by gamma.
 export function toolLink(g, tool) {
-  const side = tool === "erase" ? +(g.eraserSide || 0) : +(g.nibSide || 0);
-  return { L: Math.hypot(g.L2, side), gamma: Math.atan2(side, g.L2) };
+  const side = tool === "erase" ? +(g.eraserSide || 0) : +(g.nibSide || 0), along = tool === "erase" ? +(g.eraserAlong || 0) : +(g.nibAlong || 0);
+  return { L: Math.hypot(g.L2 + along, side), gamma: Math.atan2(side, g.L2 + along) };
 }
 // Joint angles that put this end of the pen on (x, y), or null when it is out of reach.
 export function ikTool(x, y, g, tool = "draw") {
@@ -41,8 +41,8 @@ export const GEOM = {
   L1: 160, L2: 200, standoff: 40, board: 350, elbowUp: false, pressure: 60,
   tilt: { draw: -14, lift: -2, erase: 16 },
 };
-// where the drawing sits, in arm coords: centred on the board, base `standoff` below it.
-export function drawCentre(g = GEOM) { return { cx: 0, cy: g.standoff + g.board / 2 }; }
+// where the drawing's middle sits, in arm coords (config.js works it out for a base below the board or at its corner)
+export function drawCentre(g = GEOM) { return { cx: g.cx ?? 0, cy: g.cy ?? g.standoff + g.board / 2 }; }
 
 // The base angle, a whole turn either way, that its servo can reach: with the elbow on the left the base works
 // around 180 deg, so a plain -180..180 wrap would send it to the far end of its travel.

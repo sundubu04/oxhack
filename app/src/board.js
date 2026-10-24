@@ -30,7 +30,8 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     if (!r.width || !r.height) return false;
     if (canvas.width !== Math.round(r.width * dpr) || canvas.height !== Math.round(r.height * dpr)) { canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const x0 = -g.boardW / 2 - pad, x1 = g.boardW / 2 + pad, y0 = -24, y1 = g.standoff + g.board + pad;
+    // the board, the base, and with the base at a corner the upper arm folded out past the board's edge
+    const x0 = Math.min(g.bx, g.corner ? -g.L1 : -24) - pad, x1 = g.bx + g.boardW + pad, y0 = Math.min(g.by, 0) - (g.corner ? 48 : 24), y1 = g.by + g.board + pad;
     const s = Math.min(r.width / (x1 - x0), r.height / (y1 - y0));
     view = { s, w: r.width, h: r.height, ox: (r.width - (x1 - x0) * s) / 2 - x0 * s, oy: (r.height - (y1 - y0) * s) / 2 + y1 * s };
     return true;
@@ -42,7 +43,7 @@ export function createBoard(canvas, { pad = 12 } = {}) {
   }
 
   // Ink layer, in board pixels: u right from the board's left edge, v down from its top edge.
-  const U = (p) => [(p.x + g.boardW / 2) * PXMM, (g.standoff + g.board - p.y) * PXMM];
+  const U = (p) => [(p.x - g.bx) * PXMM, (g.by + g.board - p.y) * PXMM];
   function inkSeg(a, b, mode) {
     ictx.globalCompositeOperation = mode === "erase" ? "destination-out" : "source-over";
     ictx.strokeStyle = col?.ink || "#1d1d1f"; ictx.lineCap = ictx.lineJoin = "round";
@@ -71,7 +72,7 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     if (!col) tokens();
     const { s } = view;
     ctx.clearRect(0, 0, view.w, view.h);
-    const [bx, by] = P(-g.boardW / 2, g.standoff + g.board), bw = g.boardW * s, bh = g.board * s;
+    const [bx, by] = P(g.bx, g.by + g.board), bw = g.boardW * s, bh = g.board * s;
 
     // the board, then where the arm cannot reach shaded grey
     ctx.fillStyle = col.board; ctx.fillRect(bx, by, bw, bh);
@@ -81,11 +82,11 @@ export function createBoard(canvas, { pad = 12 } = {}) {
       ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.arc(cx, cy, R, 0, Math.PI * 2, true);
       if (r > 0) { ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, Math.PI * 2); }
       ctx.fillStyle = col.reach; ctx.fill("evenodd");
-      const [dx, dy] = P(-g.half, g.standoff + g.board / 2 + g.half);
+      const [dx, dy] = P(g.cx - g.half, g.cy + g.half);
       ctx.setLineDash([4, 4]); ctx.strokeStyle = col.mount; ctx.lineWidth = 1; ctx.strokeRect(dx, dy, 2 * g.half * s, 2 * g.half * s); ctx.setLineDash([]);
       // name the grey where it shows: the top of the board, out past the arm's reach
-      if (g.L1 + g.L2 < g.standoff + g.board) {
-        const [lx, ly] = P(0, g.standoff + g.board); ctx.fillStyle = col.text3; ctx.font = `12px ${col.font}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      if (!g.corner && g.L1 + g.L2 < g.by + g.board) {
+        const [lx, ly] = P(0, g.by + g.board); ctx.fillStyle = col.text3; ctx.font = `12px ${col.font}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
         ctx.fillText("Out of reach", lx, ly + 10);
       }
       ctx.restore();

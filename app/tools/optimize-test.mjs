@@ -11,7 +11,7 @@ import { SAMPLES, clockSVG } from "../src/sample.js";
 import * as ttt from "../src/games/tictactoe.js";
 
 const g = geomFrom(withDefaults(JSON.parse(readFileSync(new URL("../arm.config.json", import.meta.url), "utf8"))));
-const cy = g.standoff + g.board / 2;
+const { cx, cy } = g, start = { x: cx, y: cy - g.half - 20 };   // the drawing's middle, and a start just below it
 const out = {};
 
 // ---- SVG to strokes without a DOM: the shapes the samples and Gemini's drawings use ----
@@ -49,16 +49,16 @@ function pathD(d) {
   push(); return S;
 }
 // a drawing placed by its viewBox in the drawing square, as the app places it, so an edit lands where it was
-const onBoard = (svg) => toBox(svgStrokes(svg), { x: -g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half });
+const onBoard = (svg) => toBox(svgStrokes(svg), { x: cx - g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half });
 
 // ---- 1. stroke order: greedy, improved, and the true best ----
 let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-const randomStrokes = (n) => Array.from({ length: n }, () => { const x = -80 + rnd() * 160, y = cy - 80 + rnd() * 160, a = rnd() * 6.28, l = 5 + rnd() * 30; return [{ x, y }, { x: x + l * Math.cos(a), y: y + l * Math.sin(a) }]; });
+const randomStrokes = (n) => Array.from({ length: n }, () => { const x = cx - 80 + rnd() * 160, y = cy - 80 + rnd() * 160, a = rnd() * 6.28, l = 5 + rnd() * 30; return [{ x, y }, { x: x + l * Math.cos(a), y: y + l * Math.sin(a) }]; });
 const orderRows = [];
 for (const n of [6, 8, 10, 12]) {
   let gs = 0, bs = 0, gWorst = 0, bWorst = 0, trials = n >= 12 ? 8 : 25;
   for (let t = 0; t < trials; t++) {
-    const S = randomStrokes(n), from = { x: 0, y: g.standoff + 20 };
+    const S = randomStrokes(n), from = start;
     const ex = exactTour(S, from).travel, gr = tourTravel(S, orderTour(S, { from, how: "greedy" }), from), be = tourTravel(S, orderTour(S, { from, how: "heuristic" }), from);
     gs += gr / ex - 1; bs += be / ex - 1; gWorst = Math.max(gWorst, gr / ex - 1); bWorst = Math.max(bWorst, be / ex - 1);
   }
@@ -73,7 +73,7 @@ const drawings = { clock: clockSVG(new Date("2026-10-24T10:10:00")), house: SAMP
 const timeOf = (tp) => makeJob(tp, toAngles(tp, g), g).total;
 const drawRows = [];
 for (const [name, svg] of Object.entries(drawings)) {
-  const S = onBoard(svg), from = { x: 0, y: g.standoff + 20 };
+  const S = onBoard(svg), from = start;
   const gr = drawPath(S, { from, how: "greedy", leadIn: g.leadIn }), be = drawPath(S, { from, leadIn: g.leadIn });
   // exactness: up to 12 strokes the order is the proven optimum
   if (S.length <= 12) { const ex = exactTour(S, from).travel, got = tourTravel(S, orderTour(S, { from }), from); if (Math.abs(ex - got) > 1e-6) throw new Error(`${name}: order is not optimal`); }
@@ -85,7 +85,7 @@ console.log("\nreal drawings, pen-up travel (mm) and time to draw (s):"); consol
 // ---- 2. changes: every way to erase, timed, and checked on an ink raster through the sim ----
 const RES = 0.5, W = Math.round(g.boardW / RES), Hh = Math.round(g.board / RES);
 const raster = () => new Uint8Array(W * Hh);
-const cell = (p) => [Math.round((p.x + g.boardW / 2) / RES), Math.round((g.standoff + g.board - p.y) / RES)];
+const cell = (p) => [Math.round((p.x - g.bx) / RES), Math.round((g.by + g.board - p.y) / RES)];
 function stamp(R, a, b, r, v) {
   const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(d / (RES / 2))), rr = Math.ceil(r / RES);
   for (let k = 0; k <= n; k++) {
@@ -117,7 +117,7 @@ function playOn(R, toolpath) {
   return R;
 }
 
-const box = { x: -g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half };
+const box = { x: cx - g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half };
 const gridS = ttt.gridStrokes(box), marks = (moves) => moves.flatMap(([c, w]) => ttt.markStrokes(box, c, w));
 const cat = onBoard(SAMPLES.cat);
 // new whiskers: the cat's last path (the right whiskers) swapped for longer, droopier ones
@@ -134,7 +134,7 @@ const scenes = {
 };
 const changeRows = [];
 for (const [name, [before, after]] of Object.entries(scenes)) {
-  const from = { x: 0, y: g.standoff + 20 };
+  const from = start;
   const res = planChange(before, after, g, { from });
   // the old way: wipe the whole drawing area, then draw everything again
   const wipe = erasePlan(g).toolpath, redraw = drawPath(after, { from: wipe.at(-1), leadIn: g.leadIn, how: "greedy" }).toolpath;

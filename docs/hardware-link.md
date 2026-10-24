@@ -1,14 +1,18 @@
 # Connecting the arm: Arduino, and where a Pi fits
 
-**Recommendation:** an Arduino Uno or Nano drives the three servos, plugged by USB into the laptop running Clockedin.
-The app plans everything and streams timed keyframes; the Arduino does only the real-time part, moving the servos
-between keyframes on its own 20 ms clock. Add a Raspberry Pi only if the arm must run without a laptop.
+**Recommendation:** an Arduino (the build has a Mega) drives the three servos, plugged by USB into the laptop running
+Clockedin. The app's server holds the USB port; the app plans everything and streams timed keyframes, and the
+Arduino does only the real-time part, moving the servos between keyframes on its own 20 ms clock. Add a Raspberry Pi
+only if the arm must run without a laptop: the same server runs on it.
 
 ```
-Laptop (Chrome, Clockedin, node server.mjs)
-   │  USB serial, 115200 baud, protocol 2: timed keyframes, flow-controlled
+Browser (Clockedin), curl or a script
+   │  HTTP to localhost: /api/arm (servo degrees, a board point, a drawing, a job's keyframes)
    ▼
-Arduino Uno / Nano (firmware/clockedin)   ── D9 base · D10 elbow · D11 tilt ──▶  3 × SG92R
+Laptop: node server.mjs (lib/arm.mjs holds the port)
+   │  USB serial, 115200 baud, protocol 3: timed keyframes, flow-controlled; live targets, glided
+   ▼
+Arduino Mega / Uno / Nano (firmware/clockedin)   ── D9 base · D10 elbow · D11 pen ──▶  3 × SG92R
    ▲                                                                              ▲
    └── powered by USB                                   5 V servo supply ─────────┘  (shared ground)
 ```
@@ -44,13 +48,16 @@ One line each way, angles in centi-degrees of servo travel (0 to 18000), times i
 
 | App sends | Board answers | Meaning |
 |---|---|---|
-| `?` | `CLOCKEDIN 2 48` | handshake: protocol and buffer size |
+| `?` | `CLOCKEDIN 3 48` | handshake: protocol and buffer size |
 | `K <t> <base> <elbow> <tilt>` | `F <free>` | one keyframe; the reply says how many slots are free |
-| `G` | `RUN` | glide to the first keyframe, then start the clock (the app sends it once 12 keyframes are buffered) |
+| `G` | `RUN` | glide to the first keyframe, then start the clock (the server sends it once 12 keyframes are buffered) |
 | `E` | `DONE` when finished | no more keyframes |
 | `S` | `STOPPED` | ease to a halt along the path over `STOP_MS`, drop the buffer (the Stop the arm button) |
 | `J <base> <elbow> <tilt>` | `F <free>` | glide there (dragging the pen on the board moves the real arm) |
 | `P` | `F <free>` | glide to the park pose |
+| `A <deg/s²> <deg/s>` | `A <accel> <speed>` | the glides' acceleration and top speed, set live |
+| `W` | `POS <b> <e> <w>` | where the servos are |
+| | `AT` | a glide has arrived (the server waits for it before putting the pen down) |
 | | `T <t> <free>` | progress, when slots free up |
 | | `LATE` | the buffer ran dry; the arm holds until more arrive |
 
@@ -134,3 +141,25 @@ joined to the Pi's. Run `sudo pigpiod`.
 **Keys on the Pi:** copy `app/.env` across by hand (never through git). To reach the app from other machines the
 server has to listen beyond the Pi itself; on a shared hackathon Wi-Fi that also lets others use the Gemini key,
 so keep it on a hotspot of your own.
+
+## Driving it live: the server's arm API
+
+`node server.mjs` holds the port (local only, 127.0.0.1). Arm setup's Live arm panel uses these, and so can curl:
+
+```
+curl -X POST localhost:5178/api/arm/connect -d '{}'                         # the first Arduino found
+curl -X POST localhost:5178/api/arm/servos -d '{"base":90,"elbow":60,"pen":40}'   # servo degrees, 0 to 180
+curl -X POST localhost:5178/api/arm/point -d '{"x":156,"y":156,"tool":"lift"}'    # a board point in mm
+curl -X POST localhost:5178/api/arm/draw -d '{"svg":"<svg viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\"/></svg>"}'
+curl -X POST localhost:5178/api/arm/tune -d '{"interval":40,"speed":120,"accel":1500}'
+curl -X POST localhost:5178/api/arm/stop -d '{}'      # or park, disconnect;  GET /api/arm for the status
+```
+
+Live moves can't make the motors jump: the newest target wins, at most one goes out every `interval` ms (40), moves
+under `minStep` (0.2°) are skipped, and the board glides to each at `speed` (120°/s) with `accel` (1500°/s²). A
+stroke's first point is reached with the pen lifted and only then put down. Drawings (`draw`, the app's Send to arm)
+go the planned way: strokes ordered for least travel, every 2 mm solved for joint angles, timed with ramps and
+corners, thinned to keyframes within 0.15° and played by the board's own clock.
+
+A Mega's bootloader hangs on to bytes that arrive while it starts, so the server waits 2 s after opening the port
+before the handshake.

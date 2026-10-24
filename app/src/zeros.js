@@ -12,13 +12,13 @@ const at = (g, x, y, tool = "draw") => { const s = ikTool(x, y, g, tool); return
 // joint angles for every 5 mm of the board the nib can reach
 function reach(g) {
   const board = [];
-  for (let x = -g.boardW / 2; x <= g.boardW / 2; x += 5) for (let y = g.standoff; y <= g.standoff + g.board; y += 5) { const a = at(g, x, y); if (a) board.push(a); }
+  for (let x = g.bx; x <= g.bx + g.boardW; x += 5) for (let y = g.by; y <= g.by + g.board; y += 5) { const a = at(g, x, y); if (a) board.push(a); }
   return board;
 }
 // and what the app must always reach: the drawing square, the wipe (with either end) and the park pose
 function joints(g) {
-  const board = reach(g), need = [], cy = g.standoff + g.board / 2, at2 = (x, y, tool) => at(g, x, y, tool);
-  for (let i = 0; i <= 20; i++) for (let k = 0; k <= 20; k++) need.push(at2(-g.half + i / 10 * g.half, cy - g.half + k / 10 * g.half));
+  const board = reach(g), need = [], { cx, cy } = g, at2 = (x, y, tool) => at(g, x, y, tool);
+  for (let i = 0; i <= 20; i++) for (let k = 0; k <= 20; k++) need.push(at2(cx - g.half + i / 10 * g.half, cy - g.half + k / 10 * g.half));
   for (const p of erasePlan(g).toolpath) need.push(at2(p.x, p.y, p.tool === "erase" ? "erase" : "draw"));
   const h = homePose(g); need.push([h.base, h.elbow]);
   return { board, need: need.filter(Boolean) };

@@ -12,7 +12,7 @@ import { clockSVG, SAMPLES } from "../src/sample.js";
 import * as ttt from "../src/games/tictactoe.js";
 
 const g = geomFrom(withDefaults(JSON.parse(readFileSync(new URL("../arm.config.json", import.meta.url), "utf8"))));
-const cy = g.standoff + g.board / 2, box = { x: -g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half };
+const { cx, cy } = g, box = { x: cx - g.half, y: cy - g.half, w: 2 * g.half, h: 2 * g.half }, start = { x: cx, y: cy - g.half - 20 };
 const lines = (svg) => [...svg.matchAll(/<line[^>]*x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/g)].map((m) => [{ x: +m[1], y: +m[2] }, { x: +m[3], y: +m[4] }]);
 const clock = (t) => { const r = []; for (let i = 0; i <= 72; i++) r.push({ x: 50 + 44 * Math.cos(i / 72 * 2 * Math.PI), y: 50 + 44 * Math.sin(i / 72 * 2 * Math.PI) }); return toBox([r, ...lines(clockSVG(t))], box); };
 
@@ -26,9 +26,9 @@ function firmwareAt(keys, tms) {
 }
 
 const jobs = {
-  "clock face": (() => { const tp = drawPath(clock(new Date("2026-10-24T10:10:00")), { from: { x: 0, y: g.standoff + 20 }, leadIn: g.leadIn }).toolpath; return makeJob(tp, toAngles(tp, g), g); })(),
-  "clock, next minute (erase and draw)": (() => { const r = planChange(clock(new Date("2026-10-24T10:10:00")), clock(new Date("2026-10-24T10:11:00")), g, { from: { x: 0, y: g.standoff + 20 } }); return makeJob(r.best.toolpath, toAngles(r.best.toolpath, g), g); })(),
-  "tic-tac-toe, new game (wipe marks)": (() => { const before = [...ttt.gridStrokes(box), ...ttt.markStrokes(box, 0, "X"), ...ttt.markStrokes(box, 4, "O"), ...ttt.markStrokes(box, 8, "X")]; const r = planChange(before, ttt.gridStrokes(box), g, { from: { x: 0, y: g.standoff + 20 } }); return makeJob(r.best.toolpath, toAngles(r.best.toolpath, g), g); })(),
+  "clock face": (() => { const tp = drawPath(clock(new Date("2026-10-24T10:10:00")), { from: start, leadIn: g.leadIn }).toolpath; return makeJob(tp, toAngles(tp, g), g); })(),
+  "clock, next minute (erase and draw)": (() => { const r = planChange(clock(new Date("2026-10-24T10:10:00")), clock(new Date("2026-10-24T10:11:00")), g, { from: start }); return makeJob(r.best.toolpath, toAngles(r.best.toolpath, g), g); })(),
+  "tic-tac-toe, new game (wipe marks)": (() => { const before = [...ttt.gridStrokes(box), ...ttt.markStrokes(box, 0, "X"), ...ttt.markStrokes(box, 4, "O"), ...ttt.markStrokes(box, 8, "X")]; const r = planChange(before, ttt.gridStrokes(box), g, { from: start }); return makeJob(r.best.toolpath, toAngles(r.best.toolpath, g), g); })(),
   "full wipe": (() => { const tp = erasePlan(g).toolpath; return makeJob(tp, toAngles(tp, g), g); })(),
 };
 

@@ -1,5 +1,6 @@
 // Dev server for Clockedin. Serves this folder, holds the API keys (from .env, never sent to the browser) and
-// answers the app's few calls: /api/status, /api/chat, /api/draw, /api/speak, /api/sims and /api/config.
+// answers the app's few calls: /api/status, /api/chat, /api/draw, /api/speak, /api/sims and /api/config. It also
+// holds the arm's USB port (/api/arm, lib/arm.mjs), so the app, curl or a script can move the arm. Local only.
 // GPT answers first when OPENAI_API_KEY is set, Gemini when it is not or when every GPT model fails. `node server.mjs`, then open the URL.
 import { createServer } from "node:http";
 import { readFile, writeFile, readdir, mkdir, unlink } from "node:fs/promises";
@@ -8,6 +9,13 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as gemini from "./lib/gemini.mjs";
 import * as gpt from "./lib/openai.mjs";
+import * as armLink from "./lib/arm.mjs";
+import { geomFrom, withDefaults, servoAngle } from "./src/config.js";
+import { toAngles, toolPoint } from "./src/ik.js";
+import { drawPath, plan } from "./src/pathplan.js";
+import { makeJob, homePose } from "./src/sim.js";
+import { keyframes, thin } from "./src/arm.js";
+import { parseSVG } from "./src/svg.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 if (existsSync(join(root, ".env"))) process.loadEnvFile(join(root, ".env"));
@@ -123,6 +131,10 @@ async function api(req, res, path) {
     } catch (e) { return send(res, 502, { error: e.message }); }
     return;
   }
+  if (path === "/api/arm" || path.startsWith("/api/arm/")) {
+    try { return send(res, 200, await arm(req, path.slice(8))); }
+    catch (e) { return send(res, 400, { ...armLink.status(), error: e.message }); }
+  }
   if (path === "/api/config" && req.method === "POST") {
     const cfg = await body(req);
     const bad = [];
@@ -132,6 +144,52 @@ async function api(req, res, path) {
     return send(res, 200, cfg);
   }
   send(res, 404, { error: "no such call" });
+}
+
+// The arm, through lib/arm.mjs. Every call answers with the arm's status.
+//   GET  /api/arm                          status: ports, connection, firmware, live settings, job, last lines
+//   POST /api/arm/connect {port?}          open the port (the first Arduino when no port is given)
+//   POST /api/arm/servos {base, elbow, pen}   servo degrees, 0 to 180; any left out stay put
+//   POST /api/arm/point {x, y, tool, start}   a board point in mm for the nib (tool draw or lift) or the eraser
+//                                          (erase); start: a stroke's first point, reached lifted, then pen down
+//   POST /api/arm/draw {strokes} | {svg}   strokes in board mm, drawn as they are, or an SVG fitted to the drawing
+//                                          square: ordered for least travel, solved, timed with ramps, streamed
+//   POST /api/arm/run {keys}               keyframes the app planned
+//   POST /api/arm/tune {interval, minStep, speed, accel}   live moves: ms apart, smallest step, glide deg/s, deg/s²
+//   POST /api/arm/park | stop | disconnect
+async function arm(req, sub) {
+  if (req.method === "GET") return armLink.status();
+  const b = await body(req, 4e6), g = geomFrom(withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8"))));
+  switch (sub) {
+    case "/connect": { const c = withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8")));
+      const s = await armLink.connect(b.port || undefined); return s.firmware ? armLink.tune({ ...c.live, accel: c.servos.accel }) : s; }
+    case "/disconnect": return armLink.disconnect();
+    case "/servos": return armLink.servos(b);
+    case "/point": return armLink.point(+b.x, +b.y, ["draw", "lift", "erase"].includes(b.tool) ? b.tool : "draw", g, servosAt(g), !!b.start);
+    case "/tune": return armLink.tune(b);
+    case "/park": return armLink.park();
+    case "/stop": return armLink.stop();
+    case "/run": return armLink.run(b.keys);
+    case "/draw": {
+      const h = homePose(g), from = toolPoint(h.base * Math.PI / 180, h.elbow * Math.PI / 180, g);
+      const strokes = b.svg ? null : (b.strokes || []).map((s) => s.map((p) => ({ x: +p.x, y: +p.y })));
+      const tp = (b.svg ? plan(parseSVG(b.svg), g, { half: g.half, leadIn: g.leadIn, from }) : drawPath(strokes, { from, leadIn: g.leadIn })).toolpath;
+      if (!tp.length) throw new Error("Nothing to draw");
+      tp.push({ ...from, pen: 0 });   // and home again
+      const an = toAngles(tp, g);
+      if (an.unreachable || an.outOfRange) throw new Error(`${an.unreachable + an.outOfRange} points are out of the arm's reach`);
+      return armLink.run(thin(keyframes(makeJob(tp, an, g), g)));
+    }
+  }
+  throw new Error("no such arm call");
+}
+// a board point -> servo degrees for that end of the pen, or null when the arm can't get there
+function servosAt(g) {
+  return (x, y, tool) => {
+    const r = toAngles([{ x, y, pen: tool === "lift" ? 0 : 1, tool }], g), a = r.path[0];
+    if (a.out_of_reach || r.outOfRange) return null;
+    return { servo: [servoAngle("base", a.base, g), servoAngle("elbow", a.elbow, g), servoAngle("tilt", a.tilt, g)], lift: servoAngle("tilt", g.tilt.lift, g) };
+  };
 }
 
 createServer(async (req, res) => {

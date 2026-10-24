@@ -14,7 +14,7 @@ import { geomFrom, withDefaults, servoAngle } from "../src/config.js";
 import { drawPath, erasePlan } from "../src/pathplan.js";
 import { toAngles, toolPoint } from "../src/ik.js";
 import { makeJob, homePose } from "../src/sim.js";
-import { keyframes } from "../src/arm.js";
+import { keyframes, thin } from "../src/arm.js";
 import { emptyScene, applyActions, sceneStrokes } from "../src/scene.js";
 import { SAMPLES, clockSVG } from "../src/sample.js";
 
@@ -45,13 +45,13 @@ const int16_t PARK[3] = {${list(PARK)}};       // beside the drawing, pen lifted
 const int16_t TILT_DRAW = ${cd("tilt", g.tilt.draw)}, TILT_LIFT = ${cd("tilt", g.tilt.lift)}, TILT_ERASE = ${cd("tilt", g.tilt.erase)};
 // geometry for moving the pen to a board point: servo deg = OFFSET + DIR * RATIO * joint deg
 const float OFFSET[3] = {${list(["base", "elbow", "tilt"].map((j) => +s(j).offset))}}, DIR[3] = {${list(["base", "elbow", "tilt"].map((j) => +s(j).dir))}}, RATIO[3] = {${list(["base", "elbow", "tilt"].map((j) => +s(j).ratio || 1))}};
-const float L1 = ${g.L1}, L2 = ${g.L2}, NIB_SIDE = ${(+g.nibSide).toFixed(2)};   // mm; the nib sits NIB_SIDE across the forearm's tip
+const float L1 = ${g.L1}, L2 = ${g.L2}, NIB_ALONG = ${(+g.nibAlong).toFixed(2)}, NIB_SIDE = ${(+g.nibSide).toFixed(2)};   // mm; the nib sits NIB_ALONG past the forearm's tip and NIB_SIDE across it
 // a servo told to stop dead overshoots: moves the board makes itself (park, jog, the motor test) speed up and slow
 // down at SERVO_ACCEL (deg/s²), the motor test's pen at PEN_ACCEL (mm/s²), and a stop eases out over STOP_MS
 const float SERVO_ACCEL = ${g.servo.accel}, PEN_ACCEL = ${g.accel};
 const uint16_t STOP_MS = ${Math.round(1000 * g.travelSpeed / g.accel)};
 const bool ELBOW_UP = ${g.elbowUp};
-const float BOARD_CX = 0, BOARD_CY = ${g.standoff + g.board / 2};   // mm from the base: the middle of the drawing area
+const float BOARD_CX = ${g.cx.toFixed(1)}, BOARD_CY = ${g.cy.toFixed(1)};   // mm from the base: the middle of the drawing area
 `;
 for (const sketch of ["clockedin", "servo-test", "playback"]) if (existsSync(new URL(`${sketch}/`, FW))) writeFileSync(new URL(`${sketch}/arm_config.h`, FW), config);
 console.log(`arm_config.h written: park ${PARK.map((v) => v / 100).join(" / ")} deg, pen ${cd("tilt", g.tilt.draw) / 100} down, ${cd("tilt", g.tilt.lift) / 100} up`);
@@ -94,11 +94,8 @@ const angles = toAngles(tp, g), job = makeJob(tp, angles, g);
 // accelerations drop with the square of the speed
 let keys = keyframes(job, g).map((k) => ({ t: Math.round(k.t / speed), a: k.a }));
 
-// drop keyframes the board would rebuild anyway (it moves linearly between keyframes): from each kept one, reach
-// as far ahead as every keyframe in between stays within 0.15 deg of the straight line and the pen doesn't change
-const TOL = 15, kept = [keys[0]];
-const fits = (a, b) => { for (let i = a + 1; i < b; i++) { const k = keys[i], u = (k.t - keys[a].t) / (keys[b].t - keys[a].t || 1); if (k.a[2] !== keys[a].a[2] || k.a.some((v, j) => Math.abs(keys[a].a[j] + (keys[b].a[j] - keys[a].a[j]) * u - v) > TOL)) return false; } return keys[a].a[2] === keys[b].a[2] || b === a + 1; };
-for (let a = 0; a < keys.length - 1; ) { let b = a + 1; while (b + 1 < keys.length && fits(a, b + 1)) b++; kept.push(keys[b]); a = b; }
+// drop keyframes the board would rebuild anyway, within 0.15 deg (thin, as the app does when it sends a job)
+const kept = thin(keys);
 // the board's own interpolation over the kept keyframes, against the full plan, every 20 ms
 const at = (K, t) => { let h = 0; while (h + 1 < K.length && K[h + 1].t <= t) h++; const a = K[h], b = K[h + 1]; if (!b) return a.a; const u = (t - a.t) / (b.t - a.t); return a.a.map((v, j) => v + (b.a[j] - v) * u); };
 let worst = 0; for (let t = 0; t <= kept.at(-1).t; t += 20) { const x = at(keys, t), y = at(kept, t); worst = Math.max(worst, ...x.map((v, j) => Math.abs(v - y[j]))); }
