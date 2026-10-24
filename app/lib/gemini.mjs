@@ -102,15 +102,17 @@ The board is a square drawing area, 0 to 100 both ways, x to the right and y dow
 Answer with JSON: {"reply": "...", "actions": [...]}.
 reply: one or two short sentences in plain British English: say what you are about to draw or change. Never describe SVG.
 actions, carried out in order:
-- {"type":"draw","id":"a short new id","name":"what it is","box":{"x":..,"y":..,"w":..,"h":..},"parts":"…","svg":"<svg viewBox=\\"0 0 100 100\\">…</svg>"} adds a drawing in that box. In parts, first list what makes the subject recognisable (for a crest: its shield shape, every charge on it and where, any motto), then draw all of it in svg. The first drawing usually takes the whole board {"x":0,"y":0,"w":100,"h":100}; later ones go in empty space, smaller, unless the person says where.
+- {"type":"draw","id":"a short new id","name":"what it is","box":{"x":..,"y":..,"w":..,"h":..},"parts":"…","svg":"<svg viewBox=\\"0 0 100 100\\">…</svg>"} adds a drawing in that box. In parts, first list what makes the subject recognisable (for a crest: its shield shape, every charge on it and where, any motto), then draw all of it in svg; texts: any words in it (below). The first drawing usually takes the whole board {"x":0,"y":0,"w":100,"h":100}; later ones go in empty space, smaller, unless the person says where.
 - {"type":"edit","id":"an id on the board","svg":"…"} changes a drawing. Start from its current SVG, given below, and change only what was asked: copy every unchanged element exactly, character for character, so the robot only wipes and redraws what changed.
+- {"type":"write","id":"…","name":"…","box":{…},"title":"… or null","lines":[{"text":"…","check":"open" | "done" | null}],"align":"left" | "center"} for anything that is mainly words: a to-do list, a shopping list, a note, a sign, a card, a short poem, a menu, a score. check "open" is a line with an empty box to tick, "done" a ticked one. At most 12 lines of about 30 characters. The app letters it neatly in its own pen font and lays it out. When the person doesn't say what goes on a list, make up a short, playful one in character. To change one (tick a line, add one, cross one out), send write with the same id and the whole new list, unchanged lines exactly as they are. A picture to go with it is a separate draw.
 - {"type":"erase","id":"an id on the board"} wipes one drawing; {"type":"clear"} wipes the board.
 - {"type":"game","game":"tictactoe","first":"person" or "robot"} starts noughts and crosses; the app draws the grid and plays the robot's moves. {"type":"move","cell":0..8} plays the person's move (0 top left, 2 top right, 8 bottom right) when a game is on.
 - {"type":"repeat","every":minutes,"prompt":"…"} when the person wants something to happen again by itself on a schedule ("keep it up to date", "a new animal every 10 minutes"): every is the minutes between runs, 1 or more; prompt is the request to run each time, short, in their words (for a clock: "draw the time", which the app draws itself). Add the actions that do it now as well.
 - No actions when the person is only chatting or asking a question.
 - Never ask which one the person means: draw the best-known one and name it in the reply. They can ask for a change.
 Every svg follows these rules:
-${DRAW_RULES}`;
+${DRAW_RULES}
+- Never draw letters or digits in the svg. Every word in a drawing (a motto, a name, a label, a number on a clock face) goes in texts: [{"text":"…","x":..,"y":..,"w":..,"h":..}], the rectangle in the same 100 x 100 box that the words should fill; the app letters them in its own pen font. Use "\n" for a second line.`;
 
 const SCHEMA = {
   type: "OBJECT",
@@ -121,10 +123,13 @@ const SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
-          type: { type: "STRING", enum: ["draw", "edit", "erase", "clear", "game", "move", "repeat"] },
+          type: { type: "STRING", enum: ["draw", "edit", "write", "erase", "clear", "game", "move", "repeat"] },
           id: { type: "STRING" }, name: { type: "STRING" }, parts: { type: "STRING" }, svg: { type: "STRING" },
           box: { type: "OBJECT", properties: { x: { type: "NUMBER" }, y: { type: "NUMBER" }, w: { type: "NUMBER" }, h: { type: "NUMBER" } } },
           game: { type: "STRING" }, first: { type: "STRING" }, cell: { type: "INTEGER" }, every: { type: "INTEGER" }, prompt: { type: "STRING" },
+          texts: { type: "ARRAY", items: { type: "OBJECT", properties: { text: { type: "STRING" }, x: { type: "NUMBER" }, y: { type: "NUMBER" }, w: { type: "NUMBER" }, h: { type: "NUMBER" } }, required: ["text", "x", "y", "w", "h"] } },
+          title: { type: "STRING" }, align: { type: "STRING" },
+          lines: { type: "ARRAY", items: { type: "OBJECT", properties: { text: { type: "STRING" }, check: { type: "STRING", nullable: true } }, required: ["text"] } },
         },
         // Gemini writes the fields in alphabetical order, so the parts come before the svg and the drawing follows them
         required: ["type"],
@@ -138,7 +143,9 @@ const SCHEMA = {
 export async function chat(messages, board, game, { key, models }) {
   if (!key) throw new Error("No Gemini key in app/.env");
   const state = board.length
-    ? `On the board now:\n${board.map((b) => `- id "${b.id}", ${b.name}, box ${JSON.stringify(b.box)}${b.svg ? `, svg: ${b.svg}` : ""}`).join("\n")}`
+    ? `On the board now:\n${board.map((b) => b.write
+        ? `- id "${b.id}", ${b.name}, written, box ${JSON.stringify(b.box)}, title ${JSON.stringify(b.write.title || null)}, align ${b.write.align}, lines: ${JSON.stringify(b.write.lines)}`
+        : `- id "${b.id}", ${b.name}, box ${JSON.stringify(b.box)}${b.svg ? `, svg: ${b.svg}` : ""}${b.texts ? `, texts: ${JSON.stringify(b.texts)}` : ""}`).join("\n")}`
     : "The board is empty.";
   const contents = messages.slice(-12).map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
   contents.push({ role: "user", parts: [{ text: `${state}${game ? `\nGame: ${game}` : ""}\n(Answer the person's last message.)` }] });

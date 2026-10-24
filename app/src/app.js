@@ -148,7 +148,7 @@ function renderTitle() {
 }
 
 // ---------- the chat ----------
-const STARTERS = ["Draw the time", "Draw a cat", "Play noughts and crosses", "Draw the Oxford logo"];
+const STARTERS = ["Draw the time", "Write a to-do list", "Play noughts and crosses", "Draw the Oxford logo"];
 function renderThread() {
   const t = $("#thread");
   if (!messages.length && !thinking) {
@@ -174,11 +174,34 @@ function localTurn(text) {
   const sm = t.match(/^(draw |show )?(me )?(a |an |the )?(cat|house|star|flower)$/);
   if (sm) return { reply: `Drawing a ${sm[4]}.`, actions: [{ type: "draw", id: sm[4], name: sm[4], svg: SAMPLES[sm[4]] }] };
   if (/(tic.?tac.?toe|noughts and crosses|naughts and crosses)/.test(t)) return { reply: "Noughts and crosses.", actions: [{ type: "game", game: "tictactoe", first: /\b(you|robot) (go |start )?first\b/.test(t) ? "robot" : "person" }] };
+  const listed = listTurn(t);
+  if (listed) return listed;
   if (scene.game) {
     if (/\b(again|new game|restart|rematch|another)\b/.test(t)) return { reply: "New game.", actions: [{ type: "game", game: "tictactoe" }] };
     const c = parseCell(t); if (c >= 0 && t.split(/\s+/).length <= 6) return { reply: "", actions: [{ type: "move", cell: c }] };
   }
   return null;
+}
+
+// Ticking off and adding to a list on the board, without a model: "tick off the first one", "check milk",
+// "add call mum to the list". Anything it can't place goes to the model as usual.
+const ORDINAL = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+function listTurn(t) {
+  const list = [...scene.items].reverse().find((i) => i.write?.lines.some((l) => l.check));
+  if (!list) return null;
+  const lines = list.write.lines.map((l) => ({ ...l }));
+  const write = (reply) => ({ reply, actions: [{ type: "write", id: list.id, lines }] });
+  const add = t.match(/^(?:please )?(?:add|put|write)\s+["“']?(.+?)["”']?\s+(?:to|on|onto)\s+(?:the|my|this|your)\s+(?:to-?do\s+|todo\s+|shopping\s+)?list$/);
+  if (add) { const text = cap(add[1]); lines.push({ text, check: "open" }); return write(`Adding "${text}".`); }
+  const m = t.match(/^(?:please )?(tick|check|cross|mark|untick|uncheck)(?:\s+off)?\s+(.+?)(?:\s+(?:as\s+)?(?:done|off|complete|completed))?$/);
+  if (!m) return null;
+  const done = !/^un/.test(m[1]);
+  const what = m[2].replace(/^(the|number|item|#|no\.?)\s*/g, "").replace(/\s+(one|item|line|thing)$/, "").replace(/["“”']/g, "").trim();
+  let k = /^\d+$/.test(what) ? +what - 1 : ORDINAL[what] ? ORDINAL[what] - 1 : what === "last" ? lines.length - 1 : -1;
+  if (k < 0) k = lines.findIndex((l) => l.text.toLowerCase().includes(what) || (what.length > 3 && what.includes(l.text.toLowerCase())));
+  if (k < 0 || k >= lines.length || !lines[k].check) return null;
+  lines[k].check = done ? "done" : "open";
+  return write(done ? `Ticking off "${lines[k].text}".` : `Unticking "${lines[k].text}".`);
 }
 
 let lastAsk = "";
@@ -205,7 +228,7 @@ async function send(text, hook = null) {
       const said = messages.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text }));
       const r = await fetch("./api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         messages: hook ? [...said, { role: "user", text }] : said,
-        board: scene.items.map(({ id, name, box, svg }) => ({ id, name, box, svg })),
+        board: scene.items.map(({ id, name, box, svg, texts, write }) => (write ? { id, name, box, write: { title: write.title, lines: write.lines, align: write.align } } : { id, name, box, svg, texts })),
         game: describeGame(scene.game),
       }) });
       const j = await r.json().catch(() => ({}));

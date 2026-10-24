@@ -1,9 +1,11 @@
-// What should be on the whiteboard: drawings, each an SVG in a box, and at most one game. The chat, the clock and
+// What should be on the whiteboard: drawings, each an SVG in a box (with any words in it as texts, lettered by
+// font.js), written items (a list, a note, a sign: lines of text, maybe with boxes to tick), and at most one game. The chat, the clock and
 // the games change the scene; the planner (optimize.js) works out how to get the board from the old one to the new.
 // Boxes are in the drawing area's own units, 0 to 100 both ways with y down, the way the chat model sees the board.
 import { parseSVG, parseSVGDom } from "./svg.js";
 import { toBox } from "./pathplan.js";
 import * as ttt from "./games/tictactoe.js";
+import { fitText, writeStrokes, writeSize } from "./font.js";
 
 export const FULL = { x: 0, y: 0, w: 100, h: 100 };
 export const emptyScene = () => ({ items: [], game: null });
@@ -20,10 +22,20 @@ function trace(svg) {
   return traced.get(svg);
 }
 
+const EMPTY = '<svg viewBox="0 0 100 100"></svg>';
+// an item's strokes in its own space, and that space: a drawing's viewBox (its words placed in the same units),
+// or for written text the box itself
+function itemLocal(it) {
+  const box = it.box || FULL;
+  if (it.write) return { strokes: writeStrokes(it.write, box), vb: { x: 0, y: 0, w: box.w, h: box.h } };
+  const t = trace(it.svg || EMPTY);
+  return { strokes: [...t.strokes, ...(it.texts || []).flatMap((x) => fitText(x.text, x))], vb: t.vb };
+}
+
 // every stroke of the scene, in board mm
 export function sceneStrokes(scene, g) {
   const out = [];
-  for (const it of scene.items) { const t = trace(it.svg); out.push(...toBox(t.strokes, boxMm(it.box || FULL, g), t.vb)); }
+  for (const it of scene.items) { const { strokes, vb } = itemLocal(it); out.push(...toBox(strokes, boxMm(it.box || FULL, g), vb)); }
   if (scene.game) out.push(...gameStrokes(scene.game, g));
   return out;
 }
@@ -67,13 +79,23 @@ export function applyActions(scene, actions) {
   let items = scene.items.slice(), game = scene.game;
   const notes = [];
   for (const a of actions || []) {
-    if (a.type === "draw" && a.svg) {
+    const texts = validTexts(a.texts);
+    const k = items.findIndex((i) => i.id === a.id);
+    if (a.type === "write" || (a.type === "edit" && (a.lines || items[k]?.write))) {
+      // a list, note or sign: new, or the same id again with its whole new text
+      const old = k >= 0 ? items[k] : null, box = old?.box || validBox(a.box) || (items.length ? freeBox(items) : FULL);
+      const write = validWrite(a, old?.write);
+      if (!write) continue;
+      write.size = writeSize(write, box, old?.write?.size);
+      if (old) items[k] = { ...old, write };
+      else items.push({ id: newItemId(items, a, "note"), name: a.name || a.title || "note", box, write });
+    } else if (a.type === "draw" && (a.svg || texts)) {
       const box = validBox(a.box) || (items.length ? null : FULL) || freeBox(items);
-      const id = a.id && !items.some((i) => i.id === a.id) ? a.id : `${(a.id || a.name || "drawing").replace(/\W+/g, "-").slice(0, 16)}-${uid()}`;
-      items.push({ id, name: a.name || "drawing", box, svg: a.svg });
-    } else if (a.type === "edit" && a.svg) {
-      const k = items.findIndex((i) => i.id === a.id); const at = k >= 0 ? k : items.length === 1 ? 0 : -1;
-      if (at >= 0) items[at] = { ...items[at], svg: a.svg }; else items.push({ id: a.id || uid(), name: a.name || "drawing", box: FULL, svg: a.svg });
+      items.push({ id: newItemId(items, a, "drawing"), name: a.name || "drawing", box, svg: a.svg || EMPTY, ...(texts ? { texts } : {}) });
+    } else if (a.type === "edit" && (a.svg || texts)) {
+      const at = k >= 0 ? k : items.length === 1 ? 0 : -1;
+      const change = { ...(a.svg ? { svg: a.svg } : {}), ...(texts ? { texts } : {}) };
+      if (at >= 0) items[at] = { ...items[at], ...change }; else items.push({ id: a.id || uid(), name: a.name || "drawing", box: FULL, svg: EMPTY, ...change });
     } else if (a.type === "erase") {
       items = items.filter((i) => i.id !== a.id);
       if (a.id === "game" || a.id === "tictactoe") game = null;
@@ -82,6 +104,24 @@ export function applyActions(scene, actions) {
     else if (a.type === "move" && game && Number.isInteger(a.cell) && a.cell >= 0 && a.cell < 9) { const r = playMove(game, a.cell); game = r.game; notes.push(r.said); }
   }
   return { scene: { items, game }, notes };
+}
+const newItemId = (items, a, kind) => (a.id && !items.some((i) => i.id === a.id) ? a.id : `${(a.id || a.name || kind).replace(/\W+/g, "-").slice(0, 16)}-${uid()}`);
+// words in a drawing: [{ text, x, y, w, h }], each a rectangle in the drawing's 100 x 100 units for the font to fill
+function validTexts(list) {
+  if (!Array.isArray(list)) return null;
+  const ok = list.filter((x) => x && typeof x.text === "string" && x.text.trim() && [x.x, x.y, x.w, x.h].every(Number.isFinite) && x.w > 1 && x.h > 1)
+    .slice(0, 16).map((x) => ({ text: x.text.slice(0, 80), x: Math.max(0, x.x), y: Math.max(0, x.y), w: Math.min(x.w, 100), h: Math.min(x.h, 100) }));
+  return ok.length ? ok : null;
+}
+// a written item: { title, lines: [{ text, check: "open" | "done" | null }], align }; what isn't sent stays as it was
+function validWrite(a, old) {
+  const lines = Array.isArray(a.lines) ? a.lines : old?.lines;
+  if (!lines) return null;
+  return {
+    title: String(a.title ?? old?.title ?? "").slice(0, 48),
+    lines: lines.slice(0, 16).map((l) => ({ text: String(typeof l === "string" ? l : l?.text ?? "").slice(0, 60), check: l?.check === "open" || l?.check === "done" ? l.check : null })),
+    align: (a.align ?? old?.align) === "center" ? "center" : "left",
+  };
 }
 function validBox(b) {
   if (!b || ![b.x, b.y, b.w, b.h].every(Number.isFinite) || b.w < 5 || b.h < 5) return null;
@@ -92,8 +132,8 @@ function validBox(b) {
 function freeBox(items) {
   const quarters = [{ x: 50, y: 0, w: 50, h: 50 }, { x: 0, y: 0, w: 50, h: 50 }, { x: 50, y: 50, w: 50, h: 50 }, { x: 0, y: 50, w: 50, h: 50 }];
   const pts = items.flatMap((it) => {
-    const b = it.box || FULL, t = trace(it.svg), s = Math.min(b.w / t.vb.w, b.h / t.vb.h);
-    return t.strokes.flat().map((p) => ({ x: b.x + (p.x - t.vb.x) * s, y: b.y + (p.y - t.vb.y) * s }));
+    const b = it.box || FULL, { strokes, vb } = itemLocal(it), s = Math.min(b.w / vb.w, b.h / vb.h);
+    return strokes.flat().map((p) => ({ x: b.x + (p.x - vb.x) * s, y: b.y + (p.y - vb.y) * s }));
   });
   const ink = (q) => pts.filter((p) => p.x >= q.x && p.x < q.x + q.w && p.y >= q.y && p.y < q.y + q.h).length;
   return quarters.map((q) => ({ q, n: ink(q) })).sort((a, b) => a.n - b.n)[0].q;
@@ -101,7 +141,9 @@ function freeBox(items) {
 
 // the whole scene as one SVG, for the Picture view
 export function sceneSVG(scene, g) {
-  const parts = scene.items.map((it) => { const b = it.box || FULL, inner = it.svg.replace(/^[\s\S]*?<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, ""), vb = trace(it.svg).vb; return `<svg x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" viewBox="${vb.x} ${vb.y} ${vb.w} ${vb.h}">${inner}</svg>`; });
+  // each item as the arm will draw it: its traced strokes and its lettering, in its own box
+  const line = (st) => `<polyline points="${st.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")}"/>`;
+  const parts = scene.items.map((it) => { const b = it.box || FULL, { strokes, vb } = itemLocal(it); return `<svg x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" viewBox="${vb.x} ${vb.y} ${vb.w} ${vb.h}">${strokes.map(line).join("")}</svg>`; });
   if (scene.game) {
     const s = (2 * g.half) / 100, cy = g.standoff + g.board / 2;
     const toUnits = (p) => `${((p.x + g.half) / s).toFixed(2)},${((cy + g.half - p.y) / s).toFixed(2)}`;
