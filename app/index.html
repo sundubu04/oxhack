@@ -85,6 +85,7 @@
           </div>
           <div class="cw-chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
             <div class="dl-thread cw-thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></div>
+            <div class="cw-repeats" id="repeats" role="group" aria-label="Repeats" hidden></div>
             <form class="dl-composer cw-composer" id="ask" autocomplete="off">
               <textarea class="dl-composer__input" id="prompt" rows="1" aria-label="Message" placeholder="Ask for a drawing, a change, or a game"></textarea>
               <div class="dl-composer__bar">
@@ -139,7 +140,6 @@
             <div class="cw-switches">
               <label class="dl-choice cw-choice"><span id="sw-physics-l">Servo limits</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-physics" aria-labelledby="sw-physics-l"></button></label>
               <label class="dl-choice cw-choice"><span id="sw-reach-l">Show reach</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-reach" aria-labelledby="sw-reach-l"></button></label>
-              <label class="dl-choice cw-choice"><span id="sw-time-l">Keep time</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-time" aria-labelledby="sw-time-l"></button></label>
               <label class="dl-choice cw-choice"><span id="sw-follow-l">Real arm follows each change</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-follow" aria-labelledby="sw-follow-l"></button></label>
             </div>
           </section>

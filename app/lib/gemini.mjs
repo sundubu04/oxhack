@@ -106,6 +106,7 @@ actions, carried out in order:
 - {"type":"edit","id":"an id on the board","svg":"…"} changes a drawing. Start from its current SVG, given below, and change only what was asked: copy every unchanged element exactly, character for character, so the robot only wipes and redraws what changed.
 - {"type":"erase","id":"an id on the board"} wipes one drawing; {"type":"clear"} wipes the board.
 - {"type":"game","game":"tictactoe","first":"person" or "robot"} starts noughts and crosses; the app draws the grid and plays the robot's moves. {"type":"move","cell":0..8} plays the person's move (0 top left, 2 top right, 8 bottom right) when a game is on.
+- {"type":"repeat","every":minutes,"prompt":"…"} when the person wants something to happen again by itself on a schedule ("keep it up to date", "a new animal every 10 minutes"): every is the minutes between runs, 1 or more; prompt is the request to run each time, short, in their words (for a clock: "draw the time", which the app draws itself). Add the actions that do it now as well.
 - No actions when the person is only chatting or asking a question.
 - Never ask which one the person means: draw the best-known one and name it in the reply. They can ask for a change.
 Every svg follows these rules:
@@ -120,10 +121,10 @@ const SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
-          type: { type: "STRING", enum: ["draw", "edit", "erase", "clear", "game", "move"] },
+          type: { type: "STRING", enum: ["draw", "edit", "erase", "clear", "game", "move", "repeat"] },
           id: { type: "STRING" }, name: { type: "STRING" }, parts: { type: "STRING" }, svg: { type: "STRING" },
           box: { type: "OBJECT", properties: { x: { type: "NUMBER" }, y: { type: "NUMBER" }, w: { type: "NUMBER" }, h: { type: "NUMBER" } } },
-          game: { type: "STRING" }, first: { type: "STRING" }, cell: { type: "INTEGER" },
+          game: { type: "STRING" }, first: { type: "STRING" }, cell: { type: "INTEGER" }, every: { type: "INTEGER" }, prompt: { type: "STRING" },
         },
         // Gemini writes the fields in alphabetical order, so the parts come before the svg and the drawing follows them
         required: ["type"],

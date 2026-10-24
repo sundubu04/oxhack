@@ -54,7 +54,8 @@ let boardStrokes = [];               // what is on it once the current job finis
 let messages = [], thinking = false;
 let planned = null;                  // { toolpath, angles, job, res, ink, wiped } for the last change
 let active = null, inkBefore = null; // the job the sim is running, and the ink it started on
-let playing = false, speed = 1, view = "board", keepTime = false, keptMinute = -1, sending = null;
+let playing = false, speed = 1, view = "board", sending = null;
+let hooks = [];   // this simulation's repeats: { id, prompt, every (minutes), slot, last, error }
 
 function load(k, d) {
   try { const v = JSON.parse(localStorage.getItem(k) || "null"); if (v == null) return d; return Array.isArray(d) ? (Array.isArray(v) ? v : d) : { ...d, ...v }; }
@@ -88,7 +89,8 @@ async function listSims() {
 }
 function renderSims() {
   const mine = doc && !sims.some((s) => s.id === doc.id) ? [{ id: doc.id, title: doc.title, updated: doc.updated }] : [];
-  $("#sims").innerHTML = [...mine, ...sims].map((s) => `<a class="dl-nav__item" href="#studio" data-sim="${esc(s.id)}" title="${esc(s.title)}">${icon("pencil")}<span class="dl-nav__label">${esc(s.title)}</span><span class="dl-nav__count">${ago(s.updated)}</span></a>`).join("");
+  // the open one shows its title now, not the one saved last
+  $("#sims").innerHTML = [...mine, ...sims].map((s) => (doc && s.id === doc.id ? { ...s, title: doc.title } : s)).map((s) => `<a class="dl-nav__item" href="#studio" data-sim="${esc(s.id)}" title="${esc(s.title)}">${icon("pencil")}<span class="dl-nav__label">${esc(s.title)}</span><span class="dl-nav__count">${ago(s.updated)}</span></a>`).join("");
   markCurrent();
 }
 // One item in the rail is current: the open simulation while the studio shows it, otherwise the page's own link.
@@ -114,12 +116,12 @@ async function openSim(id) {
 }
 async function enter(s) {
   doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now() };
-  messages = s.messages || []; scene = s.scene || emptyScene();
-  pause(); active = null; planned = null; inkBefore = null; setKeepTime(false);
+  messages = s.messages || []; scene = s.scene || emptyScene(); hooks = s.hooks || [];
+  pause(); active = null; planned = null; inkBefore = null;
   await board.setInk(s.ink); inkDirty = true;
   boardStrokes = sceneStrokes(scene, g);
   sim.reset();
-  renderTitle(); renderThread(); renderPicture(); renderAngles(); renderPlanEmpty();
+  renderTitle(); renderThread(); renderHooks(); renderPicture(); renderAngles(); renderPlanEmpty();
   $("#empty").hidden = !!(scene.items.length || scene.game);
   syncTransport(); syncLive(true); draw(); try { localStorage.setItem("clockedin.open", doc.id); } catch (e) {}
 }
@@ -132,7 +134,7 @@ async function saveNow() {
   doc.updated = Date.now();
   // the ink as it will be when the job ends, so a reopened simulation shows the finished board
   const ink = active && !sim.done ? null : board.inkURL();
-  const body = { ...doc, messages, scene, ...(ink ? { ink } : { ink: doc.ink || null }) };
+  const body = { ...doc, messages, scene, hooks, ...(ink ? { ink } : { ink: doc.ink || null }) };
   if (ink) doc.ink = ink;
   // read the reply too: an unread response keeps the request open in the browser
   try { await fetch(`./api/sims/${doc.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.text()); } catch (e) {}
@@ -155,7 +157,7 @@ function renderThread() {
   }
   t.innerHTML = messages.map((m) => m.role === "user"
     ? `<p class="dl-msg dl-msg--user">${esc(m.text)}</p>`
-    : `<div class="dl-msg dl-msg--assistant"><p class="${m.error ? "cw-msg-fail" : ""}">${m.error ? icon("circle-alert") + " " : ""}${esc(m.text)}</p>${m.note ? `<p class="dl-msg__note">${esc(m.note)}</p>` : ""}${m.error && m.retry ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-retry>Try again</button></div>` : ""}</div>`).join("")
+    : `<div class="dl-msg dl-msg--assistant"><p class="${m.error ? "cw-msg-fail" : ""}">${m.error ? icon("circle-alert") + " " : ""}${esc(m.text)}</p>${m.note ? `<p class="dl-msg__note">${esc(m.note)}</p>` : ""}${m.error && m.retry ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-retry>Try again</button></div>` : ""}${m.offer === "keep-time" && !clockHook() ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-keep-time>${icon("refresh-cw")}Keep it on time</button></div>` : ""}</div>`).join("")
     + (thinking ? `<p class="dl-msg dl-msg--assistant cw-thinking"><span class="dl-spinner" aria-hidden="true"></span>Drawing it up</p>` : "");
   t.scrollTop = t.scrollHeight;
 }
@@ -180,14 +182,19 @@ function localTurn(text) {
 }
 
 let lastAsk = "";
-async function send(text) {
+// A turn: the person's words, or a repeat's prompt when `hook` is given -> a reply and a change to the board.
+// A repeat's turn adds nothing to the chat when the app does it itself (the clock); a model's reply is shown.
+async function send(text, hook = null) {
   text = (text || "").trim();
   if (!text || thinking) return;
   if (!doc) await newSim({ focus: false });
-  setKeepTime(false);
-  messages.push({ role: "user", text }); lastAsk = text;
-  if (doc.title === "New simulation") { doc.title = cap(text).slice(0, 48); renderTitle(); renderSims(); }
-  $("#prompt").value = ""; autosize(); selectTab("chat");
+  if (!hook) {
+    messages.push({ role: "user", text }); lastAsk = text;
+    if (doc.title === "New simulation") { doc.title = cap(text).slice(0, 48); renderTitle(); renderSims(); }
+    $("#prompt").value = ""; autosize(); selectTab("chat");
+    const r = repeatTurn(text);
+    if (r) { messages.push({ role: "assistant", text: r.said }); renderThread(); renderHooks(); saveSoon(); if (r.hook) await runHook(r.hook); return; }
+  }
   let reply = "", actions = [], note = "", t0 = performance.now();
   const local = localTurn(text);
   steps.reset(); steps.set("picture", "now", local ? "on the arm" : services.openai?.ready ? "asking GPT" : "asking Gemini"); planStatus("Working", { mark: "ring" });
@@ -195,8 +202,9 @@ async function send(text) {
   else {
     thinking = true; renderThread(); busy(true);
     try {
+      const said = messages.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text }));
       const r = await fetch("./api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        messages: messages.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text })),
+        messages: hook ? [...said, { role: "user", text }] : said,
         board: scene.items.map(({ id, name, box, svg }) => ({ id, name, box, svg })),
         game: describeGame(scene.game),
       }) });
@@ -205,18 +213,81 @@ async function send(text) {
       reply = j.reply; actions = j.actions || []; note = `${modelName(j.model)}, ${(j.ms / 1000).toFixed(1)} s`;
     } catch (e) {
       thinking = false; busy(false);
-      messages.push({ role: "assistant", text: friendly(e.message), error: true, retry: true }); renderThread();
+      // a repeat that fails says so in its own row, not in the chat, and tries again at its next time
+      if (hook) { hook.error = friendly(e.message); renderHooks(); renderThread(); }
+      else { messages.push({ role: "assistant", text: friendly(e.message), error: true, retry: true }); renderThread(); }
       steps.fail("picture", "failed"); planStatus("Failed", { tone: "stop" }); saveSoon(); return;
     }
     thinking = false; busy(false);
   }
   steps.set("picture", "done", note || "on the arm");
-  const { scene: next, notes } = applyActions(scene, actions);
+  // the model asks for a repeat as an action: start it, and do the rest of the turn now
+  if (!hook) actions.filter((a) => a.type === "repeat" && a.prompt).forEach((a) => addHook(a.prompt, a.every));
+  const { scene: next, notes } = applyActions(scene, actions.filter((a) => a.type !== "repeat"));
   const said = [reply, ...notes].filter(Boolean).join(" ") || "Done.";
   const summary = change(next);
-  messages.push({ role: "assistant", text: said, note: [summary, note].filter(Boolean).join(" · ") });
+  if (hook) {
+    hook.last = Date.now(); hook.error = null; renderHooks();
+    if (!local) messages.push({ role: "assistant", text: said, note: [`Repeat, every ${everyWords(hook.every)}`, summary, note].filter(Boolean).join(" · ") });
+  } else {
+    const clock = local && actions.some((a) => a.id === "clock");
+    messages.push({ role: "assistant", text: said, note: [summary, note].filter(Boolean).join(" · "), ...(clock ? { offer: "keep-time" } : {}) });
+  }
   renderThread(); saveSoon();
-  if (S.narrate) voice.say(said, { voice: S.voice || undefined });
+  if (S.narrate && !(hook && local)) voice.say(said, { voice: S.voice || undefined });
+}
+
+// ---------- repeats: a request run again on a schedule while the simulation is open ("hooks") ----------
+// The clock is the usual one: "draw the time" every minute, done by the app itself, so the hands follow the time
+// and only the hands that moved are wiped and redrawn. Anything else is asked of the model each time.
+const NUMBER = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, ten: 10, fifteen: 15, twenty: 20, thirty: 30 };
+const everyWords = (n) => (n === 1 ? "minute" : n === 60 ? "hour" : n % 60 === 0 ? `${n / 60} hours` : `${n} minutes`);
+const isClock = (p) => /^(draw |show )?(me )?(the )?(time|clock)( now)?$/i.test(p.trim());
+const clockHook = () => hooks.find((h) => isClock(h.prompt));
+// "every 10 minutes draw a cat", "keep the clock on time", "stop repeating" -> { said, hook? }, or null for a normal turn
+function repeatTurn(text) {
+  const t = text.toLowerCase().replace(/[.!?]+$/, "").trim();
+  if (/^(stop|cancel|end|turn off|switch off|pause)\b/.test(t) && (/\b(repeat\w*|updat\w*|refresh\w*|clock|time|hooks?|automation\w*|that|it|all|everything)\b/.test(t) || t === "stop")) {
+    if (!hooks.length) return { said: "Nothing is repeating." };
+    const n = hooks.length; hooks = [];
+    return { said: n === 1 ? "Stopped the repeat." : `Stopped all ${n} repeats.` };
+  }
+  const m = text.match(/\b(?:every|each)\s+(?:(\d+|an?|one|two|three|four|five|ten|fifteen|twenty|thirty)\s+)?(sec\w*|min\w*|hours?|hrs?)\b|\bhourly\b/i);
+  const keepClock = /\b(clock|time)\b/.test(t) && /\b(keep|kept|auto\W?updat\w*|updat\w*|refresh\w*|right|correct|on time|up to date|ticking|live|current|follow\w*)\b/.test(t);
+  if (!m && !keepClock) return null;
+  let every = 1;
+  if (m) {
+    const n = m[1] ? NUMBER[m[1].toLowerCase()] ?? parseInt(m[1], 10) : 1, unit = (m[2] || "hour").toLowerCase();
+    every = unit.startsWith("h") ? n * 60 : unit.startsWith("s") ? 1 : Math.max(1, n);
+  }
+  let prompt = keepClock ? "draw the time" : text.replace(m[0], " ").replace(/\s+/g, " ").replace(/^(please |can you |could you |and |then |so )+/i, "").replace(/\s(and|then)$/i, "").trim();
+  // "do that every minute": the request before this one
+  if (!prompt || /^(do |draw |repeat )?(that|this|it)( again)?$/i.test(prompt)) prompt = messages.filter((x) => x.role === "user").at(-2)?.text || "";
+  if (!prompt) return { said: 'Say what to repeat, for example "draw the time every minute".' };
+  const hook = addHook(prompt, every);
+  return { hook, said: isClock(prompt) ? `I'll keep the clock on time: it changes every ${everyWords(every)} while this simulation is open.` : `I'll ${prompt.replace(/^please /i, "").replace(/^\w/, (c) => c.toLowerCase())} every ${everyWords(every)} while this simulation is open.` };
+}
+function addHook(prompt, every = 1) {
+  every = Math.max(1, Math.round(Number(every) || 1));
+  let h = hooks.find((x) => x.prompt.toLowerCase() === prompt.toLowerCase() || (isClock(x.prompt) && isClock(prompt)));
+  if (!h) { h = { id: newId(), prompt, every }; hooks.push(h); }
+  h.every = every; h.slot = null; h.error = null;
+  renderHooks(); saveSoon(); return h;
+}
+function removeHook(id) { hooks = hooks.filter((h) => h.id !== id); renderHooks(); renderThread(); saveSoon(); }
+// which run a repeat is due for: whole periods of local time, so "every minute" turns over on the minute
+const slotOf = (h) => { const t = now(); return Math.floor((t.getTime() / 60000 - t.getTimezoneOffset()) / h.every); };
+function runHook(h) { h.slot = slotOf(h); return send(h.prompt, h); }
+setInterval(() => {
+  if (!doc || thinking || playing || !hooks.length) return;
+  const due = hooks.find((h) => h.slot !== slotOf(h));
+  if (due) runHook(due);
+}, 1000);
+function renderHooks() {
+  const el = $("#repeats"); el.hidden = !hooks.length;
+  el.innerHTML = hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
+    + `<span class="cw-repeat__when${h.error ? " cw-msg-fail" : ""}">${h.error ? esc(h.error) : `Every ${everyWords(h.every)}${h.last ? `, last at ${hhmm(new Date(h.last))}` : ""}`}</span></div>`
+    + `<button class="dl-icon-btn" type="button" data-unhook="${esc(h.id)}" aria-label="Stop: ${esc(h.prompt)}" title="Stop">${icon("x")}</button></div>`).join("");
 }
 
 function friendly(msg) {
@@ -430,22 +501,6 @@ function selectTab(which) {
   }
 }
 
-// ---------- keep time: the clock, changed each minute (only the hands that moved are wiped and redrawn) ----------
-function setKeepTime(on) {
-  keepTime = on; $("#sw-time").setAttribute("aria-checked", String(on));
-  if (on) { keptMinute = -1; tickTime(); }
-}
-function tickTime() {
-  if (!keepTime || thinking) return;
-  const t = now(), m = t.getHours() * 60 + t.getMinutes();
-  if (m === keptMinute || playing) return;
-  keptMinute = m;
-  const items = scene.items.filter((i) => i.id !== "clock");
-  const summary = change({ items: [...items, { id: "clock", name: "clock", box: FULL, svg: clockSVG(t) }], game: null });
-  messages.push({ role: "assistant", text: `It's ${hhmm(t)}.`, note: summary }); renderThread(); saveSoon();
-  if (S.narrate) voice.say(`It's ${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, "0")}.`, { voice: S.voice || undefined });
-}
-setInterval(tickTime, 1000);
 
 // ---------- arm ----------
 function setArm(on) {
@@ -621,7 +676,7 @@ function commandList(q) {
     { label: playing ? "Pause" : "Play the change", icon: playing ? "pause" : "play", run: () => (playing ? pause() : play()), off: !active },
     { label: "Start the change again", icon: "rotate-ccw", run: () => seek(0), off: !active },
     { label: "Clear the board", icon: "eraser", run: () => send("Clear the board") },
-    { label: keepTime ? "Stop keeping time" : "Keep time: redraw the clock every minute", icon: "clock", run: () => { go("studio"); setKeepTime(!keepTime); } },
+    { label: clockHook() ? "Stop keeping the clock on time" : "Keep the clock on time: redraw its hands every minute", icon: "clock", run: () => { go("studio"); const h = clockHook(); if (h) removeHook(h.id); else runHook(addHook("draw the time", 1)); } },
     { label: S.physics ? "Ideal servos" : "Real servo limits", icon: "sliders-horizontal", run: () => togglePhysics() },
     { label: S.reach ? "Hide the reach" : "Show the reach", icon: "crosshair", run: () => toggleReach() },
     { label: "Board view", icon: "layout-grid", run: () => { go("studio"); setView("board"); } },
@@ -695,7 +750,10 @@ function wire() {
   $("#thread").addEventListener("click", (e) => {
     const s = e.target.closest("[data-say]"); if (s) send(s.dataset.say);
     if (e.target.closest("[data-retry]")) { const last = messages.at(-1); if (last?.error) messages.pop(); const u = messages.at(-1); if (u?.role === "user") { messages.pop(); send(u.text); } }
+    // the clock was just drawn for this minute, so its repeat starts at the next one
+    if (e.target.closest("[data-keep-time]")) { const h = addHook("draw the time", 1); h.slot = slotOf(h); renderThread(); }
   });
+  $("#repeats").addEventListener("click", (e) => { const b = e.target.closest("[data-unhook]"); if (b) removeHook(b.dataset.unhook); });
   $("#tab-chat").addEventListener("click", () => selectTab("chat"));
   $("#tab-plan").addEventListener("click", () => selectTab("plan"));
   $(".cw-tabs").addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const to = $("#tab-chat").getAttribute("aria-selected") === "true" ? "plan" : "chat"; selectTab(to); $(`#tab-${to}`).focus(); } });
@@ -713,7 +771,6 @@ function wire() {
   $("#scrub").addEventListener("input", () => { pause(); seek((($("#scrub").value | 0) / 1000) * (active?.total || 0)); syncLive(true); });
   $("#sw-physics").addEventListener("click", togglePhysics);
   $("#sw-reach").addEventListener("click", toggleReach);
-  $("#sw-time").addEventListener("click", () => setKeepTime(!keepTime));
   $("#sw-follow").addEventListener("click", toggleFollow);
   $("#narrate").addEventListener("click", toggleNarrate);
   $("#send").addEventListener("click", () => { if (sending) { sending.abort(); pause(); return; } arm.connected() ? sendToArm() : connectArm(); });

@@ -13,6 +13,7 @@ actions, carried out in order (leave out the fields an action doesn't use, as nu
 - edit: changes a drawing on the board. id: its id; paths: its whole new list. Start from its current paths, given below, and change only what was asked: copy every unchanged path exactly, so the robot only wipes and redraws what changed.
 - erase: wipes one drawing (id). clear: wipes the board.
 - game: starts noughts and crosses (game "tictactoe", first "person" or "robot"); the app draws the grid and plays the robot's moves. move: plays the person's move (cell 0 top left, 2 top right, 8 bottom right) when a game is on.
+- repeat: when the person wants something to happen again by itself on a schedule ("keep it up to date", "a new animal every 10 minutes"): every: minutes between runs, 1 or more; prompt: the request to run each time, short, in their words (for a clock: "draw the time", which the app draws itself). Add the actions that do it now as well.
 - No actions when the person is only chatting or asking a question.
 - Never ask which one the person means: draw the best-known one and name it in the reply. They can ask for a change.
 
@@ -31,14 +32,14 @@ const SCHEMA = {
       items: {
         type: "object", additionalProperties: false,
         // written in this order, so the parts are listed before the paths that draw them
-        required: ["type", "id", "name", "box", "parts", "paths", "game", "first", "cell"],
+        required: ["type", "id", "name", "box", "parts", "paths", "game", "first", "cell", "every", "prompt"],
         properties: {
-          type: { type: "string", enum: ["draw", "edit", "erase", "clear", "game", "move"] },
+          type: { type: "string", enum: ["draw", "edit", "erase", "clear", "game", "move", "repeat"] },
           id: S, name: S,
           box: { anyOf: [{ type: "object", additionalProperties: false, required: ["x", "y", "w", "h"], properties: { x: { type: "number" }, y: { type: "number" }, w: { type: "number" }, h: { type: "number" } } }, { type: "null" }] },
           parts: S,
           paths: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }] },
-          game: S, first: S, cell: { type: ["integer", "null"] },
+          game: S, first: S, cell: { type: ["integer", "null"] }, every: { type: ["integer", "null"] }, prompt: S,
         },
       },
     },

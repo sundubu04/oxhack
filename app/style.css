@@ -62,6 +62,13 @@
 .cw-thinking { display: inline-flex; align-items: center; gap: 8px; color: var(--dl-text-2); }
 .cw-starters { display: flex; flex-wrap: wrap; gap: 8px; }
 .cw-hello { display: grid; gap: 12px; align-content: start; }
+/* Repeats: what runs again on its own, just above the composer */
+.cw-repeats { display: grid; gap: 2px; padding: 4px 12px 0 16px; }
+.cw-repeat { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.cw-repeat > .dl-icon { color: var(--dl-accent); flex: none; }
+.cw-repeat__text { flex: 1; min-width: 0; display: grid; }
+.cw-repeat__what { font-size: var(--dl-fs-ui); color: var(--dl-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-repeat__when { font-size: var(--dl-fs-meta); color: var(--dl-text-2); }
 .cw-composer { flex: none; margin: 0 12px 12px; }
 .cw-inspector { display: flex; flex-direction: column; flex: 1; gap: 24px; min-height: 0; padding: 20px 16px 24px; overflow-y: auto; }
 .cw-new { flex: none; margin: 8px 0 0; }

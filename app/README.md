@@ -39,12 +39,13 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 
 - **Simulations** (left): *New simulation* starts a clean board and conversation; each is saved in `app/data/sims/` (gitignored) with its board, chat and ink.
 - **Chat** (right): ask in words or with the mic. Clearing the board, the time, the samples and noughts and crosses moves run in the app without a model; everything else asks GPT (or Gemini), which answers with a reply and actions (draw in a box, edit a drawing, erase one, clear, start a game, play a move). In a game, tap a square on the board or say where.
-- **Plan** tab: time to finish, reach, what was drawn and wiped, the steps, the joints, the arm connection, and the switches (servo limits, reach, keep time, the real arm follows each change).
+- **Repeats** (above the chat box): a request run again on a schedule while the simulation is open, saved with it. "Keep the clock on time" (or *Keep it on time* under a drawn clock) redraws the clock every minute, on the minute, and only the hands that moved are wiped and redrawn; the app does this itself, so it costs no credits and adds nothing to the chat. "Every 5 minutes add a star", or "do that every hour", asks the model each time and shows its reply. The model can also start one when asked to keep something up to date. "Stop repeating", or the × on a row, ends them. A repeat waits while the arm is drawing or the model is answering.
+- **Plan** tab: time to finish, reach, what was drawn and wiped, the steps, the joints, the arm connection, and the switches (servo limits, reach, the real arm follows each change).
 
 - **Studio**: type or say what to draw (⏎ or Draw). The board shows the plan faintly and the simulated ink as the arm lays it. Play, start again, erase, scrub and speed sit under the board.
 - **Board, 3D, Picture, Angles**: the sim, the same sim in 3D (drag to orbit, scroll to zoom; *Along the arm* shows the pen's tilt side-on, with the board as the floor), the picture the model made, and every waypoint with its time and angles.
 - **Inspector**: time to draw, ink, pen-up travel, the worst wobble measured in the sim, the four pipeline steps, live joint meters against each servo's range, and the arm connection.
-- **Simulation switches**: servo limits on or off (ideal servos), the reach (grey where the arm can't get to), and keep time (erase and redraw the clock every minute).
+- **Simulation switches**: servo limits on or off (ideal servos), and the reach (grey where the arm can't get to).
 - **⌘K**: every command, and "Draw …" for anything you type.
 - Drag on the board to move the pen by hand when nothing is playing.
 - **Smoothing** (Arm setup): the servos' dead band and gear play, compensated in every command, plus a 3 mm lead-in to each stroke. Why, and what to do with the motors: [`docs/hardware-link.md`](../docs/hardware-link.md#smoothing-the-line).
