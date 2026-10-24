@@ -44,6 +44,9 @@ code{font:.85em var(--mono);}
 .stage{display:grid;gap:10px;min-width:0;}
 .canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.eff{margin:0;display:grid;gap:6px;}
+.eff .ew{position:relative;width:100%;aspect-ratio:16/5;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.eff figcaption{font-size:.8rem;color:var(--ink-2);}
 .badge{position:absolute;top:10px;left:10px;font:600 .8rem/1 var(--display);padding:5px 9px;border-radius:999px;background:var(--accent-wash);color:var(--accent);display:inline-flex;gap:6px;align-items:center;}
 .badge[data-tone="warn"]{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);}
 .badge[data-tone="ok"]{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);}
@@ -92,8 +95,8 @@ summary{cursor:pointer;}
 <main class="page">
   <header>
     <h1>Clock arm simulator</h1>
-    <p class="lede">A <b>five-bar drawing arm</b> — two motors at the base, a light linkage reaching to the pen, and a bottom motor that lifts the pen and sets pressure — drawing on your <b>35 × 35 cm whiteboard</b>. Both motors stay at the base, so there's no fragile elbow motor. Tune the links, watch the reachable area cover the board, read the dexterity, and check whether the accuracy is good enough at this size.</p>
-    <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Five-bar / Line-us style</span><span>Output: motor A°, motor B°, lift, pressure</span></p>
+    <p class="lede">A <b>five-bar drawing arm</b> — two motors at the base, a light linkage reaching to the pen — drawing on your <b>35 × 35 cm whiteboard</b>. The pen tip rides on a <b>rolling ball</b> that keeps it at a constant height as the arm sweeps, and the marker <b>tilts to lift, draw and erase</b> — so there's no lift motor, and no fragile elbow motor. Tune the links, watch the reachable area cover the board, read the motor angles and dexterity, and check whether the accuracy is good enough at this size.</p>
+    <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Five-bar + rolling-ball tip</span><span>Output: motor A°, motor B°, tilt, pressure</span></p>
   </header>
 
   <section aria-label="Simulator">
@@ -104,18 +107,19 @@ summary{cursor:pointer;}
         <div class="transport">
           <button class="primary" id="run">Draw</button>
           <button id="pause" hidden>Pause</button>
-          <button id="erase">Flip &amp; erase</button>
+          <button id="erase">Tilt &amp; erase</button>
           <button id="reset">Reset</button>
           <button id="copy">Copy angle stream</button>
         </div>
         <div class="readout" aria-live="polite">
           <div><div class="k">Motor A (left)</div><div class="val"><span id="r-a">—</span><small>°</small></div></div>
           <div><div class="k">Motor B (right)</div><div class="val"><span id="r-bb">—</span><small>°</small></div></div>
-          <div><div class="k">Pen / lift</div><div class="val" id="r-p">up</div></div>
+          <div><div class="k">Pen (tilt)</div><div class="val" id="r-p">up</div></div>
           <div><div class="k">Worst dexterity</div><div class="val" id="r-d">—</div></div>
           <div><div class="k">Drawing covered</div><div class="val" id="r-c">—</div></div>
           <div><div class="k">Tip error (est.)</div><div class="val" id="r-err">—</div></div>
         </div>
+        <figure class="eff"><div class="ew"><canvas id="cv-eff" aria-label="End effector side view: a ball rolls on the board to hold height while the marker tilts to draw, lift or erase"></canvas></div><figcaption>End effector (side view): the ball rolls on the board to hold height; the marker tilts to draw, lift or erase — no lift motor.</figcaption></figure>
       </div>
       <div class="controls">
         <div class="ctl"><label for="preset">Drawing</label>
@@ -127,7 +131,7 @@ summary{cursor:pointer;}
         <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">90</span></label><input type="range" id="standoff" min="20" max="220" value="90"></div>
         <button id="optimise" style="justify-self:start">Optimise links for this drawing</button>
         <div class="ctl"><label for="fill">Drawing fills board<span class="v" id="fillv">82</span></label><input type="range" id="fill" min="30" max="98" value="82"></div>
-        <div class="ctl"><label for="pressure">Pen pressure (bottom motor)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
+        <div class="ctl"><label for="pressure">Pen pressure (tilt firmness)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
         <div class="ctl"><label for="res">Actuator (sets tip error)</label>
           <select id="res"><option value="1">Hobby servo (~1°)</option><option value="0.3">Digital metal-gear (~0.3°)</option><option value="0.1">Servo + 3:1 reduction (~0.1°)</option><option value="0.045">Stepper + microstep + belt (~0.05°)</option></select></div>
         <div class="ctl"><label for="speed">Draw speed mm/s<span class="v" id="speedv">160</span></label><input type="range" id="speed" min="20" max="500" value="160"></div>
@@ -156,30 +160,30 @@ summary{cursor:pointer;}
         </tbody>
       </table>
     </div>
-    <p>So the board size is fine — the limit is the <b>actuator</b>, not the reach. For a Maarten-Baas clock, use <b>belt/gear reduction or steppers</b>. Shrinking the links helps too: optimise for the clock disk, not the whole square, so the lever is shorter and the error smaller. Near a singularity (worst dexterity ≈ 0.4) both error and joint speed amplify ~2.5×, so keep the drawing in the dexterous band. Extra mitigations: draw <b>flat on a table</b> (gravity only adds droop, not sag, and lets the bottom motor set pressure cleanly) rather than vertical, and add a <b>camera closed-loop</b> correction if you want crisp lines from cheap servos. Prior art agrees: Plotclock uses tiny 35/55 mm links for exactly this reason, and a Cornell rebuild got unreadable digits from servo error at larger scale.</p>
+    <p>So the board size is fine — the limit is the <b>actuator</b>, not the reach. For a Maarten-Baas clock, use <b>belt/gear reduction or steppers</b>. Shrinking the links helps too: optimise for the clock disk, not the whole square, so the lever is shorter and the error smaller. Near a singularity (worst dexterity ≈ 0.4) both error and joint speed amplify ~2.5×, so keep the drawing in the dexterous band. Note the rolling ball only fixes the <b>height</b> (Z) — consistent contact and pressure, no skipping — it does <b>not</b> fix the X-Y error above, which comes from the arm's joint angles. Extra mitigations: draw <b>flat on a table</b> (gravity only adds droop, not sag) rather than vertical, and add a <b>camera closed-loop</b> correction if you want crisp lines from cheap servos. Prior art agrees: Plotclock uses tiny 35/55 mm links for exactly this reason, and a Cornell rebuild got unreadable digits from servo error at larger scale.</p>
     <p class="small muted">We optimise manipulability (<code>|sin|</code> of the transmission angle). Optimising isotropy instead (equal precision in all directions) favours slightly unequal links (La/Lb ≈ 1/√2); we keep equal links because it maximises the worst-case transmission and simplifies the build.</p>
   </section>
 
   <section aria-labelledby="h-mech">
     <h2 id="h-mech">Why the five-bar (not two serial arms)</h2>
-    <p>A serial 2-link arm puts a motor at the elbow — heavy, wobbly, and it fights gravity at the end of a long arm. The five-bar keeps <b>both motors bolted to the base</b> and reaches with a light linkage (the Line-us / Plotclock design), so it's far stiffer at this size. The <b>bottom motor</b> lifts the whole pen for pen-up and presses it for pressure — a clean third axis. The trade: a five-bar has its own singularity (when the two linkage arms line up) and a lens-shaped workspace, both shown live on the left.</p>
+    <p>A serial 2-link arm puts a motor at the elbow — heavy, wobbly, and it fights gravity at the end of a long arm. The five-bar keeps <b>both motors bolted to the base</b> and reaches with a light linkage (the Line-us / Plotclock design), so it's far stiffer at this size. At the tip, a <b>rolling ball rides on the board</b> and holds the marker at a constant height as the arm drags it around — so the arm never needs a precise Z, the pen can't dig in or skip, and board bumps are absorbed. The marker sits on <b>one tilt servo</b>: tilt it a little to draw (a trailing angle, like a hand), tilt to centre to lift, tilt the other way to bring the eraser down. That one servo replaces the whole lift axis. The trade: a five-bar has its own singularity (when the two linkage arms line up) and a lens-shaped workspace, both shown live on the left.</p>
   </section>
 
   <section aria-labelledby="h-contract">
     <h2 id="h-contract">What software hands the hardware</h2>
-    <p>Software owns point → the two motor angles; the Pi owns angle → servo. <b>Lift/pressure</b> is the bottom motor (map 0–100 % to its travel). <b>Erase</b> flips the marker 180° to its eraser end, then sweeps. We write our own IK (Plotclock is CC-BY, Makelangelo GPL-2.0, GRBL GPL-3.0 — read, don't copy; check the event's licence rule).</p>
+    <p>Software owns point → the two motor angles; the Pi owns angle → servo. The third output is the <b>marker tilt</b>: a draw angle (pen down), a centre angle (lifted — the ball still carries the weight), and an erase angle (eraser down). Pressure is how firm the draw tilt is. We write our own IK (Plotclock is CC-BY, Makelangelo GPL-2.0, GRBL GPL-3.0 — read, don't copy; check the event's licence rule).</p>
     <pre><code>{
   "mechanism": "five-bar: motors A(-d/2,0) B(+d/2,0), links La,Lb to pen",
   "board_mm": { "w": 350, "h": 350 },
   "geom_mm": { "base_width": 120, "La": 240, "Lb": 240, "standoff": 90 },
   "frame": "origin at base midpoint; x right, y up; motor angles degrees CCW from +x",
-  "lift": { "up": 0, "down": 1 }, "flip_deg": 180, "feed_mm_s": 160,
+  "tilt_deg": { "draw": -14, "lift": -2, "erase": 16 }, "feed_mm_s": 160,
   "path": [
-    { "a": 118.3, "b": 61.7, "lift": 0, "pressure": 0 },   // travel, pen up
-    { "a": 115.1, "b": 63.9, "lift": 1, "pressure": 60 },  // drawing
-    { "a": 112.0, "b": 66.2, "lift": 1, "pressure": 60 }
+    { "a": 118.3, "b": 61.7, "tilt": -2, "pressure": 0 },   // travel, lifted
+    { "a": 115.1, "b": 63.9, "tilt": -14, "pressure": 60 }, // drawing
+    { "a": 112.0, "b": 66.2, "tilt": -14, "pressure": 60 }
   ],
-  "erase": [ { "flip": 180 }, { "a": 100.2, "b": 150.0, "lift": 1, "pressure": 85, "tool": "eraser" } ]
+  "erase": [ { "a": 100.2, "b": 150.0, "tilt": 16, "pressure": 85, "tool": "eraser" } ]
 }</code></pre>
     <p class="small muted"><b>Copy angle stream</b> grabs this for the current drawing. Time the path in joint space, not Cartesian — joint speed blows up near the singularity.</p>
   </section>
@@ -322,7 +326,8 @@ function draw(){const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.h
     if(flip>0){ctx.strokeStyle=css("--warn");ctx.lineWidth=2;ctx.beginPath();ctx.arc(pen[0],pen[1],9,0,Math.PI*2*flip);ctx.stroke();}
     $("#r-a").textContent=(((pose.a*R2D)%360+360)%360).toFixed(1);
     $("#r-bb").textContent=(((pose.b*R2D)%360+360)%360).toFixed(1);
-    $("#r-p").textContent=anim.mode==="erase"?"eraser (flipped)":(down?("pen down "+S.pressure+"%"):"pen up");
+    $("#r-p").textContent=anim.mode==="erase"?"erase tilt +16°":(down?("draw tilt −14°"):"lifted (−2°)");
+    effState=anim.mode==="erase"?"erase":(down?"draw":"up");drawEff();
   }}
 // pen point from the two elbows (intersection of distal circles, upper branch)
 function fk5(pose){const d=S.base,La=S.link,Lb=S.link;const ea=pose.A,eb=pose.B;if(ea&&eb){return penFromElbows(ea.ex,ea.ey,eb.ex,eb.ey,Lb);}return{x:0,y:boardCY()};}
@@ -345,9 +350,9 @@ function tick(ts){if(!anim.on)return;const dt=Math.min(0.05,(ts-anim.last)/1000|
 function startDraw(){build();trace=[];anim={on:true,i:0,mode:"draw",last:performance.now(),acc:0,flip:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
 function startErase(){if(!seq.length)return;eraseList=buildErase();eraseAng=eraseList.map(p=>{const s=ik(p.x,p.y);return s?{a:s.alpha,b:s.beta,A:s.A,B:s.B,ok:true}:{ok:false};});
   anim={on:true,i:0,mode:"erase",last:performance.now(),acc:0,flip:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
-function streamJSON(){const path=seq.map((p,i)=>angles[i].ok?{a:+(((angles[i].a*R2D)%360+360)%360).toFixed(2),b:+(((angles[i].b*R2D)%360+360)%360).toFixed(2),lift:p.pen,pressure:p.pen?S.pressure:0}:{out_of_reach:true});
-  return JSON.stringify({mechanism:"five-bar",geom_mm:{base_width:S.base,La:S.link,Lb:S.link,standoff:S.standoff},board_mm:{w:BOARD,h:BOARD},
-    frame:"origin at base midpoint; x right, y up; motor angles degrees CCW from +x",lift:{up:0,down:1},flip_deg:180,feed_mm_s:S.speed,pressure_pct:S.pressure,
+function streamJSON(){const path=seq.map((p,i)=>angles[i].ok?{a:+(((angles[i].a*R2D)%360+360)%360).toFixed(2),b:+(((angles[i].b*R2D)%360+360)%360).toFixed(2),tilt:p.pen?-14:-2,pressure:p.pen?S.pressure:0}:{out_of_reach:true});
+  return JSON.stringify({mechanism:"five-bar + rolling-ball tip",geom_mm:{base_width:S.base,La:S.link,Lb:S.link,standoff:S.standoff},board_mm:{w:BOARD,h:BOARD},
+    frame:"origin at base midpoint; x right, y up; motor angles degrees CCW from +x",tilt_deg:{draw:-14,lift:-2,erase:16},feed_mm_s:S.speed,pressure_pct:S.pressure,
     actuator_deg:S.res,est_tip_error_mm:+tipErr().toFixed(2),worst_dexterity:+worstDex.toFixed(3),reachable:covered,path},null,2);}
 
 function rebuild(){build();trace=[];anim.on=false;anim.flip=0;$("#run").hidden=false;$("#pause").hidden=true;draw();}
@@ -369,8 +374,32 @@ $("#erase").addEventListener("click",startErase);
 $("#reset").addEventListener("click",rebuild);
 $("#copy").addEventListener("click",async()=>{const txt=streamJSON();try{await navigator.clipboard.writeText(txt);$("#copy").textContent="Copied ✓";}catch(e){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");$("#copy").textContent="Copied ✓";}catch(_){$("#copy").textContent="Copy failed";}ta.remove();}setTimeout(()=>$("#copy").textContent="Copy angle stream",1400);});
 
+// end-effector side view: a ball on the board holds height; the marker tilts to draw/lift/erase
+let effState="up";
+function fitEff(){const c=$("#cv-eff");if(!c)return;const r=c.getBoundingClientRect();if(!r.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);c.width=r.width*dpr;c.height=r.height*dpr;c.getContext("2d").setTransform(dpr,0,0,dpr,0,0);drawEff();}
+function drawEff(){const c=$("#cv-eff");if(!c)return;const x=c.getContext("2d");const r=c.getBoundingClientRect();if(!r.width)return;x.clearRect(0,0,r.width,r.height);
+  const W=r.width,Hh=r.height,surfY=Hh*0.74,cxp=W*0.52;
+  x.strokeStyle=css("--board-line");x.lineWidth=2.5;x.beginPath();x.moveTo(W*0.08,surfY);x.lineTo(W*0.92,surfY);x.stroke();
+  const ballR=Math.min(15,Hh*0.15),ride=ballR*2,bodyH=Hh*0.26,bodyW=W*0.22,ballCx=cxp-W*0.08,ballCy=surfY-ballR,bodyY=surfY-ride-bodyH;
+  x.fillStyle=css("--wash");x.strokeStyle=css("--metal");x.lineWidth=2;x.beginPath();x.arc(ballCx,ballCy,ballR,0,7);x.fill();x.stroke();
+  x.strokeStyle=css("--metal");x.lineWidth=1;x.beginPath();x.moveTo(ballCx-ballR*0.6,ballCy-ballR*0.6);x.lineTo(ballCx+ballR*0.6,ballCy+ballR*0.6);x.stroke();
+  x.fillStyle=css("--wash");x.strokeStyle=css("--arm");x.lineWidth=2.5;x.beginPath();x.roundRect(cxp-bodyW/2,bodyY,bodyW,bodyH,6);x.fill();x.stroke();
+  x.strokeStyle=css("--ink-3");x.setLineDash([3,3]);x.lineWidth=1;x.beginPath();x.moveTo(cxp+bodyW/2+10,bodyY+bodyH);x.lineTo(cxp+bodyW/2+10,surfY);x.stroke();x.setLineDash([]);
+  x.fillStyle=css("--ink-3");x.font="11px "+css("--display");x.fillText("height",cxp+bodyW/2+15,(bodyY+bodyH+surfY)/2);
+  const pivX=cxp+W*0.03,pivY=bodyY+bodyH,lifted=effState==="up",erase=effState==="erase";
+  const tiltDeg=erase?16:(lifted?-2:-14),ang=Math.PI/2+tiltDeg*Math.PI/180,reach=surfY-pivY;
+  const markLen=lifted?reach*0.72:reach/Math.sin(ang),tipX=pivX+markLen*Math.cos(ang),tipY=lifted?pivY+markLen*Math.sin(ang):surfY;
+  const nib=!erase,upX=pivX-20*Math.cos(ang),upY=pivY-20*Math.sin(ang);
+  x.lineCap="round";x.strokeStyle=css("--arm");x.lineWidth=6;x.beginPath();x.moveTo(upX,upY);x.lineTo(tipX,tipY);x.stroke();
+  x.strokeStyle=nib?css("--accent"):css("--warn");x.lineWidth=nib?4:10;x.beginPath();x.moveTo(tipX-12*Math.cos(ang),tipY-12*Math.sin(ang));x.lineTo(tipX,tipY);x.stroke();
+  x.strokeStyle=nib?css("--warn"):css("--accent");x.lineWidth=nib?8:4;x.beginPath();x.moveTo(upX,upY);x.lineTo(upX-9*Math.cos(ang),upY-9*Math.sin(ang));x.stroke();
+  if(!lifted){x.fillStyle=nib?css("--accent"):css("--warn");x.beginPath();x.arc(tipX,surfY,nib?3:6,0,7);x.fill();}
+  x.fillStyle=css("--ink-2");x.font="600 12px "+css("--display");x.fillText(erase?"erase: tilt back, eraser down":(lifted?"lifted: nib off the board":"draw: tilt ~14°, pen down"),W*0.08,Hh*0.17);
+  x.fillStyle=css("--ink-3");x.font="11px "+css("--display");x.fillText("rolling ball",ballCx-18,surfY+14);}
+
 build();
 for(let i=1;i<seq.length;i++)if(seq[i].pen===1&&angles[i].ok)trace.push({x:seq[i].x,y:seq[i].y,x0:seq[i-1].x,y0:seq[i-1].y,pen:1,pr:S.pressure});
 new ResizeObserver(fit).observe(cv);
-fit();
+new ResizeObserver(fitEff).observe($("#cv-eff"));
+fit();fitEff();
 </script>
