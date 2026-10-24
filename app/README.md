@@ -7,7 +7,7 @@ scale through the servos' real limits, and the arm gets exactly the same command
 
 ```
 words or voice
-  → a line drawing (Gemini, through the dev server)          the picture first
+  → a line drawing (GPT, or Gemini, through the dev server)          the picture first
   → the shortest pen path (fit to the board, order strokes, resample every 2 mm)
   → base, elbow and tilt angles for every waypoint (inverse kinematics)
   → live sim: SG92R top speed and 1° steps, so the line wobbles like the real one
@@ -31,17 +31,18 @@ Open it in Chrome. The samples (the time now, house, cat, star, flower) work wit
 
 They live in `app/.env`, which git ignores. The dev server reads them and calls the APIs itself; the browser never sees a key.
 
+- **OpenAI (GPT credits)**: `OPENAI_API_KEY`. When it is set GPT answers first and Gemini is the backup. `OPENAI_MODELS` lists the models to try, best first: `gpt-6.1-sol:low` (the best drawings: the Oxford crest with its motto, 10 to 20 s), `gpt-5.6-sol:low` (nearly as good, 5 to 10 s), `gpt-6-luna:low` (rougher, 4 to 8 s). A model that takes over 30 s is skipped for ten minutes. GPT returns each drawing as a list of path strokes, which the server wraps into the SVG the app keeps. With no ElevenLabs key the arm speaks with GPT's voice (`gpt-4o-mini-tts`, about 1 s). The models were compared with `node tools/model-bench.mjs` on 24 Oct 2026 (it spends credits).
 - **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). `GEMINI_MODELS` lists the models to try, best first: `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`. On the free tier each flash model allows **20 requests a day** and the pro model none; the server skips a model that's out of quota until its reset, and one that's busy for two minutes. Turning on billing for the Gemini project (the MLH credits) makes the pro model answer, and the drawings much better: the flash models draw a recognisable Oxford crest, the lite one doesn't.
-- **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart: the arm then speaks with ElevenLabs (Flash model), and Arm setup lets you pick a voice by id and hear it. Until then it speaks with Gemini's voice. Spoken lines are cached, so repeats cost no credits.
+- **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart: the arm then speaks with ElevenLabs (Flash model), and Arm setup lets you pick a voice by id and hear it. Until then it speaks with GPT's voice (or Gemini's). Spoken lines are cached, so repeats cost no credits.
 
 ## Using it
 
 - **Simulations** (left): *New simulation* starts a clean board and conversation; each is saved in `app/data/sims/` (gitignored) with its board, chat and ink.
-- **Chat** (right): ask in words or with the mic. Clearing the board, the time, the samples and noughts and crosses moves run in the app without Gemini; everything else asks Gemini, which answers with a reply and actions (draw in a box, edit a drawing, erase one, clear, start a game, play a move). In a game, tap a square on the board or say where.
+- **Chat** (right): ask in words or with the mic. Clearing the board, the time, the samples and noughts and crosses moves run in the app without a model; everything else asks GPT (or Gemini), which answers with a reply and actions (draw in a box, edit a drawing, erase one, clear, start a game, play a move). In a game, tap a square on the board or say where.
 - **Plan** tab: time to finish, reach, what was drawn and wiped, the steps, the joints, the arm connection, and the switches (servo limits, reach, keep time, the real arm follows each change).
 
 - **Studio**: type or say what to draw (⏎ or Draw). The board shows the plan faintly and the simulated ink as the arm lays it. Play, start again, erase, scrub and speed sit under the board.
-- **Board, 3D, Picture, Angles**: the sim, the same sim in 3D (drag to orbit, scroll to zoom; *Along the arm* shows the pen's tilt side-on, with the board as the floor), the picture Gemini made, and every waypoint with its time and angles.
+- **Board, 3D, Picture, Angles**: the sim, the same sim in 3D (drag to orbit, scroll to zoom; *Along the arm* shows the pen's tilt side-on, with the board as the floor), the picture the model made, and every waypoint with its time and angles.
 - **Inspector**: time to draw, ink, pen-up travel, the worst wobble measured in the sim, the four pipeline steps, live joint meters against each servo's range, and the arm connection.
 - **Simulation switches**: servo limits on or off (ideal servos), the reach (grey where the arm can't get to), and keep time (erase and redraw the clock every minute).
 - **⌘K**: every command, and "Draw …" for anything you type.
@@ -93,7 +94,8 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `src/svg.js`, `src/vectorize.js` | SVG to polylines; raster to polylines |
 | `src/voice.js`, `src/arm.js` | speech in and out; Web Serial, keyframes and flow control (protocol 2) |
 | `../firmware/clockedin` | the Arduino sketch (Uno or Nano) |
-| `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
+| `server.mjs`, `lib/openai.mjs`, `lib/gemini.mjs` | dev server holding the keys; GPT chat and voice, Gemini as the backup |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |
+| `tools/model-bench.mjs` | the GPT models timed on a few drawings (spends credits) |
 | `tools/compare-servos.mjs` | the clock under each servo model, side by side |
 | `tools/optimize-test.mjs`, `tools/verify-motors.mjs` | planner optimality and correctness; sim against the firmware |

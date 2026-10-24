@@ -38,13 +38,13 @@ const whole = (s) => Math.ceil(s - 1e-6);   // a duration is shown rounded up, t
 const secs = (s) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`);
 const mm = (v) => `${Math.round(v).toLocaleString("en-GB")} mm`;
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "now" : m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`; };
-const modelName = (m = "") => m.replace(/^gemini-/, "Gemini ").replace(/-/g, " ").replace(/\b(flash|pro|lite|image|preview)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
+const modelName = (m = "") => m.replace(/^gemini-/, "Gemini ").replace(/^gpt-/, "GPT ").replace(/-/g, " ").replace(/\b(flash|pro|lite|image|preview|sol|luna|terra|astra|mini|nano)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
 const hhmm = (t) => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
 
 // ---------- state ----------
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
-let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
+let services = { openai: { ready: false }, gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
 let serverState = "checking";   // "checking" | "up" | "offline": whether /api/status last answered
 const S = load("clockedin.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
 let sims = [], doc = null;           // the saved simulations, and the open one
@@ -151,7 +151,7 @@ function renderThread() {
   t.scrollTop = t.scrollHeight;
 }
 
-// What the app does itself, without asking Gemini: clearing, the time, the samples, and the game.
+// What the app does itself, without asking a model: clearing, the time, the samples, and the game.
 function localTurn(text) {
   const t = text.toLowerCase().replace(/[.!?]+$/, "").trim();
   if (/^(please )?(clear|wipe|erase|rub out|clean)( (it|everything|all|the board|board|it all))*$/.test(t)) return { reply: "Wiping the board.", actions: [{ type: "clear" }] };
@@ -181,7 +181,7 @@ async function send(text) {
   $("#prompt").value = ""; autosize(); selectTab("chat");
   let reply = "", actions = [], note = "", t0 = performance.now();
   const local = localTurn(text);
-  steps.reset(); steps.set("picture", "now", local ? "on the arm" : "asking Gemini"); planStatus("Working", { mark: "ring" });
+  steps.reset(); steps.set("picture", "now", local ? "on the arm" : services.openai?.ready ? "asking GPT" : "asking Gemini"); planStatus("Working", { mark: "ring" });
   if (local) ({ reply, actions } = local);
   else {
     thinking = true; renderThread(); busy(true);
@@ -213,8 +213,8 @@ async function send(text) {
 function friendly(msg) {
   // the browser's own words when the request never reached the server (stopped, or restarting)
   if (/failed to fetch|networkerror|load failed/i.test(msg)) { refreshStatus(); return "Can't reach the Clockedin server. Start it with node server.mjs in app/, then try again."; }
-  if (/503|high demand|overloaded|took over/i.test(msg)) return "Gemini is busy right now. Try again in a moment.";
-  if (/quota/i.test(msg)) return msg.replace(/^Gemini \d+: /, "");
+  if (/503|high demand|overloaded|took over|resting/i.test(msg)) return "The drawing model is busy right now. Try again in a moment.";
+  if (/quota/i.test(msg)) return msg.replace(/^(Gemini|GPT) \d+: /, "");
   return msg;
 }
 function busy(on) { const b = $("#draw"); b.setAttribute("aria-busy", String(on)); b.disabled = on; $("#ask").setAttribute("aria-busy", String(on)); }
@@ -483,24 +483,33 @@ function stream() {
 }
 
 function renderServices() {
-  const gm = services.gemini.ready, vp = services.voice.provider;
-  const voiceWord = { elevenlabs: "ElevenLabs", gemini: "Gemini voice", browser: "Browser voice" }[vp];
-  const cool = services.gemini.cooling || [];
-  const models = (services.gemini.models || []).map((m) => m.split(":")[0]);
-  const usable = models.filter((m) => !cool.some((c) => c.model === m && c.why === "quota"));
+  const vp = services.voice.provider;
+  const voiceWord = { elevenlabs: "ElevenLabs", openai: "GPT voice", gemini: "Gemini voice", browser: "Browser voice" }[vp];
   const until = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  // before the first answer, or when the server stops answering, the key is unknown: don't say "No key"
-  const word = serverState === "checking" ? "Checking" : serverState === "offline" ? "Server offline" : !gm ? "No key" : usable.length ? "Ready" : "Out of quota";
-  const mark = serverState === "checking" ? 'data-mark="ring"' : serverState === "offline" ? 'data-tone="stop"' : gm && usable.length ? 'data-mark="dot"' : 'data-tone="warn"';
+  // one provider's state: models it tries, the ones resting and why; "out" when every model is out of quota
+  const state = (p) => {
+    const cool = p?.cooling || [], models = (p?.models || []).map((m) => m.split(":")[0]);
+    const out = !models.some((m) => !cool.some((c) => c.model === m && c.why === "quota"));
+    const resting = cool.map((c) => `${modelName(c.model)} ${c.why === "quota" ? "out of quota" : c.why === "slow" ? "too slow, skipped" : "busy, skipped"} until ${until(c.until)}`);
+    return { ready: !!p?.ready, out, line: `Tries ${models.map(modelName).join(", then ")}${resting.length ? `; ${resting.join(", ")}` : ""}` };
+  };
+  const gp = state(services.openai), gm = state(services.gemini), gptOn = gp.ready && !gp.out;
+  // before the first answer, or when the server stops answering, the keys are unknown: don't say "No key"
+  const status = (s, { backup } = {}) =>
+    serverState === "checking" ? '<span class="dl-status" data-mark="ring">Checking</span>'
+    : serverState === "offline" ? '<span class="dl-status" data-tone="stop">Server offline</span>'
+    : !s.ready ? '<span class="dl-status" data-mark="dash">No key</span>'
+    : s.out ? '<span class="dl-status" data-tone="warn">Out of quota</span>'
+    : backup ? '<span class="dl-status" data-mark="ring">Backup</span>' : '<span class="dl-status" data-mark="dot">Ready</span>';
   $("#services").innerHTML =
-    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${mark}>${word}</span></div>` +
+    `<div class="cw-service"><span>GPT</span>${status(gp)}</div>` +
+    `<div class="cw-service"><span>Gemini</span>${status(gm, { backup: gptOn })}</div>` +
     `<div class="cw-service"><span>Voice</span><span>${voiceWord}</span></div>`;
-  const geminiLine = serverState === "offline" ? "Can't reach the Clockedin server: run node server.mjs in app/"
-    : serverState === "checking" ? "Asking the server"
-    : !gm ? "No key: add GEMINI_API_KEY to app/.env"
-    : `Tries ${models.map(modelName).join(", then ")}${cool.length ? `; ${cool.map((c) => `${modelName(c.model)} ${c.why === "quota" ? "out of quota" : c.why === "slow" ? "too slow, skipped" : "busy, skipped"} until ${until(c.until)}`).join(", ")}` : ""}`;
+  const line = (s, key) => serverState === "offline" ? "Can't reach the Clockedin server: run node server.mjs in app/"
+    : serverState === "checking" ? "Asking the server" : !s.ready ? `No key: add ${key} to app/.env` : s.line;
   $("#service-kv").innerHTML =
-    `<dt>Gemini</dt><dd>${geminiLine}</dd>` +
+    `<dt>GPT</dt><dd>${line(gp, "OPENAI_API_KEY")}</dd>` +
+    `<dt>Gemini</dt><dd>${gptOn ? "Used when every GPT model fails. " : ""}${line(gm, "GEMINI_API_KEY")}</dd>` +
     `<dt>Voice</dt><dd>${vp === "elevenlabs" ? "ElevenLabs" : `${voiceWord}, until an ElevenLabs key is added`}</dd>` +
     `<dt><label for="voice-id">ElevenLabs voice</label></dt><dd class="cw-voice"><input class="dl-input dl-mono" id="voice-id" placeholder="${esc(services.voice.voice || "")}" spellcheck="false"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="voice-test">${icon("volume-2")}Hear it</button></dd>` +
     `<dt>Arm</dt><dd>${arm.connected() ? "Connected over USB" : "Not connected"}</dd>`;

@@ -1,11 +1,13 @@
 // Dev server for Clockedin. Serves this folder, holds the API keys (from .env, never sent to the browser) and
-// answers the app's few calls: /api/status, /api/draw, /api/speak and /api/config. `node server.mjs`, then open the URL.
+// answers the app's few calls: /api/status, /api/chat, /api/draw, /api/speak, /api/sims and /api/config.
+// GPT answers first when OPENAI_API_KEY is set, Gemini when it is not or when every GPT model fails. `node server.mjs`, then open the URL.
 import { createServer } from "node:http";
 import { readFile, writeFile, readdir, mkdir, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as gemini from "./lib/gemini.mjs";
+import * as gpt from "./lib/openai.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 if (existsSync(join(root, ".env"))) process.loadEnvFile(join(root, ".env"));
@@ -19,7 +21,9 @@ const PRIVATE = /(^|\/)(\.env[^/]*|lib\/|node_modules\/|server\.mjs|package-lock
 const spoken = new Map();
 function remember(k, v) { spoken.set(k, v); if (spoken.size > 60) spoken.delete(spoken.keys().next().value); return v; }
 
-const keys = () => ({ gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY") });
+const keys = () => ({ openai: env("OPENAI_API_KEY"), gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY") });
+// best drawings first (10 to 18 s); then the fast one (5 to 10 s); see app/README.md for how they were picked
+const gptModels = () => env("OPENAI_MODELS", "gpt-6.1-sol:low,gpt-5.6-sol:low,gpt-6-luna:low").split(",").map((s) => s.trim()).filter(Boolean);
 // best first: the pro model answers once the project has billing (its free quota is zero, so until then it is
 // skipped at once); each flash model has its own free quota of 20 a day
 const textModels = () => env("GEMINI_MODELS", "gemini-3.1-pro-preview:low,gemini-3.5-flash:minimal,gemini-3.8-flash:low,gemini-3.1-flash-lite:low").split(",").map((s) => s.trim()).filter(Boolean);
@@ -35,32 +39,44 @@ async function body(req, max = 1e6) {
   return s ? JSON.parse(s) : {};
 }
 
+// GPT first when its key is set; Gemini when there is no GPT key or every GPT model failed
+async function either(withGpt, withGemini) {
+  const k = keys();
+  if (k.openai) {
+    try { return await withGpt({ key: k.openai, models: gptModels(), timeoutMs: 30000 }); }
+    catch (e) { if (!k.gemini) throw e; console.log(`  GPT failed (${e.message}), trying Gemini`); }
+  }
+  return withGemini({ key: k.gemini, models: textModels() });
+}
+
 async function api(req, res, path) {
   if (path === "/api/status") {
     const k = keys();
     return send(res, 200, {
+      openai: { ready: !!k.openai, models: gptModels(), cooling: gpt.coolingState() },
       gemini: { ready: !!k.gemini, model: textModels()[0].split(":")[0], models: textModels(), cooling: gemini.quotaState() },
-      voice: { provider: k.eleven ? "elevenlabs" : k.gemini ? "gemini" : "browser", voice: env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb") },
+      voice: { provider: k.eleven ? "elevenlabs" : k.openai ? "openai" : k.gemini ? "gemini" : "browser", voice: env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb") },
     });
   }
   if (path === "/api/draw" && req.method === "POST") {
     const { prompt, route } = await body(req);
     if (!prompt) return send(res, 400, { error: "Say what to draw" });
-    if (!keys().gemini) return send(res, 503, { error: "No Gemini key in app/.env" });
+    const k = keys();
+    if (!k.openai && !k.gemini) return send(res, 503, { error: "No OpenAI or Gemini key in app/.env" });
     try {
       const t0 = Date.now();
       const out = route === "image"
-        ? await gemini.generateImage(prompt, { key: keys().gemini, models: imageModels() })
-        : await gemini.generateSVG(prompt, { key: keys().gemini, models: textModels() });
+        ? await gemini.generateImage(prompt, { key: k.gemini, models: imageModels() })
+        : await either((o) => gpt.generateSVG(prompt, o), (o) => gemini.generateSVG(prompt, o));
       return send(res, 200, { ...out, ms: Date.now() - t0 });
     } catch (e) { return send(res, 502, { error: e.message }); }
   }
   if (path === "/api/chat" && req.method === "POST") {
     const { messages, board, game } = await body(req);
-    if (!keys().gemini) return send(res, 503, { error: "No Gemini key in app/.env" });
+    if (!keys().openai && !keys().gemini) return send(res, 503, { error: "No OpenAI or Gemini key in app/.env" });
     try {
       const t0 = Date.now();
-      const out = await gemini.chat(messages || [], board || [], game || null, { key: keys().gemini, models: textModels() });
+      const out = await either((o) => gpt.chat(messages || [], board || [], game || null, o), (o) => gemini.chat(messages || [], board || [], game || null, o));
       return send(res, 200, { ...out, ms: Date.now() - t0 });
     } catch (e) { return send(res, e.status === 429 ? 429 : 502, { error: e.message }); }
   }
@@ -84,7 +100,7 @@ async function api(req, res, path) {
     const { text, voice: asked } = await body(req), k = keys();
     if (!text) return send(res, 400, { error: "Nothing to say" });
     const voice = /^[A-Za-z0-9]{8,40}$/.test(asked || "") ? asked : env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb");
-    const key = `${k.eleven ? `el:${voice}` : "gm"}:${text}`;
+    const key = `${k.eleven ? `el:${voice}` : k.openai ? "oa" : "gm"}:${text}`;
     if (spoken.has(key)) { const [type, bytes] = spoken.get(key); return send(res, 200, bytes, type); }
     try {
       if (k.eleven) {
@@ -96,7 +112,11 @@ async function api(req, res, path) {
         });
         if (r.ok) { const [type, bytes] = remember(key, ["audio/mpeg", Buffer.from(await r.arrayBuffer())]); return send(res, 200, bytes, type); }
         console.log(`  ElevenLabs ${r.status}: ${(await r.text()).slice(0, 160)}`);
-        if (!k.gemini) throw new Error(`ElevenLabs ${r.status}`);
+        if (!k.openai && !k.gemini) throw new Error(`ElevenLabs ${r.status}`);
+      }
+      if (k.openai) {
+        try { const [type, bytes] = remember(key, ["audio/mpeg", await gpt.speak(text, { key: k.openai, model: env("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"), voice: env("OPENAI_VOICE", "coral") })]); return send(res, 200, bytes, type); }
+        catch (e) { console.log(`  ${e.message}`); if (!k.gemini) throw e; }
       }
       if (k.gemini) { const [type, bytes] = remember(key, ["audio/wav", await gemini.speak(text, { key: k.gemini, model: env("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts") })]); return send(res, 200, bytes, type); }
       res.writeHead(204).end();
@@ -129,5 +149,5 @@ createServer(async (req, res) => {
 }).listen(PORT, "127.0.0.1", () => {
   const k = keys();
   console.log(`Clockedin → http://localhost:${PORT}`);
-  console.log(`  Gemini ${k.gemini ? "ready" : "no key (add GEMINI_API_KEY to app/.env)"} · voice ${k.eleven ? "ElevenLabs" : k.gemini ? "Gemini TTS" : "browser"}`);
+  console.log(`  GPT ${k.openai ? `ready (${gptModels().join(", ")})` : "no key"} · Gemini ${k.gemini ? "ready" : "no key"} · voice ${k.eleven ? "ElevenLabs" : k.openai ? "GPT" : k.gemini ? "Gemini TTS" : "browser"}`);
 });
