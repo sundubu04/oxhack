@@ -1,0 +1,248 @@
+<title>Clockwork motion planning</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* One reading column, left aligned; sections separated by space, never by lines or boxes. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.page { max-width: 46rem; margin: 0 auto; padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 44px; }
+header { display: grid; gap: 10px; }
+h1 { font: 600 2rem/1.15 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.25rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.answer { font-size: 1.125rem; color: var(--ink); }
+.meta { color: var(--ink-3); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+section { display: grid; gap: 14px; min-width: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code { font: .9em var(--mono); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65ch; }
+
+/* Rows with space instead of a ruled table. */
+.rows { overflow-x: auto; }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 16px 8px 0; white-space: nowrap; }
+.rows td { padding: 8px 16px 8px 0; vertical-align: top; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+.rows td.r, .rows th.r { text-align: right; }
+.rows tr[data-current] td { background: var(--accent-wash); }
+.rows tr[data-current] td:first-child { border-radius: 6px 0 0 6px; padding-left: 8px; }
+.rows tr[data-current] td:last-child { border-radius: 0 6px 6px 0; }
+.rows .step { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.rows .file { display: block; color: var(--ink-3); font-size: .8125rem; margin-top: 2px; }
+
+/* State is a mark plus a word. */
+.state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.state[data-tone="ok"] { color: var(--ok); }
+.state[data-tone="warn"] { color: var(--warn); }
+.state[data-tone="warn"]::before { border-radius: 2px; }
+.state[data-tone="stop"] { color: var(--stop); }
+.state[data-tone="stop"]::before { border-radius: 0; transform: rotate(45deg); }
+.state[data-tone="none"] { color: var(--ink-3); }
+.state[data-tone="none"]::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* The numbers that answer the page. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 20px 24px; }
+.figure { display: grid; gap: 6px; align-content: start; }
+.figure b { display: block; font: 600 2.25rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.figure b.hero { color: var(--accent); }
+.figure span { color: var(--ink-2); font-size: .875rem; line-height: 1.4; }
+
+/* Bar rows: one series, drawn to scale from zero, the value printed beside each bar. */
+.bars { display: grid; gap: 12px; font-size: .9375rem; }
+.bar { display: grid; grid-template-columns: 14rem minmax(0, 1fr) 4.5rem; grid-template-areas: "label track val"; gap: 4px 14px; align-items: center; }
+.bar .label { grid-area: label; min-width: 0; }
+.bar .label small { display: block; color: var(--ink-3); font-size: .8125rem; line-height: 1.35; }
+.bar .track { grid-area: track; height: 12px; }
+.bar .fill { height: 100%; width: var(--w); min-width: 2px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.bar .fill.ref { background: var(--ink-3); }
+.bar .val { grid-area: val; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 34rem) { .bar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label val" "track track"; } }
+
+.formula { font: .95rem/1.7 var(--mono); color: var(--ink); overflow-x: auto; white-space: pre; padding-left: 14px; box-shadow: inset 2px 0 0 var(--accent-wash); }
+
+figure { margin: 0; overflow-x: auto; }
+figcaption { color: var(--ink-2); font-size: .875rem; margin-top: 8px; }
+pre.mermaid { background: none; margin: 0; }
+
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; color: var(--ink-2); }
+details ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>Clockwork motion planning</h1>
+    <p class="answer">Only the picture comes from a model. Fixed code does the rest: it fits and orders the strokes, solves two joint angles for every point 2 mm apart, and times each move so no servo is asked for more than it can do. The servos are not what limits the speed. Drawing needs at most 83°/s from a servo rated 600°/s; the clock's 10 seconds go on the pen speed we set and on lifting the pen.</p>
+    <p class="meta"><span>24 Oct 2026, 18:20</span><span>Eun's session</span><span>From the code at 31366be, in the sim; the real arm is not measured yet</span></p>
+  </header>
+
+  <section aria-labelledby="h-figures">
+    <h2 id="h-figures">The clock, in numbers</h2>
+    <div class="figures">
+      <div class="figure"><b class="hero num">83°/s</b><span>fastest a joint turns while drawing the clock; the SG92R is rated 600°/s</span></div>
+      <div class="figure"><b class="num">10.0 s</b><span>to draw the clock at 10:10 in the sim</span></div>
+      <div class="figure"><b class="num">0.2 ms</b><span>to plan the path, solve the angles and time the moves, on a laptop</span></div>
+      <div class="figure"><b class="num">0.10 mm</b><span>worst line error in the sim's servo model, with compensation on</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-pipe">
+    <h2 id="h-pipe">From words to servo pulses</h2>
+    <figure>
+<pre class="mermaid">
+flowchart LR
+  A["Words or voice"] --> B["Picture<br/>Gemini SVG, or a sample"]
+  B --> C["Strokes<br/>polylines"]
+  C --> D["Path<br/>fit, order, 2 mm, lead-in"]
+  D --> E["Angles<br/>two-link IK"]
+  E --> F["Timing<br/>pen speed or servo speed"]
+  F --> G["Keyframes<br/>compensated"]
+  G --> H["Arduino<br/>20 ms servo frames"]
+</pre>
+      <figcaption>Only the picture step calls a model. From the strokes on, the same picture always gives the same angles and the same timing.</figcaption>
+    </figure>
+    <div class="rows">
+      <table>
+        <thead><tr><th></th><th>Step</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td class="step">1</td><td>Picture<span class="file"><code>lib/gemini.mjs</code></span></td><td>Gemini writes an SVG line drawing on a 100 × 100 grid. Its instructions ask for "a few continuous strokes so an arm can draw it quickly", with the least thinking the model allows. The clock and the other samples need no model; the clock is built from the time now.</td></tr>
+          <tr><td class="step">2</td><td>Strokes<span class="file"><code>src/svg.js</code>, <code>vectorize.js</code></span></td><td>SVG shapes become polylines: cubic curves at 16 points, quadratic at 12, circles and ellipses at 48. A raster picture is shrunk to 256 px, thresholded, its outlines traced, specks under 14 px dropped and the rest simplified to within 1.5 px.</td></tr>
+          <tr><td class="step">3</td><td>Fit<span class="file"><code>pathplan.js</code></span></td><td>Centres the drawing, scales its longer side to 180 mm, flips it upright and places it at the middle of the board, 215 mm from the base.</td></tr>
+          <tr data-current><td class="step">4</td><td>Order<span class="file"><code>order()</code></span></td><td>Greedy nearest neighbour: start at the stroke nearest the drawing's left corner by the base, then always go to the closest stroke end, drawing each stroke whichever way round is nearer. The clock's pen-up travel drops from 732 to 598 mm.</td></tr>
+          <tr><td class="step">5</td><td>Resample<span class="file"><code>resample()</code></span></td><td>A waypoint every 2 mm along each stroke, so the joints never have far to go between points.</td></tr>
+          <tr><td class="step">6</td><td>Lead-in<span class="file"><code>plan()</code></span></td><td>A pen-up point 3 mm before each stroke, in the stroke's own direction, so the gears' slack is taken up before the pen lands.</td></tr>
+          <tr><td class="step">7</td><td>Angles<span class="file"><code>ik.js</code></span></td><td>Closed-form two-link inverse kinematics, elbow up. The nib touches beside the forearm's tip, so the forearm is solved as a slightly longer link turned by a small angle. Pen-up moves aim the end that lands next. Points out of reach or past a servo's range are counted and shown.</td></tr>
+          <tr data-current><td class="step">8</td><td>Timing<span class="file"><code>makeJob()</code> in <code>sim.js</code></span></td><td>Each move gets the longer of the pen's time and the slowest joint's time, with a 20% margin on the servo. When the tilt changes, the arm holds still until the pen has landed or lifted.</td></tr>
+          <tr><td class="step">9</td><td>Compensation<span class="file"><code>compensate()</code></span></td><td>Each base and elbow command is pushed ahead by half the servo's dead band (1°) plus half its gear play (0 until measured), in the direction the joint is turning.</td></tr>
+          <tr><td class="step">10</td><td>Keyframes<span class="file"><code>arm.js</code></span></td><td>Angles go out in each servo's own frame (zero offset, direction, gear ratio) as hundredths of a degree with a time stamp, into a 48-slot buffer on the board that the app never overfills.</td></tr>
+          <tr><td class="step">11</td><td>Arduino<span class="file"><code>firmware/clockwork</code></span></td><td>Moves the servos between keyframes on its own 20 ms servo frame, so the laptop's timing never shows in the line.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-budget">
+    <h2 id="h-budget">Where the clock's 10 seconds go</h2>
+    <p class="muted">The clock at 10:10: 15 strokes, 432 waypoints, 785 mm of line, the arm as in <code>arm.config.json</code>.</p>
+    <div class="bars">
+      <div class="bar"><div class="label">Drawing<small>785 mm at 150 mm/s</small></div><div class="track" title="Drawing: 5.23 s of 10.02 s"><div class="fill" style="--w: 52.2%"></div></div><div class="val">5.23 s</div></div>
+      <div class="bar"><div class="label">Pen-up moves<small>598 mm between strokes at 300 mm/s, and 0.67 s from the park pose</small></div><div class="track" title="Pen-up moves: 2.80 s of 10.02 s"><div class="fill" style="--w: 27.9%"></div></div><div class="val">2.80 s</div></div>
+      <div class="bar"><div class="label">Pen lifts and landings<small>29 tilt changes, about 58 ms each</small></div><div class="track" title="Pen lifts and landings: 1.68 s of 10.02 s"><div class="fill" style="--w: 16.8%"></div></div><div class="val">1.68 s</div></div>
+      <div class="bar"><div class="label">Hold at the end</div><div class="track" title="Hold at the end: 0.30 s of 10.02 s"><div class="fill" style="--w: 3.0%"></div></div><div class="val">0.30 s</div></div>
+    </div>
+    <p>None of the 432 moves was slowed by the servos. Lifting the pen is only a 4.8° turn of the tilt servo (from −57.3° to −52.4°), about 8 ms at full speed; the other 50 ms of each wait is a fixed settle in the schedule.</p>
+  </section>
+
+  <section aria-labelledby="h-speed">
+    <h2 id="h-speed">How the servos' speed is respected</h2>
+    <p>Every move between two waypoints gets whichever time is longer:</p>
+    <div class="formula">move time = max(distance ÷ pen speed, 1.2 × biggest joint turn ÷ servo speed)
+tilt wait = tilt turn ÷ servo speed + 50 ms, with the arm still</div>
+    <p>So a servo is never asked to turn faster than 83% of the speed we tell the app it has. The pen speed is 150 mm/s drawing and 300 mm/s pen up; the servo speed is the SG92R datasheet's 0.1 s per 60° at 4.8 V, which is 600°/s.</p>
+    <div class="bars" aria-label="Fastest joint turn on the clock, degrees per second">
+      <div class="bar"><div class="label">Drawing, base</div><div class="track" title="73°/s of 600°/s"><div class="fill" style="--w: 12.2%"></div></div><div class="val">73°/s</div></div>
+      <div class="bar"><div class="label">Drawing, elbow</div><div class="track" title="83°/s of 600°/s"><div class="fill" style="--w: 13.8%"></div></div><div class="val">83°/s</div></div>
+      <div class="bar"><div class="label">Pen-up moves, elbow<small>the 3 mm lead-ins, at 300 mm/s</small></div><div class="track" title="152°/s of 600°/s"><div class="fill" style="--w: 25.3%"></div></div><div class="val">152°/s</div></div>
+      <div class="bar"><div class="label">Any move, pen at 300/600 mm/s<small>twice today's pen speed</small></div><div class="track" title="304°/s of 600°/s"><div class="fill" style="--w: 50.7%"></div></div><div class="val">304°/s</div></div>
+      <div class="bar"><div class="label">SG92R rated speed<small>datasheet, 4.8 V, no load</small></div><div class="track" title="600°/s"><div class="fill ref" style="--w: 100%"></div></div><div class="val">600°/s</div></div>
+    </div>
+    <p>The joints have little to do because the arm is long: at 215 mm out, one degree of base turn moves the pen almost 4 mm, so 150 mm/s at the pen is a slow turn for the servo. The other half of the work is done by the Arduino, which moves each servo smoothly between keyframes 50 times a second instead of jumping from point to point.</p>
+  </section>
+
+  <section aria-labelledby="h-slow">
+    <h2 id="h-slow">If the servos are slower than the datasheet</h2>
+    <p>Likely, with a 180 mm link and a marker on the horn. The slowdown itself costs little. What breaks the line is planning for the wrong speed.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Real top speed</th><th class="r">Clock time, planned for it</th><th class="r">Moves the servo slowed</th><th class="r">Worst error if planned for 600°/s</th></tr></thead>
+        <tbody>
+          <tr data-current><td class="num">600°/s</td><td class="r num">10.02 s</td><td class="r num">0 of 432</td><td class="r num">0.10 mm</td></tr>
+          <tr><td class="num">300°/s</td><td class="r num">10.25 s</td><td class="r num">0</td><td class="r num">0.10 mm</td></tr>
+          <tr><td class="num">150°/s</td><td class="r num">10.73 s</td><td class="r num">5</td><td class="r num">0.10 mm</td></tr>
+          <tr><td class="num">100°/s</td><td class="r num">11.76 s</td><td class="r num">23</td><td class="r num">9.54 mm</td></tr>
+          <tr><td class="num">60°/s</td><td class="r num">14.98 s</td><td class="r num">210</td><td class="r num">80.41 mm</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Down to 200°/s the only cost is slower pen lifts. Below 150°/s the drawing itself slows, and if the app still thinks the servo does 600°/s the pen lands before the arm arrives. Planned for the real speed, every row stays within 0.1 mm in the sim.</p>
+    <ul class="plain">
+      <li><b>Measure it on the arm.</b> With the links, the pen and the real 5 V supply on, send <code>J</code> commands 60° apart from the Serial Monitor and film the horn in slow motion. Frames from start to stop ÷ the frame rate = seconds per 60°.</li>
+      <li><b>Enter it</b> in Arm setup as Servo speed. The plan re-times itself; only the moves that need it slow down.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-line">
+    <h2 id="h-line">Keeping the line on the plan</h2>
+    <p>A hobby servo stops half its dead band short of where it is told, and gear play leaves the link behind the motor. The sim models both; compensation and the lead-in take them out.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Servo model, clock at 10:10</th><th class="r">Mean off the line</th><th class="r">Worst</th></tr></thead>
+        <tbody>
+          <tr><td>SG92R, 1° dead band, no compensation</td><td class="r num">1.39 mm</td><td class="r num">4.11 mm</td></tr>
+          <tr><td>Same, plus 1° of gear play</td><td class="r num">3.14 mm</td><td class="r num">8.20 mm</td></tr>
+          <tr><td>Dead band compensated</td><td class="r num">0.01 mm</td><td class="r num">1.51 mm</td></tr>
+          <tr data-current><td>Compensated, plus the 3 mm lead-in (the default)</td><td class="r num">0.01 mm</td><td class="r num">0.10 mm</td></tr>
+          <tr><td>Play and dead band compensated, plus lead-in</td><td class="r num">0.01 mm</td><td class="r num">0.09 mm</td></tr>
+          <tr><td>Stepper at 1/16 microsteps, no compensation</td><td class="r num">0.09 mm</td><td class="r num">0.41 mm</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">The lead-in costs 0.13 s on the clock. The model's dead band is exact and the same every time; a real servo's is not, so expect a clear gain on the board, not 0.1 mm.</p>
+  </section>
+
+  <section aria-labelledby="h-next">
+    <h2 id="h-next">Not optimised yet</h2>
+    <div class="rows">
+      <table>
+        <thead><tr><th>What</th><th>What we know</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td>Pen speed</td><td>150 mm/s is a setting, not a measured limit. At 300 mm/s the clock takes 6.0 s in the sim and no joint passes 304°/s. Whether the marker and the servos hold the line that fast is the open question.</td><td><span class="state" data-tone="warn">Untested</span></td></tr>
+          <tr><td>Real servo speed</td><td>The app uses the datasheet's 600°/s. Measure it and enter it (above).</td><td><span class="state" data-tone="warn">Not measured</span></td></tr>
+          <tr><td>Pen-lift settle</td><td>A fixed 50 ms on each of 29 tilt changes: 1.45 s of the clock's 10.0 s. Shorten it on the arm until strokes start ragged.</td><td><span class="state" data-tone="warn">Not tuned</span></td></tr>
+          <tr><td>Stroke order</td><td>Greedy, not optimal. A 2-opt pass cuts the clock's pen-up travel from 598 to 544 mm, about 0.2 s. It also orders by distance on the board, not by how long the joints take.</td><td><span class="state" data-tone="none">Not built</span></td></tr>
+          <tr><td>Acceleration</td><td>Speed changes at once at every waypoint, and the sim's servo has no inertia or overshoot, so it can't show the lag at corners a loaded servo will have.</td><td><span class="state" data-tone="none">Not modelled</span></td></tr>
+          <tr><td>Erase pass</td><td>43 of its 750 points are past a servo's range (<code>node test.mjs</code>).</td><td><span class="state" data-tone="stop">Needs a look</span></td></tr>
+          <tr><td>Fourier path</td><td>The band-limited Fourier route from the <a href="https://claude.ai/artifact/DE7tSVJYnyefa7GkchoWmH">research page</a> is not in the app; the planner works on polylines.</td><td><span class="state" data-tone="none">Not built</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <details>
+    <summary>Sources</summary>
+    <ol>
+      <li>The code at commit 31366be: <code>app/src/pathplan.js</code>, <code>ik.js</code>, <code>sim.js</code>, <code>arm.js</code>, <code>svg.js</code>, <code>vectorize.js</code>, <code>pen.js</code>, <code>app/lib/gemini.mjs</code>, <code>firmware/clockwork/clockwork.ino</code>.</li>
+      <li>Clock time, its split, joint speeds, the servo and pen speed sweeps, slower-servo errors, stroke order, lead-in cost and planning time: <code>node app/tools/time-budget.mjs</code>, run 24 Oct 2026 on this Mac (planning time 0.17 ms per clock).</li>
+      <li>Line error by servo model: <code>node app/tools/compare-servos.mjs</code>, run 24 Oct 2026; the method is in <code>docs/hardware-link.md</code>, "Smoothing the line".</li>
+      <li>Erase pass out of range: <code>node app/test.mjs</code>, run 24 Oct 2026.</li>
+      <li>SG92R speed, 0.1 s per 60° at 4.8 V: the datasheet figure recorded in <code>app/src/config.js</code>.</li>
+      <li>Pen tilts (−57.3° drawing, −52.4° lifted): <code>src/pen.js</code> from the pen in <code>arm.config.json</code> (165 mm long, 17 mm barrel, 12 mm nib). The pen mount is on the <a href="https://claude.ai/artifact/NujPPg4U78MYye7YAooZEo">pen mount page</a>.</li>
+    </ol>
+  </details>
+</main>

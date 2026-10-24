@@ -13,3 +13,4 @@ Every page we publish with the Artifact tool. Republish the same source file to 
 | Rolling clock bot (views + hardware compare) | https://claude.ai/artifact/Y2X7H4zhxooCwYvn3jPxh2 | `docs/pages/rolling-bot.html` | Eun | Private |
 | Drawing arm build spec (3D print) | https://claude.ai/artifact/2gFJhEhu9WXtdMQibEL5ua | `docs/pages/arm-spec.html` | Eun | Private |
 | Pen mount study (tilt spec, live side view) | https://claude.ai/artifact/NujPPg4U78MYye7YAooZEo | `docs/pages/pen-mount.html` | Eun | Private |
+| Clockwork motion planning (picture to angles, servo speed) | https://claude.ai/artifact/Jzc1z1jmsLZgSgqmvsMYMq | `docs/pages/motion-planning.html` | Eun | Private |
