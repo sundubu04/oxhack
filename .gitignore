@@ -30,3 +30,8 @@ pitch/**/preview/
 *.log
 .claude/settings.local.json
 .claude/worktrees/
+
+# Editor cruft
+.obsidian/
+.vscode/
+.idea/
