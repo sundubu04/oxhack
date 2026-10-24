@@ -103,7 +103,7 @@ What to do with the motors, in order:
 2. **Make the horn joint rigid:** screw the servo's own horn into the link. A printed spline that slips adds play that changes as it wears, which compensation can't follow.
 3. **Preload the joints:** a rubber band from each link to the frame keeps the gears pressed on one side, so the play stays taken up.
 4. **Give the servos their own 5 V supply.** A sagging supply makes them twitch, and no software removes that.
-5. **If it still wobbles, add a 2:1 reduction** (GT2 belt or printed gears) to base and elbow; it halves dead band and play at the link. The drawing square needs 89° of base travel and 83° of elbow, so 2:1 uses 178° and 166° of a 180° servo: it fits, with the zero offsets set carefully. 3:1 does not fit. Set the ratio in the servo table.
+5. **If it still wobbles, add a 2:1 reduction** (GT2 belt or printed gears) to base and elbow; it halves dead band and play at the link. With the 160 mm upper arm and 200 mm forearm the drawing square needs 100° of base travel and 83° of elbow, so 2:1 on the base needs 200° and does not fit a 180° servo: put 2:1 on the elbow only (166°), or shrink the drawing to 150 mm (the base then needs 165°). 3:1 does not fit. Set the ratio in the servo table.
 6. **Steppers** are the step after that: in the sim, 1/16 microstepping is within 0.3 mm with no compensation. They need drivers and are much heavier; mount both at the base and drive the elbow with a belt.
 
 ## On a Raspberry Pi (the team's choice)

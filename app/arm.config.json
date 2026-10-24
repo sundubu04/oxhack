@@ -1,9 +1,9 @@
 {
   "name": "Clockedin arm",
-  "measured": false,
+  "measured": true,
   "links": {
-    "L1": 180,
-    "L2": 180
+    "L1": 160,
+    "L2": 200
   },
   "board": {
     "width": 350,

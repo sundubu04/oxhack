@@ -6,10 +6,10 @@ import { penGeometry } from "./pen.js";
 export const DEFAULT_CONFIG = {
   name: "Clockedin arm",
   measured: false,
-  links: { L1: 180, L2: 180 },
+  links: { L1: 160, L2: 200 },   // the build: upper arm 16 cm, forearm 20 cm
   board: { width: 350, height: 350, standoff: 40 },
   drawing: { size: 180 },
-  elbow: "up",
+  elbow: "up",   // up: the elbow bends to the right of the line from base to pen, as on the build (Arm setup says Right)
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
@@ -20,9 +20,9 @@ export const DEFAULT_CONFIG = {
   servos: {
     model: "TowerPro SG92R", speed: 600, resolution: 1, backlash: 0, compensate: true,
     // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
-    // zero offsets centre each joint's working range on its servo's travel (base -16 to 80 deg, elbow 45 to 157
-    // deg for the drawing square with the pen across the forearm): mount the base so its middle points 32 deg up
-    // from +x, and the elbow so its middle is 100 deg round from link 1
+    // zero offsets keep each joint's working range inside its servo's travel (base -31 to 76 deg, elbow 41 to 158
+    // deg for the drawing square, the wipe and the park pose, so servo 27 to 134 and 31 to 148): mount the base so
+    // servo 90 points 32 deg up from +x, and the elbow so servo 90 is 100 deg round from link 1
     base: { min: 0, max: 180, offset: 58, dir: 1, ratio: 1 },
     elbow: { min: 0, max: 180, offset: -10, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
