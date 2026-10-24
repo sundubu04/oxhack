@@ -56,6 +56,37 @@ The main theme is **TIME**; HRT rewards **data for predictions and decision-maki
 
 **On the vision / Presage interest.** Presage (camera biometrics) does not fit a web-security tool — it would be a separate project (idea 28), and only weakly ties to "Time" (biometrics over time). If the team wants vision *and* the security idea, the clean fit is **Gemini multimodal** for screenshot triage and headline explaining (ideas 22, 26), not Presage. Worth deciding early: security-data project (many prizes) or a vision project (fewer, but Presage/Gemini-led).
 
+## Fun route: a phone-vision game that collects data (added 24 Oct)
+
+Eun wants a fun, demo-able angle: use a phone **vision** API to make a productive, Pokémon-Go-style game that **collects a real dataset**. Two vision APIs are on offer:
+
+- **Gemini** (multimodal) — reads the *world*: identify objects, species, text, scenes. The "catch real things" route.
+- **Presage SmartSpectra** — reads your *body*: contactless heart rate + breathing (plus HRV, emotion, focus) from a face in ~20 s, FDA-cleared, free for the event. The "vitals drive the game" route. Needs a mobile/native SDK and a ~20 s still window (slower demo; note vs Delta's speed prize).
+
+The flywheel that makes it *productive* and nails **HRT + Time**: every catch is time- and place-stamped, so the data players collect trains a live model that **predicts where/when the next one appears**, and players follow that prediction. Data → prediction → decision, and the collection grows over time.
+
+Scored out of 25: **Fun** (demo delight), **Data** (is the dataset genuinely useful), **Prize** (how many tracks it stacks), **Build** (in ~20 h), **Table** (works in a 4–5 min science-fair demo).
+
+| # | Idea | Vision API | The hook | Fun | Data | Prize | Build | Table | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| G1 | **SpawnCast / ChronoDex** — catch real things into a dex; sightings are time+place stamped and a live model predicts the next spawns, which players chase | Gemini | "The game you play *makes* the forecast you play by" — the prediction flywheel | 5 | 5 | 5 | 3 | 4 | 22 |
+| G2 | **PriceDex** — hunt products, snap the price tag; crowd-sourced price/inflation data over time, with a next-week price forecast | Gemini (OCR) | "Changes in value over time" — the organisers' own HRT example, as a game | 4 | 5 | 5 | 4 | 4 | 22 |
+| G3 | **BioDex** — photograph plants/bugs/birds; Gemini IDs the species; a biodiversity map that fills over the weekend | Gemini | iNaturalist as a catching game; seasonal/time-of-day spawns | 4 | 5 | 4 | 4 | 3 | 20 |
+| G4 | **Calm Catch** — a creature you can only catch by *lowering your heart rate*; Presage reads your pulse live | Presage | Judges calm themselves and watch their own pulse catch it — the biggest instant wow at a table | 5 | 3 | 4 | 3 | 5 | 20 |
+| G5 | **Calm Duel / Face-Off** — two players, whoever stays calmest under distraction wins | Presage | Two judges duel at the table; collects a stress-response dataset | 5 | 3 | 4 | 3 | 5 | 20 |
+| G6 | **Breath Quest** — a game you steer with your breathing rate | Presage | Control a game with your breath; breathing-control data over time | 4 | 3 | 4 | 3 | 4 | 18 |
+| G7 | **Hype Meter** — everyone at the venue scans in; a live "mood map" of the room over the event | Presage | Scan the judges, show the room's live energy over time | 4 | 4 | 4 | 3 | 4 | 19 |
+| G8 | **SidewalkDex** — catch accessibility features/barriers (ramps, steps, tactile paving); a civic access map | Gemini | Productive/civic; Project-Sidewalk-as-a-game | 3 | 5 | 4 | 4 | 3 | 19 |
+| G9 | **LitterLegends** — "defeat" litter by photographing it; a cleanup heatmap that changes over time | Gemini | Visibly good; type-classified litter data | 4 | 4 | 4 | 4 | 3 | 19 |
+| G10 | **Pulse Pet** — a Tamagotchi that mirrors your vitals; thrives when you're calm and active | Presage | Longitudinal self-data; cute | 4 | 2 | 3 | 3 | 4 | 16 |
+| G11 | **Hybrid: excitement-catch** — a Gemini catch game where your heart rate (Presage) sets the catch rate | both | Stacks both vision prizes; harder to build | 4 | 4 | 5 | 2 | 3 | 18 |
+
+**Lead fun idea: G1 (SpawnCast) or its HRT-flavoured twin G2 (PriceDex).** Both are true to "Pokémon Go that collects data," both make the data *productive* through a prediction that feeds back into play, and both stack **Main (Time) + HRT + Gemini + Snowflake/Tiger Data + Delta + Vultr**, with ElevenLabs for a creature "call". G2 is the sharper HRT pitch (a trading firm's judges love price/market data over time); G1 is the more flexible, more universally fun one. If pure **demo delight** matters most, **G4 Calm Catch (Presage)** is the biggest table wow but a thinner dataset and a slower 20 s reading.
+
+**Buildability note.** The Gemini catch games are a camera web app → Gemini API → a store (Tiger Data/Snowflake) → a simple prediction (density by time/place is enough to show the flywheel) → a map. Buildable. The Presage games need its mobile/native SDK and a ~20 s window, so more platform friction and a less "snappy" demo.
+
+**Demo-at-a-table plan (either route).** Pre-seed a handful of "spawns" — printed cards or objects on the table (G1), product tags (G2), or the judges' own faces (G4). The judge catches two or three, the dex fills, and the prediction/map visibly updates. That is the whole 4–5 minutes.
+
 ## Long list
 
 Captured above (1–22). More raw seeds, not yet scored: a QR code on a "we're patching" holding page that links to the explainer; a uptime-style "is it down because of PHP2Shell?" checker; a diff tool that shows what a site's headers looked like before/after; a "trust receipt" a patched site can display; a Thunderbird/Outlook add-in that flags links to likely-unpatched domains.
