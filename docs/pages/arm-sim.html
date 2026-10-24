@@ -84,8 +84,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .flow .hot { background: var(--accent-wash); color: var(--accent); }
 .flow .arrow { background: none; color: var(--accent); padding: 0 2px; }
 .ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: s; }
-.ladder li { display: grid; grid-template-columns: 1.7rem minmax(0,1fr); gap: 12px; }
-.ladder li::before { counter-increment: s; content: counter(s); font: 600 .9rem/1.6 var(--display); color: var(--accent);
+.ladder li { position: relative; padding-left: 2.5rem; min-height: 1.7rem; }
+.ladder li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 0;
+  font: 600 .9rem/1.7rem var(--display); color: var(--accent);
   background: var(--accent-wash); border-radius: 7px; width: 1.7rem; height: 1.7rem; text-align: center; }
 .ladder b { font-weight: 600; }
 pre { margin: 0; overflow-x: auto; background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
