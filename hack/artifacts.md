@@ -5,3 +5,4 @@ Every page we publish with the Artifact tool. Republish the same source file to 
 | Page | Link | Source | Owner | Shared with |
 | --- | --- | --- | --- | --- |
 | OxHack kit (what the repo has ready) | https://claude.ai/artifact/8DTPf1AV49iF8aHPatnDt2 | `docs/pages/kit.html` | Eun | Private |
+| PHP2Shell idea research | https://claude.ai/artifact/3Zp6AaLNuv4gmZVVwWQ645 | `docs/pages/php2shell-research.html` | Eun | Private |

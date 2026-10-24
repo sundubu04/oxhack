@@ -1,0 +1,220 @@
+<title>PHP2Shell idea research</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* House research page: one reading column, groups separated by space; one pink accent; the one visual is a timeline. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.page { max-width: 48rem; margin: 0 auto; padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 52px; }
+header { display: grid; gap: 12px; }
+h1 { font: 600 2.25rem/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.3rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+h3 { font: 600 1rem/1.4 var(--display); margin: 0; }
+p { margin: 0; max-width: 65ch; }
+.lede { font-size: 1.125rem; }
+.meta { color: var(--ink-3); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+section { display: grid; gap: 16px; min-width: 0; }
+.callout { display: grid; gap: 8px; border-left: 3px solid var(--accent); padding: 2px 0 2px 18px; }
+.callout b { font: 600 1rem/1.4 var(--display); color: var(--accent); }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code { font: .875em var(--mono); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+
+.figures { display: flex; flex-wrap: wrap; gap: 20px 44px; }
+.figure b { display: block; font: 600 2.25rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.figure b.hero { color: var(--accent); }
+.figure span { color: var(--ink-2); font-size: .875rem; max-width: 22ch; display: block; }
+
+.rows { overflow-x: auto; }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 16px 8px 0; white-space: nowrap; }
+.rows td { padding: 8px 16px 8px 0; vertical-align: top; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+.rows tr[data-lead] td { background: var(--accent-wash); }
+.rows tr[data-lead] td:first-child { border-radius: 6px 0 0 6px; padding-left: 10px; }
+.rows tr[data-lead] td:last-child { border-radius: 0 6px 6px 0; }
+.rows .n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* The one visual: the race over time (Time theme). A small SVG, drawn to scale. */
+figure { margin: 0; display: grid; gap: 8px; overflow-x: auto; }
+figcaption { color: var(--ink-2); font-size: .875rem; }
+.chart { width: 100%; height: auto; max-width: 100%; }
+
+.rulelist { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.rulelist li { display: grid; grid-template-columns: 1.6rem minmax(0,1fr); gap: 12px; }
+.rulelist .k { color: var(--accent); font: 600 1rem/1.5 var(--display); font-variant-numeric: tabular-nums; }
+
+.tag { display: inline-block; font-size: .8125rem; padding: 1px 8px; border-radius: 999px; background: var(--wash); color: var(--ink-2); }
+.tag[data-tone="ok"] { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.tag[data-tone="no"] { background: color-mix(in srgb, var(--stop) 14%, transparent); color: var(--stop); }
+
+.decide { display: grid; gap: 12px; }
+.decide .q { display: grid; gap: 2px; }
+.decide .q b { font: 600 1rem/1.4 var(--display); }
+
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; }
+details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>PHP2Shell idea research</h1>
+    <p class="lede">For OxHack's "Time" theme and HRT's data track: what a <b>non-technical end user</b> could use to deal with the PHP2Shell flaws, told as a time-and-data story — and the open gap worth building.</p>
+    <p class="meta"><span>24 Oct 2026</span><span>End-user focus</span><span>Passive &amp; legal only</span></p>
+  </header>
+
+  <section aria-labelledby="h-rec">
+    <h2 id="h-rec">The recommendation</h2>
+    <div class="callout">
+      <b>Build "Time to Safe": a live, sourced tracker of whether the sites people use are back and patched, with a predicted safe-by date and a plain "what do I do".</b>
+      <p>The research found an open slot: councils, the Met Police, Dutch and Finnish government sites, Nintendo and Pokémon all went offline — and <b>no one is tracking which sites are back or patched</b>. The only public checker is a command-line header reader. A sourced, human-readable timeline is missing.</p>
+    </div>
+    <p>It fits the most prizes from one build: <b>Main (Time)</b> — the whole thing is a race over time; <b>HRT</b> — public data drives a prediction and a decision; plus <b>Snowflake / Tiger Data</b> (the time-series store), <b>Gemini</b> (explain a screenshot or headline), <b>ElevenLabs</b> (speak the verdict), <b>Delta</b> (build in it), <b>Vultr</b> (host it).</p>
+  </section>
+
+  <section aria-labelledby="h-prob">
+    <h2 id="h-prob">The problem, in numbers</h2>
+    <div class="figures">
+      <div class="figure"><b class="hero num">~70%</b><span>of websites run PHP (Wiz headline; W3Techs: 70.3% of known)</span></div>
+      <div class="figure"><b class="num">21 Oct</b><span>patches shipped; attempts seen the same day</span></div>
+      <div class="figure"><b class="num">~1.9M+</b><span>exposed PHP hosts; counts vary ~10× by method</span></div>
+      <div class="figure"><b class="num">9.2</b><span>CVSS v4, both CVEs; unauthenticated RCE</span></div>
+    </div>
+    <p class="muted">CVE-2026-109618 and CVE-2026-109619 ("PHP2Shell"): unauthenticated remote code execution in PHP core, every version 5.4–8.5. One path is a Heartbleed-style memory leak (heap bytes in a <code>PHPSESSID</code> cookie). A third, CVE-2026-115560, followed on 23 Oct. Found with AI (Wiz, OpenAI, Calif.io) — the story the press is running.</p>
+  </section>
+
+  <section aria-labelledby="h-time">
+    <h2 id="h-time">Why "Time" fits: the race</h2>
+    <figure>
+      <svg class="chart" viewBox="0 0 640 230" role="img" aria-label="A line chart: exploitation went live on 21 October while the share of sites patched climbs over the following days, with a gap between them that closes over time.">
+        <!-- axes -->
+        <line x1="54" y1="18" x2="54" y2="186" stroke="var(--ink-3)" stroke-width="1"/>
+        <line x1="54" y1="186" x2="618" y2="186" stroke="var(--ink-3)" stroke-width="1"/>
+        <!-- y labels -->
+        <text x="48" y="26" text-anchor="end" font-size="11" fill="var(--ink-3)">100%</text>
+        <text x="48" y="110" text-anchor="end" font-size="11" fill="var(--ink-3)">50%</text>
+        <text x="48" y="190" text-anchor="end" font-size="11" fill="var(--ink-3)">0%</text>
+        <!-- x labels (days) -->
+        <text x="90" y="204" text-anchor="middle" font-size="11" fill="var(--ink-3)">21 Oct</text>
+        <text x="228" y="204" text-anchor="middle" font-size="11" fill="var(--ink-3)">23</text>
+        <text x="366" y="204" text-anchor="middle" font-size="11" fill="var(--ink-3)">25</text>
+        <text x="504" y="204" text-anchor="middle" font-size="11" fill="var(--ink-3)">27</text>
+        <text x="600" y="204" text-anchor="middle" font-size="11" fill="var(--ink-3)">→</text>
+        <!-- patched curve (climbs toward 100%) -->
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="90,182 159,150 228,120 297,96 366,74 435,58 504,46 573,38"/>
+        <text x="573" y="30" text-anchor="end" font-size="12" fill="var(--accent)" font-weight="600">sites patched</text>
+        <!-- exploitation line (flat high, live from day 0) -->
+        <polyline fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="5 4" points="90,44 573,44"/>
+        <text x="96" y="38" font-size="12" fill="var(--ink-2)">exploitation live</text>
+        <!-- the gap -->
+        <text x="200" y="150" font-size="11.5" fill="var(--ink-3)">the window your sites are exposed</text>
+      </svg>
+      <figcaption>Illustrative, not measured. The product makes this real per site: how long it has looked unpatched, and a predicted date it becomes safe.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-map">
+    <h2 id="h-map">How one build maps to the tracks</h2>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Track / prize</th><th>How we hit it</th></tr></thead>
+        <tbody>
+          <tr data-lead><td><b>Main — "Time"</b></td><td>The race over time: exploitation live from 21 Oct vs the patch curve; a per-site danger timeline and a predicted safe date</td></tr>
+          <tr data-lead><td><b>HRT — data for predictions &amp; decisions</b></td><td>Public datasets → predict time-to-safe per site/sector → drive the user's decision. The core, not a bolt-on</td></tr>
+          <tr><td>Snowflake / Tiger Data</td><td>The time-series store and analytics behind the predictions</td></tr>
+          <tr><td>Gemini API</td><td>Explain a user's screenshot of a site behaving oddly; ground "explain this headline"</td></tr>
+          <tr><td>ElevenLabs</td><td>Speak the verdict for low-vision / older users — a real accessibility use</td></tr>
+          <tr><td>Delta</td><td>Build in Delta with teammates + agents, share threads; rewards snappy UX (Speed 30%)</td></tr>
+          <tr><td>Vultr</td><td>Host the backend</td></tr>
+          <tr><td class="muted">Presage / Solana / Handmade</td><td class="muted">No natural fit to this idea — a Presage camera project would be a different build</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-ideas">
+    <h2 id="h-ideas">The end-user shortlist</h2>
+    <p class="muted">Scored on our own filters (demo, buildable, data, real user, legal) out of 25. Full list and the owner-focused ideas are in <code>hack/ideas.md</code>.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Idea</th><th>The wow moment</th><th class="n">/25</th></tr></thead>
+        <tbody>
+          <tr data-lead><td><b>Time to Safe</b> — live tracker + per-site safe-by prediction (#23+#2)</td><td>A site's danger timeline: "exposed 3 days, likely safe by Sun — don't log in yet"</td><td class="n">—</td></tr>
+          <tr><td>Is this site still safe? (#1)</td><td>Type a domain, calm verdict in 2 s, from passive + public data</td><td class="n">23</td></tr>
+          <tr><td>Change-password priority (#3/#25)</td><td>Paste your accounts; "do these 3 tonight," ranked by risk</td><td class="n">23</td></tr>
+          <tr><td>Screenshot triage, Gemini (#26)</td><td>Drop a screenshot: "that card popup is not your bank — leave"</td><td class="n">22</td></tr>
+          <tr><td>Explain this scary headline (#22)</td><td>Paste a headline, get a calm, grounded "does this affect you"</td><td class="n">21</td></tr>
+          <tr><td>Read-it-to-me, ElevenLabs (#27)</td><td>Big button, calm voice: "Your bank looks safe. No action needed"</td><td class="n">20</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-rules">
+    <h2 id="h-rules">Rules the precedents force (Heartbleed, Log4Shell, HIBP)</h2>
+    <ol class="rulelist">
+      <li><span class="k">1</span><span><b>Never show "safe" from a version header.</b> Distros backport fixes without changing the version number, so the banner lies — show "up to date" only from distro/OSV data, else "unknown".</span></li>
+      <li><span class="k">2</span><span><b>The memory leak changes the advice.</b> Tell a user to change a password only <em>after</em> the site confirms it patched (the Heartbleed rule); sessions and secrets may already be exposed.</span></li>
+      <li><span class="k">3</span><span><b>Lists beat scanners for the public.</b> Build from sites' own statements + passive signals, each with a source and a timestamp, and show when it was last checked.</span></li>
+      <li><span class="k">4</span><span><b>Privacy drives adoption.</b> Check on the user's device or by hash prefix; don't store the list of sites a user cares about.</span></li>
+      <li><span class="k">5</span><span><b>Split advice by role</b> and <b>warn about fake fixes</b> — outages breed scam "fix" sites within hours.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-legal">
+    <h2 id="h-legal">The legal line (UK team)</h2>
+    <p>Both flaws are RCEs and one leaks memory. <b>Actively probing a site you don't own</b> is likely a Computer Misuse Act 1990 offence (and reading leaked memory is a crime — a teen was charged for exactly that with Heartbleed). So the tool:</p>
+    <p>
+      <span class="tag" data-tone="ok">reads only public data &amp; a normal visit's headers</span>
+      <span class="tag" data-tone="ok">active checks only on a verified-owner's own site</span>
+      <span class="tag" data-tone="ok">tracks what sites said/did, by category</span>
+      <span class="tag" data-tone="no">never sends exploit-shaped requests</span>
+      <span class="tag" data-tone="no">never publishes a named unpatched-site list</span>
+    </p>
+  </section>
+
+  <section aria-labelledby="h-decide">
+    <h2 id="h-decide">Decide early</h2>
+    <div class="decide">
+      <div class="q"><b>Security-data project, or a vision project?</b><span class="muted">The security idea stacks the most prizes and fits Time + HRT. A Presage (camera-biometrics) project is a different build with a weak Time fit — an either/or. Gemini vision fits the security idea as a feature.</span></div>
+      <div class="q"><b>Predict, don't just report.</b><span class="muted">A real time-to-safe prediction with its confidence shown wins HRT; a pretty dashboard of current state does not.</span></div>
+      <div class="q"><b>Science-fair format.</b><span class="muted">4–5 min at a table: a fast live demo + one poster beats a slide deck. The demo video doubles as the DEV write-up and the fallback.</span></div>
+    </div>
+  </section>
+
+  <details>
+    <summary>Sources &amp; what to not overstate</summary>
+    <ul>
+      <li>Primary: <a href="https://www.wiz.io/blog/php2shell-php-rce">Wiz</a>, <a href="https://watchtowr.com/intelligence/php-cve-2026-109618-faq/">watchTowr</a>, <a href="https://cert.europa.eu/publications/security-advisories/2026-018">CERT-EU</a>, <a href="https://www.ncsc.gov.uk/news/critical-security-issue-affecting-php">NCSC UK</a>, <a href="https://krebsonsecurity.com/2026/10/widespread-php-flaw-may-cause-many-site-outages-today/">Krebs</a>, <a href="https://www.malwarebytes.com/blog/bugs/2026/10/php2shell-why-websites-are-going-offline-for-emergency-security-updates">Malwarebytes</a> (for users).</li>
+      <li>Build-on data (passive/permissive): <a href="https://osv.dev/vulnerability/CVE-2026-109618">OSV.dev</a> + distro trackers, <a href="https://endoflife.date/api/v1/products/php">endoflife.date</a>, <a href="https://api.first.org/data/v1/epss?cve=CVE-2026-109618,CVE-2026-109619">EPSS</a>, <a href="https://github.com/projectdiscovery/wappalyzergo">wappalyzergo</a>, <a href="https://github.com/NCSC-NL/php2shell">NCSC-NL list</a>, <a href="https://haveibeenpwned.com/API/v3">Pwned Passwords</a>.</li>
+      <li>Precedents: <a href="https://github.com/NCSC-NL/log4shell">NCSC-NL Log4Shell</a>, <a href="https://haveibeenpwned.com/DomainSearch">HIBP</a>, <a href="https://developer.mozilla.org/en-US/observatory">Mozilla Observatory</a>, Mashable/LastPass Heartbleed lists.</li>
+      <li>Don't overstate: "exploited in the wild" is contested (attempts yes, confirmed compromise no, not in CISA KEV as of 22 Oct); the "8 TLS certs" are the CA eMudhra's, a separate story; "70%" is Wiz's headline, not an independent count; exposure counts vary ~10×.</li>
+      <li>Full brief, resources and precedents: <code>docs/research.md</code> in the repo.</li>
+    </ul>
+  </details>
+</main>

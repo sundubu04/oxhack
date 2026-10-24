@@ -105,9 +105,48 @@ OWASP CRS PRs [#4896](https://github.com/coreruleset/coreruleset/pull/4896) and 
 
 ## Precedents: how past vulnerabilities reached the public
 
-Filled from the precedents agent (Heartbleed, Log4Shell, MOVEit, Have I Been Pwned, Safe Browsing, and more).
+From the precedents agent, 24 Oct. The strategic finding:
 
-_(pending — precedents agent running)_
+> **No public patch-status tracker for PHP2Shell exists yet.** The only checker is a command-line header-reader. Councils (Oxford, Edinburgh), the Met, Dutch and Finnish government sites, Nintendo and Pokémon went offline — and nobody is tracking which sites are back, or patched. **A sourced, live list of what the sites people use have said and done is the open slot.**
+
+That is the gap our flagship fills, and it is squarely on theme: a **timeline** (Time) built from **data** that supports a user's **decision** (HRT).
+
+### Precedents worth copying (condensed; full table in the agent run)
+
+| What | How users used it | Lesson for us |
+| --- | --- | --- |
+| **Mashable Heartbleed "hit list"** | Read it; green tick = patched, so change your password | A sourced list of brand statements beats a scanner for the public |
+| **LastPass Heartbleed check** | Flagged affected sites the user already saved | Start from the user's own sites, don't ask them to scan |
+| **NCSC-NL / CISA Log4Shell lists** | Looked up a product's status | Every entry gets a source and a date; plan for it going stale |
+| **Canarytokens Log4Shell token** | Paste a string, get an email if it fires | Owner-planted decoy: legal, no install (for an owner feature) |
+| **Have I Been Pwned / Pwned Passwords** | Email sign-up; passwords checked by hash prefix | Privacy (on-device or k-anonymity) drives adoption; don't collect users' site lists |
+| **Google Safe Browsing / Netcraft / Malwarebytes Browser Guard** | Automatic warnings; user reports | Feed existing blocklists; let users report "a familiar site looks wrong" |
+| **SSL Labs / Mozilla Observatory** | Enter a host, get a graded passive report, cached | Keep results private to the owner; honest "a good grade ≠ safe" disclaimers |
+| **Citrix Bleed** | Told to end all sessions after patching | After a memory leak, a patched site is not yet safe — change secrets |
+| **CrowdStrike outage 2024** | Fake "fix" sites appeared within hours | Warn about scam fixes; downtime is not a breach |
+| **Chromebleed (deprecated)** | Warned on every page — by actively probing | An extension should read a list, never probe |
+
+### Design rules these force (into the flagship)
+
+1. **Never say "safe" from a version header.** Distros backport without bumping the version, so show **"up to date" only from distro/OSV data, else "unknown"** — never a false green.
+2. **The memory leak changes the advice:** tell a user to change a password **only after the site confirms it patched** (the Heartbleed rule), and flag that sessions/secrets may already be exposed.
+3. **Lists beat scanners.** Build the tracker from sites' **own public statements** + passive signals, with a source and timestamp per row, and show when each entry was last checked.
+4. **Privacy:** check on the user's device or by hash prefix; don't store the list of sites a user cares about server-side.
+5. **Split advice by role** (visitor / shared-host owner / self-hoster), and **warn about fake fixes** and maintenance pages.
+
+### The legal line (UK team)
+
+- **Computer Misuse Act 1990, s1:** unauthorised access is an offence; a reform report said even port scanning could technically count. Reform was announced May 2026 but there's no researcher defence yet.
+- **Reading leaked memory is not "testing":** a 19-year-old in Canada was charged for using Heartbleed to pull ~900 tax IDs. So our tool never sends exploit-shaped requests and never reads memory from a site we don't own.
+- **How the legal testers stayed clean:** header-only reads (OpenAI's checker), ownership verification before any active check (HIBP, SSL Labs), opt-in self-tests with short data retention (Huntress), caching (Mozilla Observatory).
+- **Don't publish a named list of *unpatched* sites** — it doubles as a target list. Track **what sites said/did** (offline, back, patched) and show risk by category, not a "hack these" list. Report any issue found via `security.txt` (RFC 9116).
+
+### Corrections to carry onto the stage
+
+- "Exploited in the wild" is **contested** (watchTowr/Cloudflare saw attempts; SentinelOne reports no confirmed compromise; not in CISA KEV as of 22 Oct). Say "attempts seen; no confirmed compromise," with sources.
+- Sources disagree on which CVE leaks memory (Wiz implies -109618; BleepingComputer says -109619).
+- Malwarebytes' "eight compromised TLS certificates" are a **separate** story — the CA eMudhra revoked them, not a PHP2Shell consequence.
+- Exposure counts vary ~tenfold (2.2M hosts to 22–34M instances). Show a range and say how it was counted; "70%" is Wiz's headline, not an independent measurement.
 
 ## Sources
 
