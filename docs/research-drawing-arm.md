@@ -30,6 +30,18 @@ Compiled 24 Oct 2026 for Route D in `hack/ideas.md`: a robot arm on a whiteboard
 | Joto (Those, London) | Kickstarter Mar 2017, over £362k, 1,800+ units | from £199 | Arm holds a pen and an eraser; dock stops the pen drying | UNVERIFIED | Site shows ©2023 |
 | Scribit (Carlo Ratti, Makr Shakr) | Kickstarter 2018, $1.64M from 4,352 backers | $299 early, $449 to $499 retail | Retraces every line with an eraser heated to 65 °C; needs its own heat-vanishing ink | A drawing takes "minutes to two hours"; erasing "within minutes" (Inverse, Nov 2018) | Shipping slipped to 2019; site shows ©2022 |
 
+### Robots that roll on the board
+
+Added 24 Oct 2026 after the hardware pivot to a mobile bot whose marker tilts one way to draw and the other to erase.
+
+| Thing | What it does | What it teaches us | Source |
+| --- | --- | --- | --- |
+| Root (Harvard Wyss, then Root Robotics, then iRobot Education); patent US11529740B2, priority Apr 2014 | Drives on vertical magnetic whiteboards; one motor moves a double-ended arm through three states: pen down, neutral, eraser down | Our tilt-to-draw, tilt-to-erase idea exists: credit it. Put the marker at the centre of rotation so turns leave a dot; offset the eraser to the rear. The patent blames drift on gravity ("deformation and slipping of the tire material"), calibrates it per board, finds the board edge with a downward optical array and bumpers, and can correct position from cameras or landmarks | patents.google.com/patent/US11529740B2 |
+| CMU robotics capstone, "Friction Force Explorers" | Two mecanum-wheel robots share one drawing; AprilTags in the four corners and on each robot; planning off the robot | AprilTags give an absolute position cheaply. Bumps pushed the pen off, and holding the pen down burned out its motor | github.com/rachelholladay/robotics_capstone |
+| Dusty Robotics FieldPrinter | Prints building layouts on floors, tracked live by a stationary total station; claims 1/16 in (vendor claim) | At scale, drift is solved with an external absolute reference, not wheel odometry | dustyrobotics.com |
+
+For us: an overhead camera with AprilTags on the bot and the board corners (deterministic vision, not a model), plus re-homing on the board edge between clocks. A flat board removes the gravity drift that Root's patent describes. The fixed arm needs none of this, because its joint angles are absolute.
+
 ### Desktop arms and plotters
 
 | Machine | Top speed | Price | Note |
