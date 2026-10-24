@@ -2,7 +2,7 @@
 // board, so the zero decides which part of the board the arm gives up. bestZeros picks the base and elbow zeros
 // that keep the most of the reachable board inside both servos' travel, while the drawing square, the wipe and the
 // park pose always fit with a few degrees to spare.
-import { ikTool, R2D } from "./ik.js";
+import { ikTool, fromBoard, R2D } from "./ik.js";
 import { erasePlan } from "./pathplan.js";
 import { homePose } from "./sim.js";
 
@@ -12,7 +12,7 @@ const at = (g, x, y, tool = "draw") => { const s = ikTool(x, y, g, tool); return
 // joint angles for every 5 mm of the board the nib can reach
 function reach(g) {
   const board = [];
-  for (let x = g.bx; x <= g.bx + g.boardW; x += 5) for (let y = g.by; y <= g.by + g.board; y += 5) { const a = at(g, x, y); if (a) board.push(a); }
+  for (let u = 0; u <= g.boardW; u += 5) for (let v = 0; v <= g.board; v += 5) { const p = fromBoard(g, u, v), a = at(g, p.x, p.y); if (a) board.push(a); }
   return board;
 }
 // and what the app must always reach: the drawing square, the wipe (with either end) and the park pose

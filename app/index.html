@@ -160,8 +160,22 @@
           <div class="cw-setup">
             <form class="cw-form" id="setup" novalidate></form>
             <div class="cw-preview">
-              <canvas class="cw-board" id="setup-board" aria-label="Preview of the arm with these dimensions"></canvas>
-              <p class="dl-meta" id="setup-hint">Drag on the board to move the pen</p>
+              <div class="cw-preview__bar">
+                <div class="dl-seg" role="group" aria-label="Preview" id="setup-views">
+                  <button type="button" aria-pressed="true" data-sview="board">Board</button>
+                  <button type="button" aria-pressed="false" data-sview="3d">3D</button>
+                </div>
+                <div class="dl-seg" role="group" aria-label="What pressing on the board does" id="setup-tools">
+                  <button type="button" aria-pressed="true" data-tool="draw">Write</button>
+                  <button type="button" aria-pressed="false" data-tool="erase">Erase</button>
+                  <button type="button" aria-pressed="false" data-tool="lift">Move</button>
+                </div>
+              </div>
+              <div class="cw-preview__stage">
+                <canvas class="cw-board" id="setup-board" aria-label="Preview of the arm with these dimensions"></canvas>
+                <div class="cw-3d" id="setup-3d" hidden></div>
+              </div>
+              <p class="dl-meta" id="setup-hint">Press on the board to put the pen down, drag to draw, let go to lift it</p>
             </div>
           </div>
         </div>
@@ -183,7 +197,6 @@
               <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="live-home">Home</button>
               <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="live-stop">Stop</button>
             </div>
-            <label class="dl-choice cw-choice"><span id="sw-livedraw-l">Draw on the board with the arm</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-livedraw" aria-labelledby="sw-livedraw-l"></button></label>
             <div class="cw-actions">
               <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="sketch-draw" disabled>Draw it again, planned</button>
               <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="sketch-clear" disabled>Clear</button>

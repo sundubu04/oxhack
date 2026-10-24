@@ -114,7 +114,10 @@
 .cw-servos td:first-child, .cw-servos th:first-child { padding-inline-start: 8px; }
 .cw-voice { display: flex; gap: 8px; align-items: center; }
 .cw-voice .dl-input { flex: 1; min-width: 0; }
-.cw-preview { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; min-height: 0; text-align: center; }
+.cw-preview { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; min-height: 0; text-align: center; }
+.cw-preview__bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.cw-preview__stage { position: relative; min-height: 0; }
+.cw-preview__stage > * { position: absolute; inset: 0; }
 
 /* Command palette, on the kit's dialog */
 .cw-palette.dl-dialog { gap: 0; width: min(560px, calc(100vw - 32px)); margin: 12vh auto auto; padding: 0; }

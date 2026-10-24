@@ -1,6 +1,7 @@
 // Draws the whiteboard, the planned path, the ink the simulated arm has left and the arm itself, to scale.
-// World units are mm in the arm frame: base axis at the origin, x right, y up, the board above the base.
-import { fk, toolPoint } from "./ik.js";
+// World units are mm in the arm frame: base axis at the origin, x right, y up; the board above the base, square on
+// or hung as a diamond. The ink layer is in the board's own frame, so it turns with it (and the 3D view uses it).
+import { fk, toolPoint, toBoard, boardCorners } from "./ik.js";
 
 const PXMM = 3;      // resolution of the ink layer, px per mm
 const MARKER = 2;    // width of the marker line, mm
@@ -30,8 +31,11 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     if (!r.width || !r.height) return false;
     if (canvas.width !== Math.round(r.width * dpr) || canvas.height !== Math.round(r.height * dpr)) { canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // the board, the base, and with the base at a corner the upper arm folded out past the board's edge
-    const x0 = Math.min(g.bx, g.corner ? -g.L1 : -24) - pad, x1 = g.bx + g.boardW + pad, y0 = Math.min(g.by, 0) - (g.corner ? 48 : 24), y1 = g.by + g.board + pad;
+    // the board, the base, and where the elbow can swing within its servo's travel (with the base at a corner the
+    // upper arm folds out past the board's edge)
+    const pts = [...boardCorners(g), { x: 0, y: -24 }, { x: -24, y: 0 }, { x: 24, y: 0 }], s0 = g.servo?.base;
+    if (s0) for (let v = +s0.min; v <= +s0.max; v += 10) { const a = ((v - +s0.offset) / (+s0.dir * (+s0.ratio || 1))) * D2R; pts.push({ x: g.L1 * Math.cos(a), y: g.L1 * Math.sin(a) }); }
+    const x0 = Math.min(...pts.map((p) => p.x)) - pad, x1 = Math.max(...pts.map((p) => p.x)) + pad, y0 = Math.min(...pts.map((p) => p.y)) - pad, y1 = Math.max(...pts.map((p) => p.y)) + pad;
     const s = Math.min(r.width / (x1 - x0), r.height / (y1 - y0));
     view = { s, w: r.width, h: r.height, ox: (r.width - (x1 - x0) * s) / 2 - x0 * s, oy: (r.height - (y1 - y0) * s) / 2 + y1 * s };
     return true;
@@ -43,7 +47,7 @@ export function createBoard(canvas, { pad = 12 } = {}) {
   }
 
   // Ink layer, in board pixels: u right from the board's left edge, v down from its top edge.
-  const U = (p) => [(p.x - g.bx) * PXMM, (g.by + g.board - p.y) * PXMM];
+  const U = (p) => { const q = toBoard(g, p); return [q.u * PXMM, (g.board - q.v) * PXMM]; };
   function inkSeg(a, b, mode) {
     ictx.globalCompositeOperation = mode === "erase" ? "destination-out" : "source-over";
     ictx.strokeStyle = col?.ink || "#1d1d1f"; ictx.lineCap = ictx.lineJoin = "round";
@@ -72,29 +76,32 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     if (!col) tokens();
     const { s } = view;
     ctx.clearRect(0, 0, view.w, view.h);
-    const [bx, by] = P(g.bx, g.by + g.board), bw = g.boardW * s, bh = g.board * s;
+    const corners = boardCorners(g).map((c) => P(c.x, c.y));
+    const outline = () => { ctx.beginPath(); corners.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
 
     // the board, then where the arm cannot reach shaded grey
-    ctx.fillStyle = col.board; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = col.board; outline(); ctx.fill();
     if (state.showReach) {
-      ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+      ctx.save(); outline(); ctx.clip();
       const [cx, cy] = P(0, 0), R = (g.L1 + g.L2) * s, r = Math.abs(g.L1 - g.L2) * s;
-      ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.arc(cx, cy, R, 0, Math.PI * 2, true);
+      ctx.beginPath(); ctx.rect(0, 0, view.w, view.h); ctx.arc(cx, cy, R, 0, Math.PI * 2, true);
       if (r > 0) { ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, Math.PI * 2); }
       ctx.fillStyle = col.reach; ctx.fill("evenodd");
       const [dx, dy] = P(g.cx - g.half, g.cy + g.half);
       ctx.setLineDash([4, 4]); ctx.strokeStyle = col.mount; ctx.lineWidth = 1; ctx.strokeRect(dx, dy, 2 * g.half * s, 2 * g.half * s); ctx.setLineDash([]);
       // name the grey where it shows: the top of the board, out past the arm's reach
-      if (!g.corner && g.L1 + g.L2 < g.by + g.board) {
-        const [lx, ly] = P(0, g.by + g.board); ctx.fillStyle = col.text3; ctx.font = `12px ${col.font}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
-        ctx.fillText("Out of reach", lx, ly + 10);
+      const top = { x: g.cx, y: Math.max(...boardCorners(g).map((c) => c.y)) };
+      if (Math.hypot(top.x, top.y) > g.L1 + g.L2) {
+        const [lx, ly] = P(top.x, top.y); ctx.fillStyle = col.text3; ctx.font = `12px ${col.font}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText("Out of reach", lx, ly + (g.bang ? 28 : 10));
       }
       ctx.restore();
     }
-    ctx.strokeStyle = col.edge; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-    // the board's real size, so "to scale" can be read
-    ctx.fillStyle = col.text3; ctx.font = `11px ${col.font}`; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-    ctx.fillText(`${g.boardW} × ${g.board} mm`, bx + 8, by + bh - 6);
+    ctx.strokeStyle = col.edge; ctx.lineWidth = 1; outline(); ctx.stroke();
+    // the board's real size, so "to scale" can be read: inside its bottom-left corner, or by the diamond's right point
+    ctx.fillStyle = col.text3; ctx.font = `11px ${col.font}`;
+    if (g.bang) { const [rx, ry] = corners[1]; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(`${g.boardW} × ${g.board} mm`, rx - 12, ry); }
+    else { const [lx, ly] = corners[0]; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(`${g.boardW} × ${g.board} mm`, lx + 8, ly - 6); }
 
     // what the plan will draw, faint, under the ink
     const tp = state.toolpath;
@@ -106,7 +113,9 @@ export function createBoard(canvas, { pad = 12 } = {}) {
       }
       ctx.stroke();
     }
-    ctx.drawImage(ink, bx, by, bw, bh);
+    // the ink, in the board's own frame: turned with the board
+    const [ox, oy] = P(g.bo.x, g.bo.y);
+    ctx.save(); ctx.translate(ox, oy); ctx.rotate(-(g.bang || 0)); ctx.drawImage(ink, 0, -g.board * s, g.boardW * s, g.board * s); ctx.restore();
 
     // waypoints the arm cannot reach
     if (state.unreachable?.length) {

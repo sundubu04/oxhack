@@ -1,4 +1,4 @@
-// Generated from app/arm.config.json by app/tools/arduino-export.mjs (2026-10-24 23:42).
+// Generated from app/arm.config.json by app/tools/arduino-export.mjs (2026-10-24 23:58).
 // Change the config (or the app's Arm setup page) and run "./firmware/arm config", not this file.
 // Angles are centi-degrees of servo travel (0 to 18000) unless they say deg.
 #pragma once
@@ -11,11 +11,11 @@ const int16_t LIMIT_MAX[3] = {18000, 18000, 18000};
 const int16_t PARK[3] = {16000, 1000, 4000};       // beside the drawing, pen lifted
 const int16_t TILT_DRAW = 400, TILT_LIFT = 4000, TILT_ERASE = 15000;
 // geometry for moving the pen to a board point: servo deg = OFFSET + DIR * RATIO * joint deg
-const float OFFSET[3] = {-15, 175, 90}, DIR[3] = {1, 1, 1}, RATIO[3] = {1, 1, 1};
+const float OFFSET[3] = {-60, 175, 90}, DIR[3] = {1, 1, 1}, RATIO[3] = {1, 1, 1};
 const float L1 = 160, L2 = 200, NIB_ALONG = 0.00, NIB_SIDE = 0.00;   // mm; the nib sits NIB_ALONG past the forearm's tip and NIB_SIDE across it
 // a servo told to stop dead overshoots: moves the board makes itself (park, jog, the motor test) speed up and slow
 // down at SERVO_ACCEL (deg/s²), the motor test's pen at PEN_ACCEL (mm/s²), and a stop eases out over STOP_MS
 const float SERVO_ACCEL = 1500, PEN_ACCEL = 1000;
 const uint16_t STOP_MS = 120;
 const bool ELBOW_UP = false;
-const float BOARD_CX = 155.6, BOARD_CY = 155.6;   // mm from the base: the middle of the drawing area
+const float BOARD_CX = 0.0, BOARD_CY = 220.0;   // mm from the base: the middle of the drawing area

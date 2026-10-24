@@ -2,7 +2,7 @@
 // edit, or a game. Every change is planned as the difference from what is already on the board (optimize.js):
 // only what changed is wiped and drawn, in the order the sim times as fastest. The sim plays it to scale through
 // the servos' limits, and the real arm gets the same commands.
-import { toAngles, toolPoint } from "./ik.js";
+import { toAngles, toolPoint, onBoard } from "./ik.js";
 import { parseSVG } from "./svg.js";
 import { plan } from "./pathplan.js";
 import { planChange } from "./optimize.js";
@@ -13,7 +13,7 @@ import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle } from "./co
 import { makeJob, Sim, homePose } from "./sim.js";
 import { bestZeros, boardShare } from "./zeros.js";
 import { createBoard } from "./board.js";
-import { nibHeight } from "./pen.js";
+import { penTilt } from "./pen.js";
 import { emptyScene, sceneStrokes, applyActions, describeGame, cellName, boxMm, sceneSVG, FULL } from "./scene.js";
 import { parseCell } from "./games/tictactoe.js";
 
@@ -507,8 +507,8 @@ function draw3d() {
   if (!v3) return;
   v3.update(sim.j, inkDirty); inkDirty = false;
   const pg = g.pen, mode = sim.mode(), end = mode === "erase" ? "eraser" : "nib";
-  const hNib = mode === "erase" ? nibHeight(pg, -sim.j.tilt) : nibHeight(pg, sim.j.tilt);
-  $("#read3d").textContent = `Tilt ${sim.j.tilt.toFixed(0)}° from flat · ${end} ${hNib <= 0.5 ? "on the board" : `${hNib.toFixed(1)} mm off the board`} · shaft ${pg.height.toFixed(0)} mm up · pen meets the board at ${pg.beta.toFixed(0)}°`;
+  const lean = Math.sin(penTilt(g, sim.j.tilt) * Math.PI / 180) * pg.half, hNib = Math.max(0, pg.height + (mode === "erase" ? -lean : lean));
+  $("#read3d").textContent = `Pen servo ${servoAngle("tilt", sim.j.tilt, g).toFixed(0)}° · ${end} ${hNib <= 0.5 ? "on the board" : `${hNib.toFixed(1)} mm off the board`} · shaft ${pg.height.toFixed(0)} mm up · pen meets the board at ${pg.beta.toFixed(0)}°`;
 }
 function setView(v) {
   view = v;
@@ -623,7 +623,7 @@ function showPage(page) {
 // ---------- arm setup ----------
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
-  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom-left corner"], ["below", "Below the middle"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
+  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
   ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["penServo.draw", "Pen servo, nib down", "°"], ["penServo.lift", "Pen servo, lifted", "°"], ["penServo.erase", "Pen servo, eraser down", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
@@ -661,8 +661,8 @@ function renderSetup() {
   setupBoard.setGeom(gg); setupSim.setGeom(gg); if (!setupSim.manual) setupSim.reset();
   clockStrokes ??= parseSVG(clockSVG(now()));
   const p = plan(clockStrokes, gg, { half: gg.half, leadIn: gg.leadIn }), an = toAngles(p.toolpath, gg), job = makeJob(p.toolpath, an, gg);
-  const drawn = liveStrokes().flatMap((st) => st.map((q, i) => ({ x: q.x, y: q.y, pen: i ? 1 : 0 })));
-  setupBoard.render({ toolpath: drawn.length ? drawn : p.toolpath, joints: setupSim.j, mode: null, showReach: true, hover: setupHover });
+  setupBoard.render({ toolpath: setupInk ? null : p.toolpath, joints: setupSim.j, mode: setupSim.mode(), showReach: true, hover: setupHover });
+  if (v3s && setupView === "3d") { v3s.setGeom(gg, c.pen); v3s.update(setupSim.j, setupInkDirty); setupInkDirty = false; }
   let ok = 0, n = 0, worst = 1;
   const { cx, cy } = gg;
   for (let i = 0; i <= 20; i++) for (let k = 0; k <= 20; k++) {
@@ -835,7 +835,7 @@ function wire() {
 
   jogOn($("#board"), () => board, () => sim, (h) => { hover = h; }, () => !playing && !sending, () => { draw(); syncLive(true); kick(); if (sim.manual) arm.jog(sim.manual, g); },
     (p) => { const c = cellAt(p); if (c < 0 || thinking) return false; send(cap(cellName(c))); return true; });
-  jogOn($("#setup-board"), () => setupBoard, () => setupSim, (h) => { setupHover = h; }, () => true, () => { renderSetup(); kickSetup(); });
+  jogOn($("#setup-board"), () => setupBoard, () => setupSim, (h) => { setupHover = h; }, () => false, () => renderSetup());
 
   $("#setup").addEventListener("input", () => { setupSim.manual = null; renderSetup(); $("#save-note").textContent = dirty() ? "Not saved yet" : ""; });
   $("#save").addEventListener("click", save);
@@ -853,7 +853,7 @@ function wire() {
 // ---------- live arm (Arm setup) ----------
 // The real arm through the server: three sliders in servo degrees, calibration copied from them into the form,
 // and drawing on the preview board with the arm following. Strokes drawn by hand are kept, to draw again planned.
-let sketch = [], liveDraw = false, sliding = 0, liveTimer = 0;
+let sketch = [], sliding = 0, liveTimer = 0;
 const sliders = () => [0, 1, 2].map((j) => +$(`[data-servo="${j}"]`).value);
 function setSliders(a) { a.forEach((v, j) => { $(`[data-servo="${j}"]`).value = v; $(`[data-servo-n="${j}"]`).value = (+v).toFixed(1); }); }
 // servo degrees -> the pose the preview shows, through the calibration on the form
@@ -868,6 +868,7 @@ function slide(j, v) {
   clearTimeout(sliding); sliding = setTimeout(() => { sliding = 0; }, 1500);   // the server's echo doesn't move a slider in use
 }
 function renderLive() {
+  $("#setup-hint").textContent = `${TOOL_HINT[setupTool](readSetup().penServo)}${arm.connected() ? ". The arm does it too" : ""}`;
   const s = arm.state(); if (!s) return;
   const sel = $("#live-port"), list = [...new Set([...(s.port ? [s.port] : []), ...(s.ports || [])])];
   if (sel.dataset.list !== list.join()) { sel.innerHTML = list.length ? list.map((p) => `<option>${esc(p)}</option>`).join("") : `<option value="">No Arduino plugged in</option>`; sel.dataset.list = list.join(); }
@@ -876,8 +877,8 @@ function renderLive() {
   status($("#live-status"), on ? (s.job?.state === "running" ? "Drawing" : "Connected") : s.open ? "Other sketch" : "Not connected", { mark: on ? "dot" : "", tone: s.open && !on ? "warn" : "" });
   $("#live-connect").textContent = s.open ? "Disconnect" : "Connect";
   $$("#live-servos input, #live-home, #live-stop").forEach((el) => { el.disabled = !on; });
-  $("#sketch-draw").disabled = !on || !sketch.length || s.job?.state === "running"; $("#sketch-clear").disabled = !sketch.length;
-  if (on && s.sent && !sliding) { setSliders(s.sent); if (!liveDraw && !setupSim.manual) showServos(s.sent); }
+  $("#sketch-draw").disabled = !on || !sketch.length || s.job?.state === "running"; $("#sketch-clear").disabled = !sketch.length && !setupInk;
+  if (on && s.sent && !sliding) { setSliders(s.sent); if (!setupSim.manual) showServos(s.sent); }
   if (!on) $("#live-where").textContent = s.open ? "The board isn't running the Clockedin firmware: upload firmware/clockedin" : "Connect to move the arm";
   $("#live-log").textContent = [s.error, ...(s.log || []).slice(-8)].filter(Boolean).join("\n");
   syncSend();
@@ -894,23 +895,72 @@ function calibrate(what) {
   if (what === "draw" || what === "lift" || what === "erase") set(`penServo.${what}`, p);
   $("#setup").dispatchEvent(new Event("input")); toast("Copied: Save to keep it");
 }
-// drawing on the preview board with the real arm: pen down while the pointer is down, lifted when it comes up
-function liveBoard() {
-  const cv = $("#setup-board"); let stroke = null;
-  const at = (e) => setupBoard.toWorld(e.clientX, e.clientY);
-  cv.addEventListener("pointerdown", (e) => { if (!liveDraw || !arm.connected()) return; const p = at(e); stroke = [p]; arm.point(p.x, p.y, "draw", true); });
-  cv.addEventListener("pointermove", (e) => {
-    if (!stroke) return; const p = at(e), q = stroke.at(-1);
-    if (Math.hypot(p.x - q.x, p.y - q.y) < 1) return;   // 1 mm is the finest a marker shows
-    stroke.push(p); arm.point(p.x, p.y, "draw"); renderSetup();
-  });
-  const up = () => { if (!stroke) return; const q = stroke.at(-1); arm.point(q.x, q.y, "lift"); if (stroke.length > 1) sketch.push(stroke); stroke = null; renderSetup(); renderLive(); };
-  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
-  return () => (stroke ? [...sketch, stroke] : sketch);
+// Pressing on the board, flat or in 3D, uses the tool chosen above it. Write puts the nib down (the pen servo's
+// nib-down angle, 4 deg on the build), Erase the eraser (150 deg), Move only travels, pen lifted (40 deg); dragging
+// carries on, letting go lifts the pen where it is. A press somewhere new travels there lifted first and puts the
+// pen down on arrival, as the real arm does when it is connected. The sim lays and wipes ink as it goes; what is
+// written by hand is kept, to draw again planned.
+let setupTool = "draw", stroke = null, lowerAt = null, setupInk = false, setupInkDirty = true, v3s = null, setupView = "board";
+const TOOL_HINT = { draw: (ps) => `Press to put the nib down (${ps.draw}°), drag to write, let go to lift it (${ps.lift}°)`, erase: (ps) => `Press to put the eraser down (${ps.erase}°), drag to wipe, let go to lift it (${ps.lift}°)`, lift: (ps) => `Press and drag to move the pen, lifted (${ps.lift}°)` };
+// the base and elbow that put this tool's end on p, or null when the arm can't get there
+function poseAt(p, tool) {
+  const r = toAngles([{ x: p.x, y: p.y, pen: tool === "lift" ? 0 : 1, tool }], setupSim.g), a = r.path[0];
+  return a.out_of_reach || r.outOfRange ? null : { base: a.base, elbow: a.elbow };
 }
-let liveStrokes = () => sketch;
+function pressAt(p) {
+  const a = poseAt(p, setupTool); if (!a) return false;
+  stroke = { tool: setupTool, pts: [p] };
+  setupSim.manual = { ...a, tilt: setupSim.g.tilt.lift }; lowerAt = setupTool === "lift" ? null : setupTool;
+  if (arm.connected()) arm.point(p.x, p.y, setupTool, setupTool !== "lift");
+  kickSetup(); renderLive(); return true;
+}
+function dragTo(p) {
+  if (!stroke) return; const q = stroke.pts.at(-1);
+  if (Math.hypot(p.x - q.x, p.y - q.y) < 1) return;   // 1 mm is the finest a marker shows
+  const a = poseAt(p, stroke.tool); if (!a) return;
+  stroke.pts.push(p); setupSim.manual = { ...a, tilt: setupSim.manual?.tilt ?? setupSim.g.tilt.lift };
+  if (arm.connected()) arm.point(p.x, p.y, stroke.tool);
+  kickSetup();
+}
+function releasePen() {
+  if (!stroke) return; lowerAt = null;
+  if (setupSim.manual) setupSim.manual = { ...setupSim.manual, tilt: setupSim.g.tilt.lift };
+  if (arm.connected()) arm.servos(undefined, undefined, readSetup().penServo.lift);   // lift it where it is
+  if (stroke.tool === "draw" && stroke.pts.length > 1) sketch.push(stroke.pts);
+  stroke = null; kickSetup(); renderLive();
+}
+function onSetupInk(a, b, mode) { setupBoard.inkSeg(a, b, mode); setupInk = setupInkDirty = true; }
+// the pen goes down once the sim's arm has reached the press
+function lowerIfThere() {
+  const m = setupSim.manual;
+  if (lowerAt && m && Math.abs(setupSim.j.base - m.base) < 0.6 && Math.abs(setupSim.j.elbow - m.elbow) < 0.6) {
+    const T = setupSim.g.tilt; setupSim.manual = { ...m, tilt: lowerAt === "erase" ? T.erase : T.draw }; lowerAt = null;
+  }
+}
+function setTool(t) {
+  setupTool = t; $$("#setup-tools button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t))); renderLive();
+}
+async function setSetupView(v) {
+  setupView = v; $$("#setup-views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.sview === v)));
+  $("#setup-board").hidden = v !== "board"; $("#setup-3d").hidden = v !== "3d";
+  if (v === "3d" && !v3s) {
+    try {
+      const { createView3d } = await import("./view3d.js"); v3s = createView3d($("#setup-3d"), setupBoard.ink);
+      v3s.press({ accept: (p) => onBoard(setupSim.g, p) && !!poseAt(p, setupTool), down: pressAt, move: dragTo, up: releasePen });
+    } catch (e) { toast(`The 3D view needs WebGL: ${e.message}`, "circle-alert"); return setSetupView("board"); }
+  }
+  v3s?.show(v === "3d"); setupInkDirty = true; renderSetup();
+}
+function liveBoard() {
+  const cv = $("#setup-board"), at = (e) => setupBoard.toWorld(e.clientX, e.clientY);
+  cv.addEventListener("pointerdown", (e) => { if (e.button === 0 && pressAt(at(e))) cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", (e) => dragTo(at(e)));
+  cv.addEventListener("pointerup", releasePen); cv.addEventListener("pointercancel", releasePen);
+}
 function wireLive() {
-  liveStrokes = liveBoard();
+  liveBoard();
+  $("#setup-tools").addEventListener("click", (e) => { const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool); });
+  $("#setup-views").addEventListener("click", (e) => { const b = e.target.closest("[data-sview]"); if (b) setSetupView(b.dataset.sview); });
   $("#live-connect").addEventListener("click", async () => {
     const s = arm.state();
     try { if (s?.open) await arm.disconnect(); else { await arm.connect($("#live-port").value || undefined); toast("Arm connected"); } }
@@ -920,11 +970,7 @@ function wireLive() {
   $("#live-servos").addEventListener("input", (e) => { const j = e.target.dataset.servo ?? e.target.dataset.servoN; if (j != null) slide(+j, e.target.value); });
   $("#live-home").addEventListener("click", () => arm.park().then(() => { setupSim.manual = null; refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
   $("#live-stop").addEventListener("click", () => arm.stop().then(refreshLive));
-  $("#sw-livedraw").addEventListener("click", () => {
-    liveDraw = !liveDraw; $("#sw-livedraw").setAttribute("aria-checked", String(liveDraw));
-    $("#setup-hint").textContent = liveDraw ? "Draw on the board: the arm draws it as you go" : "Drag on the board to move the pen";
-  });
-  $("#sketch-clear").addEventListener("click", () => { sketch = []; renderSetup(); renderLive(); });
+  $("#sketch-clear").addEventListener("click", () => { sketch = []; setupBoard.clearInk(); setupInk = false; setupInkDirty = true; renderSetup(); renderLive(); });
   $("#sketch-draw").addEventListener("click", () => arm.draw(sketch).then(() => { toast("Drawing it again, in the shortest order"); refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
   $$("[data-cal]").forEach((b) => b.addEventListener("click", () => calibrate(b.dataset.cal)));
   // live settings change on the board as they are typed, saved or not
@@ -939,7 +985,8 @@ function kickSetup() {
   if (setupRaf) return; setupTs = performance.now();
   setupRaf = requestAnimationFrame(function f(ts) {
     setupRaf = 0; const dt = Math.min(0.1, (ts - setupTs) / 1000); setupTs = ts;
-    setupSim.advance(dt); renderSetup(); if (settling(setupSim)) { setupTs = ts; setupRaf = requestAnimationFrame(f); }
+    setupSim.advance(dt, onSetupInk); lowerIfThere(); renderSetup();
+    if (settling(setupSim) || lowerAt) { setupTs = ts; setupRaf = requestAnimationFrame(f); }
   });
 }
 

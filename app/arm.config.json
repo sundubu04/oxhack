@@ -63,7 +63,7 @@
     "base": {
       "min": 0,
       "max": 180,
-      "offset": -15,
+      "offset": -60,
       "dir": 1,
       "ratio": 1
     },

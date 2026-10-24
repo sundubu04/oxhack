@@ -3,7 +3,8 @@
 // Same frame as everywhere else: mm, base axis at the origin, x right, y up the board, z out of the board.
 import * as THREE from "three";
 import { OrbitControls } from "../ui/vendor/OrbitControls.js";
-import { fk } from "./ik.js";
+import { fk, fromBoard, toolPoint } from "./ik.js";
+import { penTilt } from "./pen.js";
 
 const D2R = Math.PI / 180;
 
@@ -31,7 +32,7 @@ export function createView3d(host, inkCanvas) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b4b7, 2.1));
   const sun = new THREE.DirectionalLight(0xffffff, 1.7);
   sun.position.set(-260, 520, 700); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;   // no striped acne on the board
   Object.assign(sun.shadow.camera, { left: -450, right: 450, top: 450, bottom: -450, near: 10, far: 2000 });
   scene.add(sun, sun.target);
 
@@ -67,12 +68,12 @@ export function createView3d(host, inkCanvas) {
 
   let g = null, built = "";
   function build(geom) {
-    g = geom; const key = JSON.stringify([g.boardW, g.board, g.bx, g.by, g.L1, g.L2, g.pen.half, g.pen.height]);
+    g = geom; const key = JSON.stringify([g.boardW, g.board, g.bo, g.bang, g.L1, g.L2, g.pen.half, g.pen.height]);
     if (key === built) return; built = key;
-    const mx = g.bx + g.boardW / 2, my = g.by + g.board / 2;   // the board's middle
+    const { x: mx, y: my } = fromBoard(g, g.boardW / 2, g.board / 2);   // the board's middle; it turns with its edge
     paint.width = Math.round(g.boardW * 3); paint.height = Math.round(g.board * 3);
-    board.scale.set(g.boardW, g.board, 1); board.position.set(mx, my, 0);
-    frame.scale.set(g.boardW + 24, g.board + 24, 10); frame.position.set(mx, my, -5.2);
+    board.scale.set(g.boardW, g.board, 1); board.position.set(mx, my, 0); board.rotation.z = g.bang || 0;
+    frame.scale.set(g.boardW + 24, g.board + 24, 10); frame.position.set(mx, my, -5.2); frame.rotation.z = g.bang || 0;
     // the base sits below the board, on a block as tall as the arm's plane
     stand.scale.set(60, 44, g.pen.height - 14); stand.position.set(0, 0, (g.pen.height - 14) / 2 - 10);
     baseServo.scale.set(23, 12.5, 27); elbowServo.scale.set(23, 12.5, 27); tiltServo.scale.set(27, 12.5, 23);
@@ -97,15 +98,17 @@ export function createView3d(host, inkCanvas) {
     at(link1, f.ex / 2, f.ey / 2, z, t1);
     at(elbowServo, f.ex, f.ey, z - 16, t12);
     at(link2, (f.ex + f.px) / 2, (f.ey + f.py) / 2, z, t12);
-    at(tiltServo, f.px - 18 * Math.cos(t12), f.py - 18 * Math.sin(t12), z + 10, t12);
+    at(tiltServo, f.px - 18 * Math.cos(t12), f.py - 18 * Math.sin(t12), z + 14, t12);
     // ball caster a little back along the forearm, clear of the pen's swing
     const bx = f.px - 24 * Math.cos(t12), by = f.py - 24 * Math.sin(t12);
     post.scale.set(1, z - 12, 1); post.position.set(bx, by, (z + 12) / 2); post.rotation.set(Math.PI / 2, 0, 0);
     ball.position.set(bx, by, 6);
-    // the pen lies across the forearm; the tilt turns it about the forearm, nib down to draw
-    const side = new THREE.Vector3(-Math.sin(t12), Math.cos(t12), 0), out = new THREE.Vector3(0, 0, 1);
-    const tau = j.tilt * D2R, nibDir = side.clone().multiplyScalar(Math.cos(tau)).addScaledVector(out, Math.sin(tau)).normalize();
-    pen.position.set(f.px, f.py, z);
+    // the pen swings about a shaft over the middle of where its nib and its eraser touch (as measured), nib down to
+    // draw and eraser down to erase
+    const N = toolPoint(t1, j.elbow * D2R, g, "draw"), E = toolPoint(t1, j.elbow * D2R, g, "erase"), gap = Math.hypot(E.x - N.x, E.y - N.y);
+    const along = gap > 1 ? new THREE.Vector3((E.x - N.x) / gap, (E.y - N.y) / gap, 0) : new THREE.Vector3(Math.sin(t12), -Math.cos(t12), 0), out = new THREE.Vector3(0, 0, 1);
+    const tau = penTilt(g, j.tilt) * D2R, nibDir = along.clone().multiplyScalar(-Math.cos(tau)).addScaledVector(out, Math.sin(tau)).normalize();
+    pen.position.set((N.x + E.x) / 2, (N.y + E.y) / 2, z);
     pen.quaternion.setFromUnitVectors(qUp, nibDir.clone().negate());   // the group's -y end is the nib
   }
 
@@ -118,8 +121,8 @@ export function createView3d(host, inkCanvas) {
   // camera views: the whole board from three-quarters, square on, from the side, or along the forearm
   let lastJ = null;
   function frameView(kind, j = lastJ) {
-    if (!g) return;
-    const cx = g.bx + g.boardW / 2, cy = g.by + g.board / 2, span = Math.max(g.board, g.boardW);   // the board's middle
+    if (!g) return; framed = kind;
+    const { x: cx, y: cy } = fromBoard(g, g.boardW / 2, g.board / 2), span = Math.max(g.board, g.boardW) * (g.bang ? Math.SQRT2 : 1);   // the board's middle
     if (kind === "along" && j) {
       // from just past the forearm's tip, looking back along it, with the board as the floor: the pen's swing
       // is square to the view, like the side view in the pen mount study
@@ -130,7 +133,8 @@ export function createView3d(host, inkCanvas) {
     } else {
       orbit(new THREE.Vector3(0, 1, 0));
       controls.target.set(cx, cy - 20, 40);
-      const d = span * 2.6;
+      // far enough back for the board to fit the narrower of the view's two angles (a tall panel is narrow)
+      const fov = Math.min(camera.fov, (2 * Math.atan(Math.tan((camera.fov * D2R) / 2) * camera.aspect)) / D2R), d = (span * 0.78) / Math.tan((fov * D2R) / 2);
       if (kind === "front") camera.position.set(cx, cy - 20, d);
       else if (kind === "side") camera.position.set(cx + d, cy - 20, 90);
       else camera.position.set(cx + d * 0.5, cy + d * 0.12, d * 0.85);
@@ -139,12 +143,34 @@ export function createView3d(host, inkCanvas) {
   }
 
   let raf = 0, visible = false;
+  let framed = "three-quarter";
   function size() {
     const r = host.getBoundingClientRect(); if (!r.width || !r.height) return;
-    renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+    const was = camera.aspect; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+    if (g && Math.abs(was - camera.aspect) > 0.05 && framed !== "along") frameView(framed);   // a new shape: frame the board again
   }
   new ResizeObserver(size).observe(host);
   function loop() { raf = 0; if (!visible) return; controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(loop); }
+
+  // Pressing on the board itself hands the point (mm, in the arm's frame) to press handlers instead of turning the
+  // view: { accept(p), down(p), move(p), up() }. Anywhere else, or the right button, still orbits.
+  const ray = new THREE.Raycaster(), surface = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), el = renderer.domElement;
+  let presser = null, pressing = false;
+  function pick(e) {
+    const r = el.getBoundingClientRect(), hit = new THREE.Vector3();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+    return ray.ray.intersectPlane(surface, hit) ? { x: hit.x, y: hit.y } : null;
+  }
+  el.addEventListener("pointerdown", (e) => {
+    if (!presser || e.button !== 0) return; const p = pick(e); if (!p || !presser.accept(p)) return;
+    e.stopImmediatePropagation(); controls.enabled = false; pressing = true; el.setPointerCapture(e.pointerId); presser.down(p);
+  }, { capture: true });
+  el.addEventListener("pointermove", (e) => {
+    if (pressing) { const p = pick(e); if (p) presser.move(p); }
+    else if (presser) el.style.cursor = (() => { const p = pick(e); return p && presser.accept(p) ? "crosshair" : ""; })();
+  });
+  const release = () => { if (!pressing) return; pressing = false; controls.enabled = true; presser.up(); };
+  el.addEventListener("pointerup", release); el.addEventListener("pointercancel", release);
 
   return {
     // geom from config.geomFrom(), plus the pen's own measurements for drawing it
@@ -152,5 +178,6 @@ export function createView3d(host, inkCanvas) {
     update(j, inkChanged) { lastJ = j; place(j); if (inkChanged) paintBoard(); },
     show(on) { visible = on; if (on) { size(); paintBoard(); if (!raf) raf = requestAnimationFrame(loop); } },
     view: frameView,
+    press(handlers) { presser = handlers; },
   };
 }

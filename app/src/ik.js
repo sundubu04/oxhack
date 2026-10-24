@@ -41,6 +41,13 @@ export const GEOM = {
   L1: 160, L2: 200, standoff: 40, board: 350, elbowUp: false, pressure: 60,
   tilt: { draw: -14, lift: -2, erase: 16 },
 };
+// The board in the arm's frame: u along its bottom edge from its corner `bo`, v up its side (config.js sets bo and
+// bang, the edge's angle from x; 45 deg when it hangs as a diamond over the base).
+export function toBoard(g, p) { const c = Math.cos(g.bang || 0), s = Math.sin(g.bang || 0), dx = p.x - g.bo.x, dy = p.y - g.bo.y; return { u: dx * c + dy * s, v: dy * c - dx * s }; }
+export function fromBoard(g, u, v) { const c = Math.cos(g.bang || 0), s = Math.sin(g.bang || 0); return { x: g.bo.x + u * c - v * s, y: g.bo.y + u * s + v * c }; }
+export const boardCorners = (g) => [[0, 0], [g.boardW, 0], [g.boardW, g.board], [0, g.board]].map(([u, v]) => fromBoard(g, u, v));
+export function onBoard(g, p) { const q = toBoard(g, p); return q.u >= -1e-6 && q.u <= g.boardW + 1e-6 && q.v >= -1e-6 && q.v <= g.board + 1e-6; }
+
 // where the drawing's middle sits, in arm coords (config.js works it out for a base below the board or at its corner)
 export function drawCentre(g = GEOM) { return { cx: g.cx ?? 0, cy: g.cy ?? g.standoff + g.board / 2 }; }
 

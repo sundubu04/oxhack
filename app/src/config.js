@@ -1,4 +1,4 @@
-import { penGeometry } from "./pen.js";
+import { penGeometry, measuredPen } from "./pen.js";
 
 // The arm's real dimensions live in app/arm.config.json, the one place to change them. The Arm setup page
 // edits that file through the dev server; everything else reads the flat geometry that geomFrom() makes.
@@ -7,9 +7,9 @@ export const DEFAULT_CONFIG = {
   name: "Clockedin arm",
   measured: false,
   links: { L1: 160, L2: 200 },   // the build: upper arm 16 cm, forearm 20 cm
-  // base "corner": the base shaft sits at the board's bottom-left corner and the arm reaches in along the
-  // diagonal, the drawing's middle `drawing.reach` mm from the base (the build, 25 Oct). base "below": centred
-  // `standoff` mm below the board's bottom edge, the drawing in the board's middle.
+  // base "corner": the board hangs as a diamond with the base shaft at its bottom corner, and the arm reaches
+  // straight up through it, the drawing's middle `drawing.reach` mm above the base (the build, 25 Oct; the jog
+  // sketch's frame). base "below": centred `standoff` mm below a square board's bottom edge, the drawing in its middle.
   board: { width: 350, height: 350, standoff: 40, base: "corner" },
   drawing: { size: 160, reach: 220 },
   elbow: "down",   // the build's elbow sits to the left of the line from base to pen ("up" would put it on the right)
@@ -34,11 +34,10 @@ export const DEFAULT_CONFIG = {
   servos: {
     model: "TowerPro SG92R", speed: 600, accel: 1500, resolution: 1, backlash: 0, compensate: true,
     // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
-    // zero offsets, servo deg = offset + joint deg (joints from the board's bottom edge, the elbow from the upper
-    // arm, + anticlockwise), from the jog sketch: base servo 0 points 60 deg round from its +x, which is the board's
-    // diagonal turned back 45 deg, so 15 deg in the board's frame; elbow servo 175 with the links straight.
-    // Calibrate live in Arm setup (Live). Best zeros there is for mounting horns afresh.
-    base: { min: 0, max: 180, offset: -15, dir: 1, ratio: 1 },
+    // zero offsets, servo deg = offset + joint deg (the base from +x, the elbow from the upper arm, + anticlockwise),
+    // from the jog sketch: base servo 0 points 60 deg round from +x; elbow servo 175 with the links straight.
+    // Calibrate live in Arm setup (Live arm). Best zeros there is for mounting horns afresh.
+    base: { min: 0, max: 180, offset: -60, dir: 1, ratio: 1 },
     elbow: { min: 0, max: 180, offset: 175, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
@@ -62,8 +61,9 @@ export function withDefaults(cfg = {}, def = DEFAULT_CONFIG) {
   return out;
 }
 
-// The flat geometry the planner, IK and sim use. Base axis at the origin, x along the board's bottom edge, y up
-// it. The board's bottom-left corner is (bx, by), the drawing's middle (cx, cy).
+// The flat geometry the planner, IK and sim use. Base axis at the origin, x right, y up (towards the drawing).
+// The board's own corner is `bo`, its bottom edge at `bang` radians from x (45 deg for the diamond); the
+// drawing's middle is (cx, cy), upright in the arm's frame.
 export function geomFrom(cfg) {
   const c = withDefaults(cfg), W = +c.board.width, H = +c.board.height, corner = c.board.base === "corner";
   const reach = +c.drawing.reach || +c.board.standoff + H / 2;
@@ -71,13 +71,15 @@ export function geomFrom(cfg) {
   return {
     L1: +c.links.L1, L2: +c.links.L2,
     standoff: +c.board.standoff, board: H, boardW: W, corner,
-    bx: corner ? 0 : -W / 2, by: corner ? 0 : +c.board.standoff,
-    cx: corner ? reach / Math.SQRT2 : 0, cy: corner ? reach / Math.SQRT2 : +c.board.standoff + H / 2,
+    bo: corner ? { x: 0, y: 0 } : { x: -W / 2, y: +c.board.standoff }, bang: corner ? Math.PI / 4 : 0,
+    cx: 0, cy: corner ? reach : +c.board.standoff + H / 2,
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     ...penFields(c.pen),
     // what was measured on the arm wins over what pen.js works out from the marker's size
     tilt: { draw: joint("tilt", c.penServo.draw), lift: joint("tilt", c.penServo.lift), erase: joint("tilt", c.penServo.erase), liftErase: joint("tilt", c.penServo.lift) },
     nibAlong: +c.tool.nib.along, nibSide: +c.tool.nib.side, eraserAlong: +c.tool.eraser.along, eraserSide: +c.tool.eraser.side,
+    // the marker's shaft height and swing, from where its two ends were measured to touch (for the 3D view)
+    pen: { ...penGeometry(c.pen), ...measuredPen(+c.pen.length, Math.hypot(+c.tool.eraser.along - +c.tool.nib.along, +c.tool.eraser.side - +c.tool.nib.side)) },
     park: { base: joint("base", c.park.base), elbow: joint("elbow", c.park.elbow) },
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,

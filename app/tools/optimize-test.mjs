@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { geomFrom, withDefaults } from "../src/config.js";
 import { fitStrokes, toBox, orderTour, tourTravel, exactTour, drawPath, plan, erasePlan, resample } from "../src/pathplan.js";
 import { planChange, diffStrokes } from "../src/optimize.js";
-import { toAngles } from "../src/ik.js";
+import { toAngles, toBoard } from "../src/ik.js";
 import { makeJob, Sim } from "../src/sim.js";
 import { SAMPLES, clockSVG } from "../src/sample.js";
 import * as ttt from "../src/games/tictactoe.js";
@@ -85,7 +85,7 @@ console.log("\nreal drawings, pen-up travel (mm) and time to draw (s):"); consol
 // ---- 2. changes: every way to erase, timed, and checked on an ink raster through the sim ----
 const RES = 0.5, W = Math.round(g.boardW / RES), Hh = Math.round(g.board / RES);
 const raster = () => new Uint8Array(W * Hh);
-const cell = (p) => [Math.round((p.x - g.bx) / RES), Math.round((g.by + g.board - p.y) / RES)];
+const cell = (p) => { const q = toBoard(g, p); return [Math.round(q.u / RES), Math.round((g.board - q.v) / RES)]; };
 function stamp(R, a, b, r, v) {
   const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(d / (RES / 2))), rr = Math.ceil(r / RES);
   for (let k = 0; k <= n; k++) {
