@@ -38,6 +38,7 @@
             <div class="cw-titles">
               <h1 class="dl-h1 cw-title" id="title">New drawing</h1>
               <p class="dl-meta" id="subtitle">Type it, say it, or pick a sample</p>
+              <p class="cw-mobile-answer" id="m-answer" hidden></p>
             </div>
             <div class="dl-seg" role="group" aria-label="View" id="views">
               <button type="button" aria-pressed="true" data-view="board">Board</button>
@@ -52,11 +53,11 @@
             <button class="dl-icon-btn" type="button" id="narrate" aria-pressed="false" aria-label="Arm speaks" title="Arm speaks"><i data-icon="volume-x"></i></button>
             <button class="dl-btn dl-btn--primary" type="submit" id="draw">Draw</button>
           </form>
-          <div class="dl-banner" data-tone="stop" role="alert" id="error" hidden><i data-icon="circle-alert"></i><p id="error-text"></p></div>
 
           <div class="cw-stage" id="stage">
             <canvas class="cw-board" id="board" aria-label="The whiteboard and the arm"></canvas>
             <p class="cw-empty" id="empty">The arm draws here first, to scale</p>
+            <p class="cw-empty cw-fail" id="error" role="alert" hidden><i data-icon="circle-alert"></i><span id="error-text"></span><button class="dl-link cw-retry" type="button" id="retry">Try again</button></p>
             <div class="cw-picture" id="picture" hidden></div>
             <div class="cw-angles" id="angles" hidden></div>
           </div>
@@ -78,11 +79,9 @@
         <aside class="cw-inspector" aria-label="Plan and arm">
           <section class="cw-sec">
             <div class="cw-sec__head"><h2 class="dl-kicker">Plan</h2><span class="dl-status" id="plan-status">Nothing yet</span></div>
+            <div class="cw-skel" id="stats-skel" hidden><span class="dl-skeleton cw-skel__n"></span><span class="dl-skeleton cw-skel__l"></span></div>
             <div class="cw-stats" id="stats" hidden>
-              <div class="cw-hero">
-                <div class="dl-stat dl-stat--hero" data-tone="accent"><b class="dl-stat__n" id="st-time">0 s</b><span class="dl-stat__l">to draw</span></div>
-                <span class="dl-status" id="reach-status" data-mark="dot">All in reach</span>
-              </div>
+              <p class="cw-answer"><b class="dl-num cw-answer__n" id="st-time">0 s</b><span>to draw</span><span class="dl-status" id="reach-status" data-mark="dot">All in reach</span></p>
               <div class="cw-kpis">
                 <div class="dl-stat"><b class="dl-stat__n" id="st-ink">0 mm</b><span class="dl-stat__l">ink</span></div>
                 <div class="dl-stat"><b class="dl-stat__n" id="st-travel">0 mm</b><span class="dl-stat__l">pen up</span></div>
@@ -104,7 +103,7 @@
           <section class="cw-sec">
             <div class="cw-sec__head"><h2 class="dl-kicker">Arm</h2><span class="dl-status" id="arm-status">Not connected</span></div>
             <div class="cw-actions">
-              <button class="dl-btn dl-btn--primary cw-send" type="button" id="send"><i data-icon="usb"></i><span>Connect arm</span></button>
+              <button class="dl-btn dl-btn--secondary cw-send" type="button" id="send"><i data-icon="usb"></i><span>Connect arm</span></button>
               <button class="dl-icon-btn" type="button" id="download" aria-label="Download the angles" title="Download the angles" disabled><i data-icon="download"></i></button>
               <button class="dl-icon-btn" type="button" id="copy" aria-label="Copy the angles" title="Copy the angles" disabled><i data-icon="copy"></i></button>
             </div>

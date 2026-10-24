@@ -15,7 +15,7 @@ export const DEFAULT_CONFIG = {
     model: "TowerPro SG92R", speed: 600, resolution: 1,
     base: { min: 0, max: 180, offset: 0, dir: 1 },
     elbow: { min: 0, max: 180, offset: 0, dir: 1 },
-    tilt: { min: -90, max: 90, offset: 0, dir: 1 },
+    tilt: { min: 0, max: 180, offset: 90, dir: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
 };
 

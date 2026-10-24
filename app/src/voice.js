@@ -3,9 +3,9 @@
 
 let playing = null;
 
-export async function say(text) {
+export async function say(text, { voice } = {}) {
   try {
-    const r = await fetch("./api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const r = await fetch("./api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice }) });
     if (r.status === 200) {
       const url = URL.createObjectURL(await r.blob());
       if (playing) playing.pause();

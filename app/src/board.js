@@ -15,7 +15,8 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     const cs = getComputedStyle(canvas);
     const v = (n) => cs.getPropertyValue(n).trim();
     col = { board: v("--dl-bg"), edge: v("--dl-line-ctl"), plan: v("--dl-line-ctl"), ink: v("--dl-ink"), arm: v("--dl-text-2"), joint: v("--dl-bg"),
-      accent: v("--dl-accent"), reach: v("--dl-hover"), stop: v("--dl-stop"), info: v("--dl-info"), mount: v("--dl-line-strong"), text3: v("--dl-text-3") };
+      accent: v("--dl-accent"), reach: v("--dl-hover"), stop: v("--dl-stop"), info: v("--dl-info"), mount: v("--dl-line-strong"), text3: v("--dl-text-3"),
+      font: v("--dl-font") };
   }
 
   function setGeom(geom) {
@@ -73,9 +74,17 @@ export function createBoard(canvas, { pad = 12 } = {}) {
       ctx.fillStyle = col.reach; ctx.fill("evenodd");
       const [dx, dy] = P(-g.half, g.standoff + g.board / 2 + g.half);
       ctx.setLineDash([4, 4]); ctx.strokeStyle = col.mount; ctx.lineWidth = 1; ctx.strokeRect(dx, dy, 2 * g.half * s, 2 * g.half * s); ctx.setLineDash([]);
+      // name the grey where it shows: the top of the board, out past the arm's reach
+      if (g.L1 + g.L2 < g.standoff + g.board) {
+        const [lx, ly] = P(0, g.standoff + g.board); ctx.fillStyle = col.text3; ctx.font = `12px ${col.font}`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText("Out of reach", lx, ly + 10);
+      }
       ctx.restore();
     }
     ctx.strokeStyle = col.edge; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    // the board's real size, so "to scale" can be read
+    ctx.fillStyle = col.text3; ctx.font = `11px ${col.font}`; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillText(`${g.boardW} × ${g.board} mm`, bx + 8, by + bh - 6);
 
     // what the plan will draw, faint, under the ink
     const tp = state.toolpath;
@@ -99,9 +108,10 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     const j = state.joints; if (!j) return;
     const f = fk(j.base * D2R, j.elbow * D2R, g.L1, g.L2), base = P(0, 0), elb = P(f.ex, f.ey), tip = P(f.px, f.py);
     ctx.fillStyle = col.mount; const mw = 36 * s, mh = 14 * s; ctx.beginPath(); ctx.roundRect(base[0] - mw / 2, base[1] - mh / 2, mw, mh, 3); ctx.fill();
-    ctx.globalAlpha = 0.85; ctx.strokeStyle = col.arm; ctx.lineCap = "round"; ctx.lineWidth = Math.max(5, 14 * s);
+    // lighter than the ink, so the drawing stays the darkest thing on the board
+    ctx.globalAlpha = 0.55; ctx.strokeStyle = col.mount; ctx.lineCap = "round"; ctx.lineWidth = Math.max(4, 8 * s);
     ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(elb[0], elb[1]); ctx.lineTo(tip[0], tip[1]); ctx.stroke(); ctx.globalAlpha = 1;
-    for (const p of [base, elb]) { ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(3, 5 * s), 0, Math.PI * 2); ctx.fillStyle = col.joint; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col.arm; ctx.stroke(); }
+    for (const p of [base, elb]) { ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(3, 4 * s), 0, Math.PI * 2); ctx.fillStyle = col.joint; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = col.mount; ctx.stroke(); }
     if (state.mode === "erase") {
       ctx.beginPath(); ctx.arc(tip[0], tip[1], (g.eraserWidth / 2) * s, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = col.info; ctx.stroke();
     } else {

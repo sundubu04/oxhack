@@ -1,18 +1,51 @@
 {
   "name": "Clockwork arm",
   "measured": false,
-  "links": { "L1": 180, "L2": 180 },
-  "board": { "width": 350, "height": 350, "standoff": 40 },
-  "drawing": { "size": 180 },
+  "links": {
+    "L1": 180,
+    "L2": 180
+  },
+  "board": {
+    "width": 350,
+    "height": 350,
+    "standoff": 40
+  },
+  "drawing": {
+    "size": 180
+  },
   "elbow": "up",
-  "pen": { "drawTilt": -14, "liftTilt": -2, "eraseTilt": 16, "pressure": 60, "eraserWidth": 20 },
-  "motion": { "drawSpeed": 150, "travelSpeed": 300 },
+  "pen": {
+    "drawTilt": -14,
+    "liftTilt": -2,
+    "eraseTilt": 16,
+    "pressure": 60,
+    "eraserWidth": 20
+  },
+  "motion": {
+    "drawSpeed": 150,
+    "travelSpeed": 300
+  },
   "servos": {
     "model": "TowerPro SG92R",
     "speed": 600,
     "resolution": 1,
-    "base": { "min": 0, "max": 180, "offset": 0, "dir": 1 },
-    "elbow": { "min": 0, "max": 180, "offset": 0, "dir": 1 },
-    "tilt": { "min": -90, "max": 90, "offset": 0, "dir": 1 }
+    "base": {
+      "min": 0,
+      "max": 180,
+      "offset": 0,
+      "dir": 1
+    },
+    "elbow": {
+      "min": 0,
+      "max": 180,
+      "offset": 0,
+      "dir": 1
+    },
+    "tilt": {
+      "min": 0,
+      "max": 180,
+      "offset": 90,
+      "dir": 1
+    }
   }
 }

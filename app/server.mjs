@@ -15,6 +15,10 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/ja
 // Never served: keys, the server's own code, installed packages.
 const PRIVATE = /(^|\/)(\.env[^/]*|lib\/|node_modules\/|server\.mjs|package-lock\.json)/;
 
+// Spoken lines repeat ("Done.", the time each minute); keep the last few so a repeat costs no credits.
+const spoken = new Map();
+function remember(k, v) { spoken.set(k, v); if (spoken.size > 60) spoken.delete(spoken.keys().next().value); return v; }
+
 const keys = () => ({ gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY") });
 const textModels = () => [...new Set([env("GEMINI_MODEL", "gemini-3.5-flash"), env("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite"), "gemini-3.1-flash-lite", "gemini-3.8-flash"])];
 const imageModels = () => [env("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image"), "gemini-3.1-flash-image"];
@@ -33,7 +37,7 @@ async function api(req, res, path) {
     const k = keys();
     return send(res, 200, {
       gemini: { ready: !!k.gemini, model: textModels()[0] },
-      voice: { provider: k.eleven ? "elevenlabs" : k.gemini ? "gemini" : "browser" },
+      voice: { provider: k.eleven ? "elevenlabs" : k.gemini ? "gemini" : "browser", voice: env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb") },
     });
   }
   if (path === "/api/draw" && req.method === "POST") {
@@ -49,19 +53,24 @@ async function api(req, res, path) {
     } catch (e) { return send(res, 502, { error: e.message }); }
   }
   if (path === "/api/speak" && req.method === "POST") {
-    const { text } = await body(req), k = keys();
+    const { text, voice: asked } = await body(req), k = keys();
     if (!text) return send(res, 400, { error: "Nothing to say" });
+    const voice = /^[A-Za-z0-9]{8,40}$/.test(asked || "") ? asked : env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb");
+    const key = `${k.eleven ? `el:${voice}` : "gm"}:${text}`;
+    if (spoken.has(key)) { const [type, bytes] = spoken.get(key); return send(res, 200, bytes, type); }
     try {
       if (k.eleven) {
-        const voice = env("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb");
-        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+        // ElevenLabs first whenever its key is in .env; Flash is its low-latency model
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_64`, {
           method: "POST", headers: { "xi-api-key": k.eleven, "Content-Type": "application/json", Accept: "audio/mpeg" },
           body: JSON.stringify({ text, model_id: env("ELEVENLABS_MODEL", "eleven_flash_v2_5") }),
+          signal: AbortSignal.timeout(15000),
         });
-        if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
-        return send(res, 200, Buffer.from(await r.arrayBuffer()), "audio/mpeg");
+        if (r.ok) { const [type, bytes] = remember(key, ["audio/mpeg", Buffer.from(await r.arrayBuffer())]); return send(res, 200, bytes, type); }
+        console.log(`  ElevenLabs ${r.status}: ${(await r.text()).slice(0, 160)}`);
+        if (!k.gemini) throw new Error(`ElevenLabs ${r.status}`);
       }
-      if (k.gemini) return send(res, 200, await gemini.speak(text, { key: k.gemini, model: env("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts") }), "audio/wav");
+      if (k.gemini) { const [type, bytes] = remember(key, ["audio/wav", await gemini.speak(text, { key: k.gemini, model: env("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts") })]); return send(res, 200, bytes, type); }
       res.writeHead(204).end();
     } catch (e) { return send(res, 502, { error: e.message }); }
     return;

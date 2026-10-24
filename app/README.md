@@ -31,7 +31,7 @@ Open it in Chrome. The samples (the time now, house, cat, star, flower) work wit
 They live in `app/.env`, which git ignores. The dev server reads them and calls the APIs itself; the browser never sees a key.
 
 - **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). The free tier covers the vector drawings and the Gemini voice. `gemini-2.5-flash` is closed to new keys, so the default is `gemini-3.5-flash`, then `gemini-3.1-flash-lite`, then `gemini-3.8-flash`, each given 20 s before the next is tried. The image route (Nano Banana) needs billing on the key's project.
-- **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart; until then the arm speaks with Gemini's voice.
+- **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart: the arm then speaks with ElevenLabs (Flash model), and Arm setup lets you pick a voice by id and hear it. Until then it speaks with Gemini's voice. Spoken lines are cached, so repeats cost no credits.
 
 ## Using it
 
@@ -49,17 +49,12 @@ drawing size, pen tilts and eraser width, speeds, and each servo's range, zero o
 in **Arm setup** (it saves the file and shows reach, coverage, dexterity and the clock's draw time as you type)
 or by hand. The numbers in it now are the design ones (`"measured": false`); saving from the app marks them measured.
 
-## Serial protocol
+## The arm over USB
 
-115200 baud, one line per waypoint, sent when the arm should set off for it (the sim's schedule):
-
-```
-base,elbow,tilt,pressure      e.g.  57.03,85.02,-14,60     degrees, pressure 0 to 100
-SKIP                          a waypoint out of reach
-HOME                          end of the path: park
-```
-
-When the tilt changes, the firmware should move the tilt servo first and let it settle before moving the arm; the sim assumes that.
+An Arduino Uno or Nano runs `firmware/clockwork` and drives the servos; the app streams timed keyframes and the
+board moves between them on its own 20 ms servo frame. **Connect arm** finds it, dragging the pen on the board moves
+the real arm, **Send to arm** draws the plan while the sim plays alongside, and the same button stops it. Wiring,
+the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](../docs/hardware-link.md).
 
 ## Files
 
@@ -73,6 +68,7 @@ When the tilt changes, the firmware should move the tilt servo first and let it 
 | `src/ik.js` | two-link inverse kinematics and the angle stream |
 | `src/pathplan.js` | fit, order, resample; the eraser's zigzag |
 | `src/svg.js`, `src/vectorize.js` | SVG to polylines; raster to polylines |
-| `src/voice.js`, `src/arm.js` | speech in and out; Web Serial |
+| `src/voice.js`, `src/arm.js` | speech in and out; Web Serial, keyframes and flow control (protocol 2) |
+| `../firmware/clockwork` | the Arduino sketch (Uno or Nano) |
 | `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |

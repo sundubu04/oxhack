@@ -80,14 +80,15 @@ export class Sim {
   }
 
   // Advance by dt seconds in small steps. onInk(from, to, mode) gets every piece of line the tip leaves.
-  advance(dt, onInk) {
+  // hold: the job's clock stands still and only the servos move (settling while paused).
+  advance(dt, onInk, hold = false) {
     const h = 1 / 240;
-    for (let left = dt; left > 1e-9; left -= h) this.step(Math.min(h, left), onInk);
+    for (let left = dt; left > 1e-9; left -= h) this.step(Math.min(h, left), onInk, hold);
   }
 
-  step(dt, onInk) {
+  step(dt, onInk, hold = false) {
     const job = this.job;
-    if (job && !this.manual) {
+    if (job && !this.manual && !hold) {
       this.t = Math.min(this.t + dt, job.total);
       while (this.i < job.n - 1 && job.tGo[this.i + 1] <= this.t) this.i++;
       while (this.ti < job.n - 1 && job.tTilt[this.ti + 1] <= this.t) this.ti++;
