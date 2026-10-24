@@ -1,0 +1,223 @@
+<title>OxHack idea board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* House idea board: one reading column, routes separated by space; one pink accent; a prize-fit matrix. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.page { max-width: 50rem; margin: 0 auto; padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 52px; }
+header { display: grid; gap: 12px; }
+h1 { font: 600 2.25rem/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.3rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+h3 { font: 600 1.0625rem/1.35 var(--display); margin: 0; }
+p { margin: 0; max-width: 66ch; }
+.lede { font-size: 1.125rem; }
+.meta { color: var(--ink-3); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+section { display: grid; gap: 16px; min-width: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code { font: .875em var(--mono); }
+.muted { color: var(--ink-2); }
+.small { font-size: .9375rem; }
+
+/* Top picks */
+.picks { display: grid; gap: 16px; }
+.pick { display: grid; gap: 6px; border-left: 3px solid var(--accent); padding: 2px 0 2px 18px; }
+.pick .top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.pick h3 { color: var(--ink); }
+.pick .id { font: 600 .8125rem/1 var(--display); color: var(--accent); }
+.pick .route { font-size: .8125rem; color: var(--ink-3); }
+
+/* Tables of ideas */
+.rows { overflow-x: auto; }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 14px 8px 0; white-space: nowrap; }
+.rows td { padding: 8px 14px 8px 0; vertical-align: top; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+.rows .id { color: var(--accent); font: 600 .875rem/1.5 var(--display); white-space: nowrap; }
+.rows .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.rows tr[data-lead] td { background: var(--accent-wash); }
+.rows tr[data-lead] td:first-child { border-radius: 6px 0 0 6px; padding-left: 8px; }
+.rows tr[data-lead] td:last-child { border-radius: 0 6px 6px 0; }
+
+/* Prize-fit matrix */
+.matrix { overflow-x: auto; }
+.matrix table { border-collapse: collapse; font-size: .9375rem; min-width: 0; }
+.matrix th { font-weight: 600; color: var(--ink-2); padding: 0 10px 8px; text-align: center; white-space: nowrap; }
+.matrix th.row { text-align: left; padding-left: 0; }
+.matrix td { padding: 7px 10px; text-align: center; }
+.matrix td.row { text-align: left; padding-left: 0; white-space: nowrap; }
+.matrix td.row b { font-weight: 600; }
+.matrix .dot { color: var(--accent); font-size: 1.05rem; line-height: 1; }
+.matrix .half { color: var(--ink-3); }
+.matrix tr + tr td { border-top: 1px solid var(--wash); }
+
+.note { color: var(--ink-2); font-size: .9375rem; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font: 600 .9375rem/1.4 var(--display); }
+.flow span { background: var(--wash); border-radius: 999px; padding: 4px 12px; }
+.flow .arrow { background: none; color: var(--accent); padding: 0; }
+
+.decide { display: grid; gap: 12px; }
+.decide .q { display: grid; gap: 2px; }
+.decide .q b { font: 600 1rem/1.4 var(--display); }
+
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; }
+details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>OxHack idea board</h1>
+    <p class="lede">What to build this weekend. The strongest ideas share one shape — a phone-vision game that collects a time-stamped dataset and turns it into a prediction — which lines up the main theme and the best sponsor prizes at once.</p>
+    <p class="meta"><span>24 Oct 2026</span><span>Theme: Time</span><span>Science-fair demo, 4–5 min</span></p>
+  </header>
+
+  <section aria-labelledby="h-frame">
+    <h2 id="h-frame">The one shape that wins across tracks</h2>
+    <div class="flow" aria-label="vision then time-stamped data then prediction then a decision">
+      <span>point the camera</span><span class="arrow">→</span><span>time-stamped data</span><span class="arrow">→</span><span>a prediction</span><span class="arrow">→</span><span>a decision / the next move</span>
+    </div>
+    <p class="note">The <b>vision</b> is Gemini (reads the world) or Presage (reads your pulse). The <b>data</b> grows over the event, so it is a time-series — the native fit for Snowflake / Tiger Data. The <b>prediction</b> and decision are HRT's brief. And because the data is time-stamped and things change over time, it is the <b>Time</b> theme. One build, many prizes.</p>
+  </section>
+
+  <section aria-labelledby="h-picks">
+    <h2 id="h-picks">Top picks</h2>
+    <div class="picks">
+      <div class="pick">
+        <div class="top"><span class="id">N1</span><h3>Chronocache</h3><span class="route">real-life Easter eggs · Gemini</span></div>
+        <p>Geocaching where <b>the camera is the lock and time is the gate.</b> Hide an egg pinned to a real view; set it to open now, at a future date (a capsule), only in a window, or on a schedule. Every hide and find trains a "where and when to look next" forecast. Demo: hide one on the table with a 2-minute unlock, a judge finds it live.</p>
+      </div>
+      <div class="pick">
+        <div class="top"><span class="id">G1 / G2</span><h3>SpawnCast / PriceDex</h3><span class="route">catch-and-collect · Gemini</span></div>
+        <p>Pokémon-Go-style: photograph real things into a dex; the time-stamped sightings train a model that <b>predicts the next spawns</b>, which players chase. <b>PriceDex</b> is the HRT-sharp twin — snap price tags, build crowd-sourced inflation data with a price forecast ("changes in value over time" is the organisers' own example).</p>
+      </div>
+      <div class="pick">
+        <div class="top"><span class="id">N2</span><h3>Time Capsule</h3><span class="route">real-life Easter eggs · Gemini + ElevenLabs</span></div>
+        <p>The warmer, simpler cut: pin a message, photo or voice note to a real spot that stays locked until a future time. "Leave something for whoever stands here in six months." Pure Time, and genuinely moving — an easy, memorable demo.</p>
+      </div>
+      <div class="pick">
+        <div class="top"><span class="id">G4</span><h3>Calm Catch</h3><span class="route">biometric · Presage</span></div>
+        <p>The biggest instant wow at a table: a creature you catch only by <b>lowering your own heart rate</b>, read from your face by Presage. Judges play it with their pulse. Thinner dataset and a slower 20-second reading, but unforgettable.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-matrix">
+    <h2 id="h-matrix">Which prizes each stacks</h2>
+    <div class="matrix">
+      <table>
+        <caption class="muted small" style="text-align:left;margin-bottom:10px">● strong fit · <span class="half">·</span> partial. Main (Time) and HRT are the big two; the rest are sponsor prizes.</caption>
+        <thead>
+          <tr><th class="row">Idea</th><th>Time</th><th>HRT</th><th>Gemini</th><th>Presage</th><th>Data store</th><th>Eleven&shy;Labs</th><th>Delta</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="row"><b>N1 Chronocache</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td></tr>
+          <tr><td class="row"><b>G2 PriceDex</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td></tr>
+          <tr><td class="row"><b>G1 SpawnCast</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td></tr>
+          <tr><td class="row"><b>N2 Time Capsule</b></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td></tr>
+          <tr><td class="row"><b>G4 Calm Catch</b></td><td><span class="half">·</span></td><td><span class="half">·</span></td><td></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="half">·</span></td><td><span class="half">·</span></td></tr>
+          <tr><td class="row"><b>PHP Time to Safe</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-eggs">
+    <h2 id="h-eggs">Route A — real-life Easter eggs (neo-geocache)</h2>
+    <p class="note">The camera recognises a real view to unlock an egg; GPS only gets you close. Hides, finds and time rules make a spatiotemporal log.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>#</th><th>Idea</th><th>Hook</th><th class="n">/25</th></tr></thead>
+        <tbody>
+          <tr data-lead><td class="id">N1</td><td><b>Chronocache</b></td><td>Vision lock + time gate + a forecast of the next finds</td><td class="n">22</td></tr>
+          <tr><td class="id">N2</td><td>Time Capsule</td><td>Messages that unlock at a future time</td><td class="n">21</td></tr>
+          <tr><td class="id">N6</td><td>Venue hunt</td><td>A time-boxed egg trail around this room — most demoable</td><td class="n">20</td></tr>
+          <tr><td class="id">N4</td><td>Data-bounty eggs</td><td>Eggs reward collecting a specific datum — directed citizen science</td><td class="n">20</td></tr>
+          <tr><td class="id">N3</td><td>Vision dead-drop</td><td>No coordinates; the clue is a photo; eggs self-destruct</td><td class="n">19</td></tr>
+          <tr><td class="id">N7</td><td>Predictive hiding</td><td>The app forecasts a cache's findability and suggests spots</td><td class="n">19</td></tr>
+          <tr><td class="id">N8</td><td>Echo eggs</td><td>Voice notes tied to places — a crowd-built audio tour (ElevenLabs)</td><td class="n">18</td></tr>
+          <tr><td class="id">N5</td><td>Then &amp; Now</td><td>Old photos layered on the present; history over time</td><td class="n">18</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-game">
+    <h2 id="h-game">Route B — phone-vision data game</h2>
+    <p class="note">Catch real things (Gemini) or let your vitals drive the game (Presage); the collection trains a prediction.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>#</th><th>Idea</th><th>API</th><th>Hook</th><th class="n">/25</th></tr></thead>
+        <tbody>
+          <tr data-lead><td class="id">G1</td><td><b>SpawnCast</b></td><td>Gemini</td><td>Catch real things; the game forecasts the next spawns</td><td class="n">22</td></tr>
+          <tr data-lead><td class="id">G2</td><td><b>PriceDex</b></td><td>Gemini</td><td>Snap prices; crowd-sourced inflation data + a forecast</td><td class="n">22</td></tr>
+          <tr><td class="id">G3</td><td>BioDex</td><td>Gemini</td><td>Biodiversity map that fills over the weekend</td><td class="n">20</td></tr>
+          <tr><td class="id">G4</td><td>Calm Catch</td><td>Presage</td><td>Catch it by lowering your heart rate — table wow</td><td class="n">20</td></tr>
+          <tr><td class="id">G5</td><td>Calm Duel</td><td>Presage</td><td>Two judges; stay calmest under distraction</td><td class="n">20</td></tr>
+          <tr><td class="id">G7</td><td>Hype Meter</td><td>Presage</td><td>A live mood map of the room over the event</td><td class="n">19</td></tr>
+          <tr><td class="id">G9</td><td>LitterLegends</td><td>Gemini</td><td>Photograph litter to defeat it; a cleanup heatmap</td><td class="n">19</td></tr>
+          <tr><td class="id">G8</td><td>SidewalkDex</td><td>Gemini</td><td>Catch accessibility features; a civic access map</td><td class="n">19</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-php">
+    <h2 id="h-php">Route C — PHP2Shell tool (the serious one, weaker for now)</h2>
+    <p class="note">Timely and real, and it fits Time + HRT, but it is less fun to demo and the obvious version is a crowded space. Keep it as the fallback, not the lead.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>#</th><th>Idea</th><th>Hook</th><th class="n">/25</th></tr></thead>
+        <tbody>
+          <tr><td class="id">23+2</td><td><b>Time to Safe</b></td><td>Live tracker of which sites are back/patched + a safe-by forecast</td><td class="n">—</td></tr>
+          <tr><td class="id">1</td><td>Is this site safe?</td><td>Passive verdict in 2 s from public data</td><td class="n">23</td></tr>
+          <tr><td class="id">3</td><td>Change-password priority</td><td>"Do these 3 tonight," ranked by risk</td><td class="n">23</td></tr>
+        </tbody>
+      </table>
+      <p class="small muted">Full brief, open-source resources, precedents and the legal line: the <a href="https://claude.ai/artifact/3Zp6AaLNuv4gmZVVwWQ645">PHP2Shell research page</a>.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-decide">
+    <h2 id="h-decide">Decide early</h2>
+    <div class="decide">
+      <div class="q"><b>Pick a lane: eggs (A) or catch-game (B).</b><span class="note">They share the same engine (vision → spatiotemporal data → forecast), so the choice is mostly flavour. Eggs feel more novel and more Time-native; the catch game is more familiar and the data story is crisper. PHP (C) is the fallback.</span></div>
+      <div class="q"><b>Gemini or Presage.</b><span class="note">Gemini (web app, catch the world) is more buildable and the data is richer. Presage (native SDK, read the body) is the biggest table wow but slower and more friction. Hybrids exist but cost build time.</span></div>
+      <div class="q"><b>Build in Delta?</b><span class="note">It's a stackable prize and rewards snappy UX, but check it coexists with the repo's Claude Code setup before committing the night to it.</span></div>
+      <div class="q"><b>Confirm the clock.</b><span class="note">The event times in the repo are estimates from "25 hours, demos Sunday" — get the real submission and judging times from Discord.</span></div>
+    </div>
+  </section>
+
+  <details>
+    <summary>Scoring &amp; where the detail lives</summary>
+    <ul>
+      <li>Scores are our own filters out of 25 (fun to demo, data value, prize fit, buildable in ~20 h, works in a 4–5 min table demo). They sort; they don't decide.</li>
+      <li>Every idea, with the full sub-scores and the long list, is in <code>hack/ideas.md</code> in the repo.</li>
+      <li>The tracks and prizes are in <code>hack/event.md</code> and <code>hack/opening-ceremony.md</code>; the PHP research is its own page, linked above.</li>
+      <li>Presage measures heart rate and breathing from a face in ~20 s (FDA-cleared, free for the event); Gemini is general multimodal vision.</li>
+    </ul>
+  </details>
+</main>
