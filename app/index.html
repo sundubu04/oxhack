@@ -37,7 +37,7 @@
           <header class="cw-head">
             <div class="cw-titles">
               <h1 class="dl-h1 cw-title" id="title">New drawing</h1>
-              <p class="dl-meta" id="subtitle">Describe it, say it, or pick a sample</p>
+              <p class="dl-meta" id="subtitle">Type it, say it, or pick a sample</p>
             </div>
             <div class="dl-seg" role="group" aria-label="View" id="views">
               <button type="button" aria-pressed="true" data-view="board">Board</button>
@@ -56,7 +56,7 @@
 
           <div class="cw-stage" id="stage">
             <canvas class="cw-board" id="board" aria-label="The whiteboard and the arm"></canvas>
-            <p class="cw-empty" id="empty">Describe a drawing or pick a sample, and the arm draws it here first</p>
+            <p class="cw-empty" id="empty">The arm draws here first, to scale</p>
             <div class="cw-picture" id="picture" hidden></div>
             <div class="cw-angles" id="angles" hidden></div>
           </div>
@@ -78,8 +78,11 @@
         <aside class="cw-inspector" aria-label="Plan and arm">
           <section class="cw-sec">
             <div class="cw-sec__head"><h2 class="dl-kicker">Plan</h2><span class="dl-status" id="plan-status">Nothing yet</span></div>
-            <div class="cw-stats">
-              <div class="dl-stat dl-stat--hero" data-tone="accent"><b class="dl-stat__n" id="st-time">0 s</b><span class="dl-stat__l">to draw</span></div>
+            <div class="cw-stats" id="stats" hidden>
+              <div class="cw-hero">
+                <div class="dl-stat dl-stat--hero" data-tone="accent"><b class="dl-stat__n" id="st-time">0 s</b><span class="dl-stat__l">to draw</span></div>
+                <span class="dl-status" id="reach-status" data-mark="dot">All in reach</span>
+              </div>
               <div class="cw-kpis">
                 <div class="dl-stat"><b class="dl-stat__n" id="st-ink">0 mm</b><span class="dl-stat__l">ink</span></div>
                 <div class="dl-stat"><b class="dl-stat__n" id="st-travel">0 mm</b><span class="dl-stat__l">pen up</span></div>
@@ -99,7 +102,16 @@
           </section>
 
           <section class="cw-sec">
-            <div class="cw-sec__head"><h2 class="dl-kicker">Joints</h2><span class="dl-status" id="pen-status">Pen up</span></div>
+            <div class="cw-sec__head"><h2 class="dl-kicker">Arm</h2><span class="dl-status" id="arm-status">Not connected</span></div>
+            <div class="cw-actions">
+              <button class="dl-btn dl-btn--primary cw-send" type="button" id="send"><i data-icon="usb"></i><span>Connect arm</span></button>
+              <button class="dl-icon-btn" type="button" id="download" aria-label="Download the angles" title="Download the angles" disabled><i data-icon="download"></i></button>
+              <button class="dl-icon-btn" type="button" id="copy" aria-label="Copy the angles" title="Copy the angles" disabled><i data-icon="copy"></i></button>
+            </div>
+          </section>
+
+          <section class="cw-sec">
+            <div class="cw-sec__head"><h2 class="dl-kicker">Joints</h2><span class="dl-status" id="pen-status">Parked</span></div>
             <div class="cw-joints" id="joints"></div>
           </section>
 
@@ -107,18 +119,8 @@
             <h2 class="dl-kicker">Simulation</h2>
             <div class="cw-switches">
               <label class="dl-choice cw-choice"><span id="sw-physics-l">Servo limits</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-physics" aria-labelledby="sw-physics-l"></button></label>
-              <label class="dl-choice cw-choice"><span id="sw-reach-l">Show reach</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-reach" aria-labelledby="sw-reach-l"></button></label>
+              <label class="dl-choice cw-choice"><span id="sw-reach-l">Show reach</span><button class="dl-switch" type="button" role="switch" aria-checked="true" id="sw-reach" aria-labelledby="sw-reach-l"></button></label>
               <label class="dl-choice cw-choice"><span id="sw-time-l">Keep time</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="sw-time" aria-labelledby="sw-time-l"></button></label>
-            </div>
-          </section>
-
-          <section class="cw-sec">
-            <div class="cw-sec__head"><h2 class="dl-kicker">Arm</h2><span class="dl-status" id="arm-status">Not connected</span></div>
-            <div class="cw-actions">
-              <button class="dl-btn dl-btn--secondary" type="button" id="connect"><i data-icon="usb"></i>Connect</button>
-              <button class="dl-btn dl-btn--secondary" type="button" id="send" disabled><i data-icon="send"></i>Send to arm</button>
-              <button class="dl-icon-btn" type="button" id="download" aria-label="Download the angles" title="Download the angles" disabled><i data-icon="download"></i></button>
-              <button class="dl-icon-btn" type="button" id="copy" aria-label="Copy the angles" title="Copy the angles" disabled><i data-icon="copy"></i></button>
             </div>
           </section>
         </aside>

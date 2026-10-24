@@ -37,7 +37,7 @@
 .cw-picture img { width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
 .cw-angles { min-height: 0; overflow: auto; }
 .cw-angles .dl-table { width: 100%; }
-.cw-empty { position: absolute; inset: auto 0 12px; text-align: center; font-size: var(--dl-fs-sm); color: var(--dl-text-2); pointer-events: none; }
+.cw-empty { position: absolute; inset: 41% 0 auto; text-align: center; font-size: var(--dl-fs-sm); color: var(--dl-text-2); pointer-events: none; }
 
 .cw-transport { display: flex; align-items: center; gap: 8px; }
 .cw-scrub { flex: 1; min-width: 0; height: 24px; margin: 0 4px; accent-color: var(--dl-accent); cursor: pointer; }
@@ -47,6 +47,9 @@
 .cw-sec { display: grid; gap: 12px; }
 .cw-sec__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cw-stats { display: grid; gap: 12px; }
+.cw-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.cw-hero > .dl-status { padding-bottom: 4px; }
+.cw-send { flex: 1; }
 .cw-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cw-kpis .dl-stat__n { font-size: var(--dl-fs-lg); }
 .cw-steps { gap: 8px; padding: 12px; }

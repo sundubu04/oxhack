@@ -29,9 +29,10 @@ export function makeJob(toolpath, angles, g) {
   return { toolpath, path: angles.path, tCmd, tGo, tTilt, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
 }
 
-// The pose the arm parks in: pen up, just below the drawing.
+// The pose the arm parks in: pen up, beside the drawing on the elbow's side, so neither link crosses it.
 export function homePose(g) {
-  const y = g.standoff + g.board / 2 - g.half - 12, s = ik(0, y, g.L1, g.L2, g.elbowUp) || { t1: Math.PI / 2, t2: 0 };
+  const x = (g.elbowUp ? 1 : -1) * Math.min(g.half + 25, g.boardW / 2 - 10), y = g.standoff + g.board / 2 + g.half / 2;
+  const s = ik(x, y, g.L1, g.L2, g.elbowUp) || ik(0, g.standoff + g.board / 2, g.L1, g.L2, g.elbowUp) || { t1: Math.PI / 2, t2: 0 };
   return { base: s.t1 * R2D, elbow: s.t2 * R2D, tilt: g.tilt.lift };
 }
 

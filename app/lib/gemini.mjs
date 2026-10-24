@@ -19,10 +19,11 @@ function pickSVG(text) {
 async function call(model, key, body) {
   for (const level of ["minimal", "low", null]) {
     const generationConfig = { ...body.generationConfig, ...(level ? { thinkingConfig: { thinkingLevel: level } } : {}) };
+    // a busy model can sit on a request for minutes; give up on it and try the next one
     const res = await fetch(`${BASE}/${model}:generateContent`, {
       method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ ...body, generationConfig }),
-    });
+      body: JSON.stringify({ ...body, generationConfig }), signal: AbortSignal.timeout(20000),
+    }).catch((e) => { const err = new Error(e.name === "TimeoutError" ? `${model} took over 20 s` : e.message); err.status = 503; throw err; });
     if (res.ok) return res.json();
     const text = await res.text();
     if (res.status === 400 && /thinking/i.test(text)) continue;

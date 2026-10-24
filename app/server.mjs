@@ -16,7 +16,7 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/ja
 const PRIVATE = /(^|\/)(\.env[^/]*|lib\/|node_modules\/|server\.mjs|package-lock\.json)/;
 
 const keys = () => ({ gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY") });
-const textModels = () => [env("GEMINI_MODEL", "gemini-3.5-flash"), env("GEMINI_FALLBACK_MODEL"), "gemini-3.1-flash-lite"];
+const textModels = () => [...new Set([env("GEMINI_MODEL", "gemini-3.5-flash"), env("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite"), "gemini-3.1-flash-lite", "gemini-3.8-flash"])];
 const imageModels = () => [env("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image"), "gemini-3.1-flash-image"];
 
 function send(res, code, body, type = "application/json") {

@@ -38,7 +38,7 @@ const modelName = (m = "") => m.replace(/^gemini-/, "Gemini ").replace(/-/g, " "
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim;
 let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
-const S = load("clockwork.prefs", { narrate: false, route: "svg", physics: true, reach: false });
+const S = load("clockwork.prefs", { narrate: false, route: "svg", physics: true, reach: true });
 let recent = load("clockwork.recent", []);
 let drawing = null;       // { prompt, strokes, picture, meta, sample }
 let planned = null;       // { plan, angles, job } for the drawing
@@ -58,6 +58,14 @@ function toast(msg, name = "check") {
 }
 function showError(msg) { $("#error-text").textContent = msg; $("#error").hidden = false; }
 function hideError() { $("#error").hidden = true; }
+
+// ---------- state words: one vocabulary, colour only for what needs attention ----------
+function status(el, text, { tone = "", mark = "" } = {}) {
+  el.textContent = text;
+  if (tone) el.dataset.tone = tone; else delete el.dataset.tone;
+  if (mark) el.dataset.mark = mark; else delete el.dataset.mark;
+}
+const planStatus = (text, o) => status($("#plan-status"), text, o);
 
 // ---------- pipeline steps ----------
 const steps = {
@@ -88,7 +96,11 @@ async function run(text) {
   if (!text) { $("#prompt").focus(); return; }
   hideError(); pause(); setKeepTime(false); busy(true); go("studio");
   $("#prompt").value = text;
-  steps.reset(); steps.set("picture", "now", "drawing");
+  const before = [$("#title").textContent, $("#subtitle").textContent];
+  $("#title").textContent = text.charAt(0).toUpperCase() + text.slice(1);
+  $("#subtitle").textContent = sampleFor(text) ? "Sample" : "Making the picture with Gemini";
+  planStatus("Making picture", { mark: "ring" });
+  steps.reset(); steps.set("picture", "now", "making");
   const sample = sampleFor(text), t0 = performance.now();
   try {
     let strokes, picture, meta;
@@ -109,6 +121,9 @@ async function run(text) {
     play();
   } catch (e) {
     steps.fail("picture", "failed");
+    planStatus("Failed", { tone: "stop" });
+    // the board still shows the last drawing, so its title stays with it
+    [$("#title").textContent, $("#subtitle").textContent] = before;
     showError(e.message || String(e));
   } finally { busy(false); }
 }
@@ -142,7 +157,7 @@ function setDrawing(d, { remember = false } = {}) {
   renderPicture(); renderAngles(); renderPlanStats(); $("#empty").hidden = true;
   startJob(planned.job, { clear: true });
   ["#download", "#copy"].forEach((s) => { $(s).disabled = false; });
-  $("#send").disabled = !arm.connected();
+  syncSend();
   if (remember) remember_(d);
 }
 
@@ -169,18 +184,25 @@ function play() {
   if (sim.done) { seek(0); }
   playing = true; sim.manual = null;
   $("#play").setAttribute("aria-label", "Pause"); $("#play").title = "Pause"; setIcon($("#play"), "pause");
-  steps.set("sim", "now");
+  steps.set("sim", "now"); $("#steps").dataset.state = "running";
   kick();
 }
 function pause() {
   playing = false;
   $("#play").setAttribute("aria-label", "Play"); $("#play").title = "Play"; setIcon($("#play"), "play");
+  showPaused();
+}
+// a job stopped part way: the step stops turning and says where it stopped
+function showPaused() {
+  if (!active || !planned || sim.done || !$("#steps")) return;
+  if (sim.t > 0) { steps.set("sim", "now", `paused at ${clock(sim.t)}`); $("#steps").dataset.state = "stopped"; }
+  else { steps.set("sim", "next", ""); $("#steps").dataset.state = "ready"; }
 }
 function seek(t) {
   if (!active) return;
   board.clearInk(); sim.reset(); sim.load(active); sim.physics = S.physics;
   sim.advance(Math.max(0, Math.min(t, active.total)), onInk);
-  syncTransport(); draw();
+  syncTransport(); draw(); if (!playing) showPaused();
 }
 function eraseBoard() {
   if (!board.hasInk()) { toast("The board is already clean", "info"); return; }
@@ -236,8 +258,9 @@ function syncLive(force) {
     m.dataset.tone = p < 0.02 || p > 0.98 ? "warn" : "";
   }
   const mode = sim.mode(), ps = $("#pen-status");
-  ps.textContent = mode === "draw" ? "Drawing" : mode === "erase" ? "Erasing" : "Pen up";
-  ps.dataset.tone = mode === "draw" ? "ok" : mode === "erase" ? "info" : "";
+  if (playing) status(ps, mode === "draw" ? "Drawing" : mode === "erase" ? "Erasing" : "Moving, pen up", { mark: mode === "draw" ? "dot" : mode === "erase" ? "ring" : "" });
+  else if (!active || sim.t === 0) status(ps, sim.manual ? "Moved by hand" : "Parked");
+  else status(ps, sim.done ? "Done" : "Paused", { mark: sim.done ? "dot" : "" });
   if (planned && active === planned.job) $("#st-err").textContent = `${sim.dev.max.toFixed(1)} mm`;
   syncTransport();
   if (view === "angles" && active === planned?.job && sim.i !== lastRow) {
@@ -260,10 +283,12 @@ function renderPlanStats() {
   $("#st-ink").textContent = mm(p.ink);
   $("#st-travel").textContent = mm(p.travel);
   $("#st-err").textContent = "0.0 mm";
-  const st = $("#plan-status");
-  if (angles.unreachable) { st.textContent = `${angles.unreachable} out of reach`; st.dataset.tone = "stop"; }
-  else if (angles.outOfRange) { st.textContent = `${angles.outOfRange} past servo limits`; st.dataset.tone = "warn"; }
-  else { st.textContent = "Ready"; st.dataset.tone = "ok"; }
+  $("#stats").hidden = false;
+  const rs = $("#reach-status");
+  if (angles.unreachable) status(rs, `${angles.unreachable} points out of reach`, { tone: "stop" });
+  else if (angles.outOfRange) status(rs, `${angles.outOfRange} points past servo limits`, { tone: "warn" });
+  else status(rs, "All in reach", { mark: "dot" });
+  planStatus("Ready", { mark: "dot" });
 }
 
 function renderPicture() {
@@ -321,9 +346,15 @@ setInterval(tickTime, 1000);
 
 // ---------- arm ----------
 function setArm(on) {
-  const st = $("#arm-status"); st.textContent = on ? "Connected" : "Not connected"; st.dataset.tone = on ? "ok" : "";
-  $("#connect").hidden = on; $("#send").disabled = !on || !planned;
-  renderServices();
+  status($("#arm-status"), on ? "Connected" : "Not connected", { mark: on ? "dot" : "" });
+  syncSend(); renderServices();
+}
+// the arm's one action, in one place: Connect arm until it is connected, then Send to arm
+function syncSend() {
+  const b = $("#send"), on = arm.connected();
+  if (b.getAttribute("aria-busy") === "true") return;
+  setIcon(b, on ? "send" : "usb"); b.querySelector("span").textContent = on ? "Send to arm" : "Connect arm";
+  b.disabled = on && !planned;
 }
 async function connectArm() {
   try { await arm.connect(); setArm(true); toast("Arm connected"); }
@@ -332,14 +363,14 @@ async function connectArm() {
 async function sendToArm() {
   if (!planned) return;
   if (!arm.connected()) { await connectArm(); if (!arm.connected()) return; }
-  const b = $("#send"); b.setAttribute("aria-busy", "true"); b.disabled = true;
+  const b = $("#send"), label = b.querySelector("span"); b.setAttribute("aria-busy", "true");
   sending = new AbortController();
   try {
     seek(0); play();   // the sim plays alongside, at the same pace
-    await arm.send(planned.angles.path, { times: planned.job.tTilt, signal: sending.signal, onProgress: (i, n) => { b.lastChild.textContent = `Sending ${Math.round((i / n) * 100)}%`; } });
+    await arm.send(planned.angles.path, { times: planned.job.tTilt, signal: sending.signal, onProgress: (i, n) => { label.textContent = `Sending ${Math.round((i / n) * 100)}%`; } });
     toast("Sent to the arm");
   } catch (e) { showError(e.message); }
-  finally { sending = null; b.removeAttribute("aria-busy"); b.disabled = false; b.lastChild.textContent = "Send to arm"; }
+  finally { sending = null; b.removeAttribute("aria-busy"); syncSend(); }
 }
 function stream() {
   const { plan: p, angles, job } = planned;
@@ -372,8 +403,8 @@ function renderServices() {
   const gm = services.gemini.ready, vp = services.voice.provider;
   const voiceWord = { elevenlabs: "ElevenLabs", gemini: "Gemini voice", browser: "Browser voice" }[vp];
   $("#services").innerHTML =
-    `<div class="cw-service"><span>Gemini</span><span class="dl-status" data-tone="${gm ? "ok" : "warn"}">${gm ? "Ready" : "No key"}</span></div>` +
-    `<div class="cw-service"><span>Voice</span><span class="dl-status" data-tone="${vp === "elevenlabs" ? "ok" : "info"}">${voiceWord}</span></div>`;
+    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${gm ? 'data-mark="dot"' : 'data-tone="warn"'}>${gm ? "Ready" : "No key"}</span></div>` +
+    `<div class="cw-service"><span>Voice</span><span>${voiceWord}</span></div>`;
   $("#service-kv").innerHTML =
     `<dt>Gemini</dt><dd>${gm ? `Ready, ${esc(modelName(services.gemini.model))}` : "No key: add GEMINI_API_KEY to app/.env"}</dd>` +
     `<dt>Voice</dt><dd>${vp === "elevenlabs" ? "ElevenLabs" : `${voiceWord} until ELEVENLABS_API_KEY is in app/.env`}</dd>` +
@@ -538,8 +569,7 @@ function wire() {
   $("#sw-reach").addEventListener("click", toggleReach);
   $("#sw-time").addEventListener("click", () => setKeepTime(!keepTime));
   $("#narrate").addEventListener("click", toggleNarrate);
-  $("#connect").addEventListener("click", connectArm);
-  $("#send").addEventListener("click", sendToArm);
+  $("#send").addEventListener("click", () => { if ($("#send").getAttribute("aria-busy") === "true") return; arm.connected() ? sendToArm() : connectArm(); });
   $("#download").addEventListener("click", () => arm.download(stream(), `clockwork-${(drawing?.prompt || "drawing").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.json`));
   $("#copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(JSON.stringify(stream(), null, 2)); toast("Angles copied"); } catch (e) { showError("The browser would not copy. Use the download instead."); }

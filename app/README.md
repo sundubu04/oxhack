@@ -30,7 +30,7 @@ Open it in Chrome. The samples (the time now, house, cat, star, flower) work wit
 
 They live in `app/.env`, which git ignores. The dev server reads them and calls the APIs itself; the browser never sees a key.
 
-- **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). The free tier covers the vector drawings and the Gemini voice. `gemini-2.5-flash` is closed to new keys, so the default is `gemini-3.5-flash`, then `gemini-3.8-flash`, then `gemini-3.1-flash-lite` when one is busy. The image route (Nano Banana) needs billing on the key's project.
+- **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). The free tier covers the vector drawings and the Gemini voice. `gemini-2.5-flash` is closed to new keys, so the default is `gemini-3.5-flash`, then `gemini-3.1-flash-lite`, then `gemini-3.8-flash`, each given 20 s before the next is tried. The image route (Nano Banana) needs billing on the key's project.
 - **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart; until then the arm speaks with Gemini's voice.
 
 ## Using it
