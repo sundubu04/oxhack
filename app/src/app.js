@@ -11,6 +11,7 @@ import { SAMPLES, clockSVG } from "./sample.js";
 import { loadConfig, saveConfig, geomFrom, withDefaults, DEFAULT_CONFIG, servoAngle } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
 import { createBoard } from "./board.js";
+import { nibHeight } from "./pen.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -37,7 +38,7 @@ const modelName = (m = "") => m.replace(/^gemini-/, "Gemini ").replace(/-/g, " "
 
 // ---------- state ----------
 let cfg = withDefaults({}), g = geomFrom(cfg);
-let board, sim, setupBoard, setupSim;
+let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
 let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
 const S = load("clockwork.prefs", { narrate: false, route: "svg", physics: true, reach: true, voice: "" });
 let recent = load("clockwork.recent", []);
@@ -194,7 +195,7 @@ function remember_(d) {
 function replan() { if (drawing) setDrawing(drawing); else { sim.reset(); draw(); } }
 
 // ---------- the sim ----------
-const onInk = (a, b, mode) => board.inkSeg(a, b, mode);
+const onInk = (a, b, mode) => { board.inkSeg(a, b, mode); inkDirty = true; };
 
 function startJob(job, { clear = false } = {}) {
   pause();
@@ -261,6 +262,7 @@ function settling(s) { const t = s.target(); return Math.abs(t.base - s.j.base) 
 
 let hover = null;
 function draw() {
+  if (view === "3d") { draw3d(); return; }
   board.render({
     toolpath: active?.toolpath, joints: sim.j, mode: sim.mode(), showReach: S.reach, hover,
     unreachable: planned && active === planned.job ? planned.plan.toolpath.filter((_, i) => planned.angles.path[i].out_of_reach) : null,
@@ -340,10 +342,28 @@ function renderAngles() {
   lastRow = -1;
 }
 
+// ---------- 3D: the arm and the pen's tilt, to orbit round ----------
+async function open3d() {
+  if (!v3) {
+    try { const { createView3d } = await import("./view3d.js"); v3 = createView3d($("#view3d"), board.ink); v3.setGeom(g, cfg.pen); }
+    catch (e) { showError(`The 3D view needs WebGL: ${e.message}`); setView("board"); return; }
+  }
+  v3.show(true); inkDirty = true; draw3d();
+}
+function draw3d() {
+  if (!v3) return;
+  v3.update(sim.j, inkDirty); inkDirty = false;
+  const pg = g.pen, mode = sim.mode(), end = mode === "erase" ? "eraser" : "nib";
+  const hNib = mode === "erase" ? nibHeight(pg, -sim.j.tilt) : nibHeight(pg, sim.j.tilt);
+  $("#read3d").textContent = `Tilt ${sim.j.tilt.toFixed(0)}° from flat · ${end} ${hNib <= 0.5 ? "on the board" : `${hNib.toFixed(1)} mm off the board`} · shaft ${pg.height.toFixed(0)} mm up · pen meets the board at ${pg.beta.toFixed(0)}°`;
+}
+
 function setView(v) {
   view = v;
   $$("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
   $("#board").hidden = v !== "board"; $("#picture").hidden = v !== "picture"; $("#angles").hidden = v !== "angles";
+  $("#view3d").hidden = v !== "3d"; v3?.show(v === "3d");
+  if (v === "3d") open3d();
   if (v === "board") draw();
   if (v === "angles") { lastRow = -1; syncLive(true); }
 }
@@ -470,7 +490,7 @@ function showPage(page) {
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["board.standoff", "Base below board", "mm"], ["drawing.size", "Drawing size", "mm"]]],
-  ["Pen", [["pen.drawTilt", "Draw tilt", "°"], ["pen.liftTilt", "Lift tilt", "°"], ["pen.eraseTilt", "Erase tilt", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["pen.nibSide", "Nib, across the tip", "mm"], ["pen.eraserSide", "Eraser, across the tip", "mm"]]],
+  ["Pen", [["pen.length", "Length, nib to eraser", "mm"], ["pen.barrel", "Barrel width", "mm"], ["pen.nib", "Nib sticks out", "mm"], ["pen.angle", "Meets the board at (0 = best)", "°"], ["pen.margin", "Barrel kept off the board", "mm"], ["pen.press", "Press in", "mm"], ["pen.lift", "Lift clear", "mm"], ["pen.eraserWidth", "Eraser width", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
@@ -521,7 +541,12 @@ function renderSetup() {
     `<dt>Drawing square</dt><dd>${cover}% reachable within servo limits</dd>` +
     `<dt>Worst dexterity</dt><dd>${ok ? worst.toFixed(2) : "none reachable"}</dd>` +
     `<dt>Servo step at the tip</dt><dd>${step.toFixed(1)} mm at full stretch</dd>` +
-    `<dt>Clock takes</dt><dd>${secs(job.total)}${an.unreachable ? `, ${an.unreachable} points out of reach` : ""}</dd>`;
+    `<dt>Clock takes</dt><dd>${secs(job.total)}${an.unreachable ? `, ${an.unreachable} points out of reach` : ""}</dd>` +
+    `<dt>Pen meets the board at</dt><dd>${gg.pen.beta.toFixed(0)}°${+c.pen.angle > 0 ? `, best is ${Math.ceil(gg.pen.best)}°` : ", the best for this pen"}</dd>` +
+    `<dt>Tilt shaft above the board</dt><dd>${gg.pen.height.toFixed(1)} mm</dd>` +
+    `<dt>Tilts from flat</dt><dd>draw ${gg.pen.draw.toFixed(1)}°, lift ${gg.pen.lift.toFixed(1)}°, erase +${gg.pen.erase.toFixed(1)}°</dd>` +
+    `<dt>Nib and eraser</dt><dd>${gg.pen.side.toFixed(0)} mm either side of the forearm's tip; reach to the nib ${mm(Math.hypot(gg.L2, gg.pen.side))}</dd>` +
+    `<dt>Barrel edge while drawing</dt><dd>${gg.pen.clearance >= 0 ? `${gg.pen.clearance.toFixed(1)} mm off the board` : `hits the board by ${(-gg.pen.clearance).toFixed(1)} mm`}</dd>`;
   const fs = $("#fit-status");
   fs.textContent = cover === 100 ? "Fits" : `${cover}% fits`; fs.dataset.tone = cover === 100 ? "ok" : cover > 80 ? "warn" : "stop";
   $("#save").disabled = !dirty(); $("#revert").disabled = !dirty();
@@ -538,7 +563,7 @@ async function save() {
   finally { b.removeAttribute("aria-busy"); b.textContent = "Save"; renderSetup(); }
 }
 function applyConfig() {
-  g = geomFrom(cfg); board.setGeom(g); sim.setGeom(g);
+  g = geomFrom(cfg); board.setGeom(g); sim.setGeom(g); v3?.setGeom(g, cfg.pen);
   buildJoints(); replan();
 }
 
@@ -600,6 +625,10 @@ function toggleNarrate() {
 function wire() {
   $("#ask").addEventListener("submit", (e) => { e.preventDefault(); if ($("#draw").getAttribute("aria-busy") !== "true") run($("#prompt").value); });
   $("#views").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
+  $("#cams").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || !v3) return;
+    $$("#cams button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); v3.view(b.dataset.cam, sim.j);
+  });
   $("#speed").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; speed = +b.dataset.speed; $$("#speed button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); });
   $("#play").addEventListener("click", () => (playing ? pause() : play()));
   $("#rewind").addEventListener("click", () => seek(0));

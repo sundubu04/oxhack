@@ -93,8 +93,8 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 <main class="page">
   <header>
     <h1>Pen mount study</h1>
-    <p class="answer" id="answer">Clamp the marker at its middle on the third servo, with the servo shaft running along the forearm and about 61 mm off the board. The pen then meets the board at 60°, the way a hand holds it. Ink and eraser are 120° apart on the servo, and the servo itself sets the pressure. Trim the eraser's felt to 60° so it sits flat.</p>
-    <p class="meta"><span>OxHack · Clockwork arm</span><span>24 Oct 2026</span><span id="pen-note">Placeholder pen, 140 mm × 17 mm: enter yours below</span></p>
+    <p class="answer" id="answer">Clamp the 165 mm marker at its middle on the third servo, across the forearm, with the servo shaft running along the forearm 68 mm above the board. The pen then meets the board at 56°.</p>
+    <p class="meta"><span>OxHack · Clockwork arm</span><span>24 Oct 2026</span><span id="pen-note">Pen 165 mm long; barrel width and nib are placeholders until measured</span></p>
   </header>
 
   <section aria-labelledby="h-spec">
@@ -128,10 +128,11 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
     <h2 id="h-pen">Your pen</h2>
     <p class="muted">Measure the marker with its caps on. The numbers on this page update as you type.</p>
     <div class="fields">
-      <div class="field"><label for="f-L">Length, nib to eraser (mm)</label><input id="f-L" type="number" inputmode="decimal" value="140"></div>
+      <div class="field"><label for="f-L">Length, nib to eraser (mm)</label><input id="f-L" type="number" inputmode="decimal" value="165"></div>
       <div class="field"><label for="f-D">Barrel width (mm)</label><input id="f-D" type="number" inputmode="decimal" value="17"></div>
       <div class="field"><label for="f-t">Nib sticks out (mm)</label><input id="f-t" type="number" inputmode="decimal" value="12"></div>
-      <div class="field"><label for="f-a">Clamp, from the nib (mm)</label><input id="f-a" type="number" inputmode="decimal" value="70"></div>
+      <div class="field"><label for="f-a">Clamp, from the nib (mm)</label><input id="f-a" type="number" inputmode="decimal" value="82.5"></div>
+      <div class="field"><label for="f-m">Barrel kept off the board (mm)</label><input id="f-m" type="number" inputmode="decimal" value="5"></div>
       <div class="field"><label for="f-c">Lift clear of the board (mm)</label><input id="f-c" type="number" inputmode="decimal" value="3"></div>
       <div class="field"><label for="f-p">Press into the board (mm)</label><input id="f-p" type="number" inputmode="decimal" value="1"></div>
     </div>
@@ -146,18 +147,18 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
   </section>
 
   <details>
-    <summary>Why 60°: the same pen at every angle</summary>
+    <summary>Why this angle: the same pen at every angle</summary>
     <div class="rows" style="margin-top:10px"><table id="sweep"></table></div>
-    <p style="margin-top:10px">Lower angles slide less at each touch but bring the barrel's edge close to the board, and the eraser meets it more on its rim. Higher angles slide more and use more of the servo's travel. 55° to 65° all work; 60° leaves the most margin on both sides.</p>
+    <p style="margin-top:10px">Lower angles slide less at each touch, turn the servo less and keep the shaft lower, but bring the barrel's edge closer to the board and meet it with more of the eraser's rim. So the best is the lowest angle that still keeps the barrel clear by the margin. Up to about 65° works too, with a longer slide.</p>
   </details>
 
   <section aria-labelledby="h-build">
     <h2 id="h-build">How to attach it</h2>
     <ol class="steps" id="steps">
       <li><b>Servo at the end of the forearm, shaft along the forearm.</b> The pen then swings across the forearm, so ink and eraser touch to either side of the arm, not ahead of it or behind it. The arm's reach is the same for both.</li>
-      <li><b>Shaft <span class="num" id="s-d">61 mm</span> off the board.</b> A ball caster under the bracket, on a post of that height, keeps the distance fixed as the arm moves.</li>
+      <li><b>Shaft <span class="num" id="s-d">68 mm</span> off the board.</b> A ball caster under the bracket, on a post of that height, keeps the distance fixed as the arm moves.</li>
       <li><b>Clamp the pen at its balance point</b>, a printed collar with a screw, fixed to the servo's own horn. Balanced, its weight puts no load on the servo on an upright board.</li>
-      <li><b>Trim the eraser felt to <span class="num" id="s-trim">60°</span></b>, or glue a felt pad on a printed wedge at that angle, so it wipes with its whole face rather than its rim.</li>
+      <li><b>Trim the eraser felt to <span class="num" id="s-trim">56°</span></b>, or glue a felt pad on a printed wedge at that angle, so it wipes with its whole face rather than its rim.</li>
       <li><b>Find the three angles on the real arm.</b> Start from the numbers above, then nudge draw and erase until the nib and the felt just bend.</li>
     </ol>
   </section>
@@ -186,15 +187,17 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180, SPEED = 600;   // SG92R: 0.1 s per 60 deg
 const STALL = 24.5;                        // N·cm, 2.5 kg·cm
+// the best angle: the lowest at which the barrel's edge still clears the board by the margin (as in the app)
+const bestBeta = () => { const R = P.D / 2, A = Math.hypot(P.t, R); return Math.min(89, Math.ceil((Math.atan2(R, P.t) + Math.asin(Math.min(1, P.m / A))) / D2R)); };
 const DESIGNS = [
-  { id: "flip", name: "Flip", beta: 90 },
-  { id: "a60", name: "Angled 60°", beta: 60 },
-  { id: "a45", name: "Angled 45°", beta: 45 },
-  { id: "rocker", name: "Rocker 15°", beta: 15 },
+  { id: "flip", name: "Flip", get beta() { return 90; } },
+  { id: "best", get name() { return `Best, ${bestBeta()}°`; }, get beta() { return bestBeta(); } },
+  { id: "a45", name: "Angled 45°", get beta() { return 45; } },
+  { id: "rocker", name: "Rocker 15°", get beta() { return 15; } },
 ];
-let design = "a60", pose = "draw";
-const P = { L: 140, D: 17, t: 12, a: 70, c: 3, p: 1 };
-try { Object.assign(P, JSON.parse(localStorage.getItem("penmount") || "{}")); } catch (e) {}
+let design = "best", pose = "draw";
+const P = { L: 165, D: 17, t: 12, a: 82.5, c: 3, p: 1, m: 5 };
+try { Object.assign(P, JSON.parse(localStorage.getItem("penmount2") || "{}")); } catch (e) {}
 
 // Geometry of one design for the current pen. Angles are tilt from the pen lying flat; negative brings the nib down.
 function solve(beta) {
@@ -248,10 +251,11 @@ function render() {
       <td><span class="state" data-tone="${tone}">${word}</span></td></tr>`;
   }).join("");
   $("#table").innerHTML = `<thead><tr><th>Mount</th><th>Shaft height</th><th>Ink to eraser</th><th>Meets board, nib / eraser</th><th>Barrel</th><th>Slide per press</th><th>Nib / eraser off shaft</th><th>Servo per newton</th><th></th></tr></thead><tbody>${rows}</tbody>`;
-  // the specification, for the recommended 60° mount
-  const best = solve(60), srv = (v) => f0(90 + v);
+  // the specification, for the best angle for this pen
+  const bb = bestBeta(), best = solve(bb), srv = (v) => f0(90 + v);
+  $("#answer").textContent = `Clamp the ${f0(P.L)} mm marker at its middle on the third servo, across the forearm, with the servo shaft running along the forearm ${f0(best.d)} mm above the board. The pen then meets the board at ${bb}°: the lowest angle that keeps the barrel ${f0(P.m)} mm clear, so the nib slides least as it lands and the servo turns least. Ink and eraser are ${f0(best.travel ?? 0)}° apart on the servo, and the servo itself sets the pressure.`;
   $("#spec").innerHTML = `<tbody>
-    <tr><td>Pen meets the board at</td><td class="num"><b>60°</b> (55° to 65° works)</td></tr>
+    <tr><td>Pen meets the board at</td><td class="num"><b>${bb}°</b>, the lowest that keeps the barrel ${f1(P.m)} mm off the board (up to about 65° also works)</td></tr>
     <tr><td>Servo shaft</td><td>along the forearm, <span class="num">${f0(best.d)} mm</span> above the board</td></tr>
     <tr><td>Clamp</td><td>at the pen's balance point, <span class="num">${f0(best.a)} mm</span> from the nib</td></tr>
     <tr><td>Tilt from flat: draw, lift, erase</td><td class="num"><b>${f0(best.drawT)}°, ${f0(best.liftT)}°, +${f0(best.eraseT ?? 0)}°</b></td></tr>
@@ -264,11 +268,11 @@ function render() {
     <tr><td>Where each end touches</td><td class="num">nib ${f0(best.offInk)} mm to one side of the shaft, eraser ${f0(best.offEr ?? 0)} mm to the other</td></tr>
     <tr><td>Servo load</td><td class="num">${f1(best.torque)} N·cm per newton of pen force; the SG92R stalls at ${STALL} N·cm</td></tr>
   </tbody>`;
-  $("#sweep").innerHTML = `<thead><tr><th>Angle</th><th>Shaft</th><th>Ink to eraser</th><th>Slide per press</th><th>Barrel clears by</th><th>Servo per newton</th></tr></thead><tbody>${[40, 45, 50, 55, 60, 65, 70, 75, 80].map((g) => { const r = solve(g); return `<tr ${g === 60 ? "data-current" : ""}><td class="num">${g}°</td><td class="num">${f0(r.d)} mm</td><td class="num">${r.travel == null ? "–" : f0(r.travel) + "°"}</td><td class="num">${f1(r.tail)} mm</td><td class="num">${r.shoulder >= 0 ? f1(r.shoulder) + " mm" : `<span class="state" data-tone="stop">hits</span>`}</td><td class="num">${f1(r.torque)} N·cm</td></tr>`; }).join("")}</tbody>`;
+  $("#sweep").innerHTML = `<thead><tr><th>Angle</th><th>Shaft</th><th>Ink to eraser</th><th>Slide per press</th><th>Barrel clears by</th><th>Servo per newton</th></tr></thead><tbody>${[...new Set([40, 45, 50, bb, 55, 60, 65, 70, 75, 80])].sort((x, y) => x - y).map((g) => { const r = solve(g); return `<tr ${g === bb ? "data-current" : ""}><td class="num">${g}°</td><td class="num">${f0(r.d)} mm</td><td class="num">${r.travel == null ? "–" : f0(r.travel) + "°"}</td><td class="num">${f1(r.tail)} mm</td><td class="num">${r.shoulder >= 0 ? f1(r.shoulder) + " mm" : `<span class="state" data-tone="stop">hits</span>`}</td><td class="num">${f1(r.torque)} N·cm</td></tr>`; }).join("")}</tbody>`;
   // text that follows the pen
   $("#s-d").textContent = `${f0(best.d)} mm`; $("#s-trim").textContent = `${f0(best.be ?? 60)}°`;
   $("#s-off").textContent = best.offEr != null && Math.abs(best.offInk - best.offEr) > 2 ? `${f0(best.offInk)} mm and ${f0(best.offEr)} mm` : `${f0(best.offInk)} mm`;
-  $("#pen-note").textContent = `Pen ${f0(P.L)} mm × ${f0(P.D)} mm${P.L === 140 && P.D === 17 ? ", a placeholder: enter yours below" : ""}`;
+  $("#pen-note").textContent = `Pen ${f0(P.L)} mm long${P.D === 17 && P.t === 12 ? "; barrel width and nib are placeholders until measured" : `, ${f0(P.D)} mm barrel`}`;
   target = poseAngle(s); if (!anim) { shown = target; draw(); }
   readout(s);
 }
@@ -351,12 +355,12 @@ $("#cycle").addEventListener("click", () => {
   const next = () => { go(seq[i++ % seq.length]); cycleTimer = setTimeout(next, 1600); };
   next();
 });
-["L", "D", "t", "a", "c", "p"].forEach((k) => {
+["L", "D", "t", "a", "c", "p", "m"].forEach((k) => {
   const el = $(`#f-${k}`); el.value = P[k];
   el.addEventListener("input", () => {
     const v = parseFloat(el.value); if (!isFinite(v) || v <= 0) return;
     if (k === "L" && Math.abs(P.a - P.L / 2) < 0.5) { P.a = v / 2; $("#f-a").value = P.a; }   // keep the clamp centred until it's moved
-    P[k] = v; try { localStorage.setItem("penmount", JSON.stringify(P)); } catch (e) {}
+    P[k] = v; try { localStorage.setItem("penmount2", JSON.stringify(P)); } catch (e) {}
     render();
   });
 });

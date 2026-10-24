@@ -35,6 +35,11 @@
 
 .cw-stage { position: relative; flex: 1; min-height: 0; display: grid; }
 .cw-board { display: block; width: 100%; height: 100%; min-height: 0; touch-action: none; cursor: crosshair; }
+.cw-3d { position: relative; min-height: 0; border-radius: var(--dl-r-card); overflow: hidden; }
+.cw-3d__canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.cw-3d__canvas:active { cursor: grabbing; }
+.cw-3d__cams { position: absolute; top: 12px; left: 12px; background: var(--dl-raised); }
+.cw-3d__read { position: absolute; left: 12px; bottom: 12px; margin: 0; padding: 4px 8px; border-radius: var(--dl-r-tag); background: var(--dl-raised); font-size: var(--dl-fs-xs); color: var(--dl-text-2); }
 .cw-picture { display: grid; place-items: center; min-height: 0; }
 .cw-picture img { width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
 .cw-angles { min-height: 0; overflow: auto; }

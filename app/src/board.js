@@ -130,5 +130,5 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     }
   }
 
-  return { setGeom, render, inkSeg, clearInk, hasInk, toWorld, retheme: () => { col = null; } };
+  return { setGeom, render, inkSeg, clearInk, hasInk, toWorld, ink, retheme: () => { col = null; } };
 }

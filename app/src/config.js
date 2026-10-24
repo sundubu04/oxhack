@@ -1,3 +1,5 @@
+import { penGeometry } from "./pen.js";
+
 // The arm's real dimensions live in app/arm.config.json, the one place to change them. The Arm setup page
 // edits that file through the dev server; everything else reads the flat geometry that geomFrom() makes.
 // Lengths in mm, angles in degrees, speeds in mm/s (pen) and deg/s (servo).
@@ -8,9 +10,10 @@ export const DEFAULT_CONFIG = {
   board: { width: 350, height: 350, standoff: 40 },
   drawing: { size: 180 },
   elbow: "up",
-  // Tilts from the pen lying flat, and where the nib and the eraser touch across the forearm's tip: the 60° mount
-  // from docs/pages/pen-mount.html, for a 140 mm marker clamped at its middle (re-run it with the real pen).
-  pen: { drawTilt: -62, liftTilt: -55, eraseTilt: 62, nibSide: 35, eraserSide: -35, pressure: 60, eraserWidth: 20 },
+  // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
+  // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
+  // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
+  pen: { length: 165, barrel: 17, nib: 12, angle: 0, margin: 5, press: 1, lift: 3, pressure: 60, eraserWidth: 20 },
   motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3 },   // leadIn: mm of pen-up glide onto each stroke
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
   // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both.
@@ -40,12 +43,17 @@ export function geomFrom(cfg) {
     L1: +c.links.L1, L2: +c.links.L2,
     standoff: +c.board.standoff, board: +c.board.height, boardW: +c.board.width,
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
-    tilt: { draw: +c.pen.drawTilt, lift: +c.pen.liftTilt, erase: +c.pen.eraseTilt },
-    nibSide: +c.pen.nibSide, eraserSide: +c.pen.eraserSide,
+    ...penFields(c.pen),
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn,
     servo: { speed: +c.servos.speed, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
   };
+}
+
+// The tilts and the two ends' offsets across the forearm come from the pen's measurements.
+function penFields(p) {
+  const pg = penGeometry(p);
+  return { pen: pg, tilt: { draw: pg.draw, lift: pg.lift, erase: pg.erase }, nibSide: pg.side, eraserSide: -pg.side };
 }
 
 // Geometry angle -> the angle the servo is commanded to, through its calibration.

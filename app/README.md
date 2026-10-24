@@ -36,7 +36,7 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 ## Using it
 
 - **Studio**: type or say what to draw (⏎ or Draw). The board shows the plan faintly and the simulated ink as the arm lays it. Play, start again, erase, scrub and speed sit under the board.
-- **Board, Picture, Angles**: the sim, the picture Gemini made, and every waypoint with its time and angles.
+- **Board, 3D, Picture, Angles**: the sim, the same sim in 3D (drag to orbit, scroll to zoom; *Along the arm* shows the pen's tilt side-on, with the board as the floor), the picture Gemini made, and every waypoint with its time and angles.
 - **Inspector**: time to draw, ink, pen-up travel, the worst wobble measured in the sim, the four pipeline steps, live joint meters against each servo's range, and the arm connection.
 - **Simulation switches**: servo limits on or off (ideal servos), the reach (grey where the arm can't get to), and keep time (erase and redraw the clock every minute).
 - **⌘K**: every command, and "Draw …" for anything you type.
@@ -44,6 +44,8 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 - **Smoothing** (Arm setup): the servos' dead band and gear play, compensated in every command, plus a 3 mm lead-in to each stroke. Why, and what to do with the motors: [`docs/hardware-link.md`](../docs/hardware-link.md#smoothing-the-line).
 
 ## The arm's dimensions
+
+The pen is entered as the marker itself: its length (165 mm, the team's), barrel width and how far the nib sticks out. From those, `src/pen.js` picks the best angle for it to meet the board (the lowest that keeps the barrel 5 mm clear), the tilt shaft's height above the board, the draw, lift and erase tilts, and how far the nib and eraser touch either side of the forearm's tip. Arm setup shows all of them; the reasoning is in [`docs/pages/pen-mount.html`](../docs/pages/pen-mount.html).
 
 `app/arm.config.json` is the one place for them: link lengths, board size and how far the base sits below it,
 drawing size, pen tilts and eraser width, speeds, and each servo's range, zero offset and direction. Edit it
@@ -65,6 +67,8 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `src/app.js` | the pipeline, sim loop, palette, history and setup page |
 | `src/sim.js` | the arm simulation: schedule, servo speed and resolution, servo end stops, wobble measurement |
 | `src/board.js` | draws the board, plan, ink and arm to scale |
+| `src/view3d.js` | the 3D view, on three.js 0.170 (MIT, `ui/vendor/`, licence beside it) |
+| `src/pen.js` | the marker on the tilt servo: best angle, shaft height, tilts, offsets |
 | `src/config.js`, `arm.config.json` | the arm's dimensions and servo calibration |
 | `src/ik.js` | two-link inverse kinematics and the angle stream |
 | `src/pathplan.js` | fit, order, resample; the eraser's zigzag |

@@ -15,11 +15,13 @@
   },
   "elbow": "up",
   "pen": {
-    "drawTilt": -62,
-    "liftTilt": -55,
-    "eraseTilt": 62,
-    "nibSide": 35,
-    "eraserSide": -35,
+    "length": 165,
+    "barrel": 17,
+    "nib": 12,
+    "angle": 0,
+    "margin": 5,
+    "press": 1,
+    "lift": 3,
     "pressure": 60,
     "eraserWidth": 20
   },

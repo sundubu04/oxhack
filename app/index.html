@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Clockwork</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23a34a69'/%3E%3C/svg%3E">
+  <script type="importmap">{ "imports": { "three": "./ui/vendor/three.module.min.js" } }</script>
   <link rel="stylesheet" href="./ui/kit.css">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -42,6 +43,7 @@
             </div>
             <div class="dl-seg" role="group" aria-label="View" id="views">
               <button type="button" aria-pressed="true" data-view="board">Board</button>
+              <button type="button" aria-pressed="false" data-view="3d">3D</button>
               <button type="button" aria-pressed="false" data-view="picture">Picture</button>
               <button type="button" aria-pressed="false" data-view="angles">Angles</button>
             </div>
@@ -58,6 +60,15 @@
             <canvas class="cw-board" id="board" aria-label="The whiteboard and the arm"></canvas>
             <p class="cw-empty" id="empty">The arm draws here first, to scale</p>
             <p class="cw-empty cw-fail" id="error" role="alert" hidden><i data-icon="circle-alert"></i><span id="error-text"></span><button class="dl-link cw-retry" type="button" id="retry">Try again</button></p>
+            <div class="cw-3d" id="view3d" hidden>
+              <div class="dl-seg cw-3d__cams" role="group" aria-label="Camera" id="cams">
+                <button type="button" aria-pressed="true" data-cam="three-quarter">Three-quarter</button>
+                <button type="button" aria-pressed="false" data-cam="front">Front</button>
+                <button type="button" aria-pressed="false" data-cam="side">Side</button>
+                <button type="button" aria-pressed="false" data-cam="along">Along the arm</button>
+              </div>
+              <p class="cw-3d__read dl-num" id="read3d"></p>
+            </div>
             <div class="cw-picture" id="picture" hidden></div>
             <div class="cw-angles" id="angles" hidden></div>
           </div>
