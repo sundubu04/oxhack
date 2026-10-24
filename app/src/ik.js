@@ -61,7 +61,9 @@ export function toAngles(toolpath, g = GEOM) {
     const tool = tools[i];
     const base = +((((s.t1 * R2D + 180) % 360) + 360) % 360 - 180).toFixed(2), elbow = +(s.t2 * R2D).toFixed(2);
     if (!lim("base", base) || !lim("elbow", elbow)) outOfRange++;
-    return { base, elbow, tilt: g.tilt[tool], pressure: tool === "lift" ? 0 : g.pressure };
+    // lifted, the pen waits on the side of the end it uses next, so wipes don't swing it over to the nib and back
+    const tilt = tool === "lift" && hand[i] === "erase" ? (g.tilt.liftErase ?? g.tilt.lift) : g.tilt[tool];
+    return { base, elbow, tilt, pressure: tool === "lift" ? 0 : g.pressure };
   });
   return { path, unreachable, outOfRange, worstDex: +worstDex.toFixed(3) };
 }

@@ -51,6 +51,15 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     ictx.beginPath(); ictx.moveTo(ua, va); ictx.lineTo(ub, vb); ictx.stroke();
   }
   function clearInk() { ictx.clearRect(0, 0, ink.width, ink.height); }
+  // the ink before a job, so rewinding replays it on top of what was already there
+  const snapshot = () => ictx.getImageData(0, 0, ink.width, ink.height);
+  const restore = (img) => { if (img && img.width === ink.width && img.height === ink.height) ictx.putImageData(img, 0, 0); else clearInk(); };
+  // as an image, to keep with a saved simulation
+  const inkURL = () => ink.toDataURL("image/png");
+  const setInk = (url) => new Promise((res) => {
+    clearInk(); if (!url) return res();
+    const im = new Image(); im.onload = () => { ictx.globalCompositeOperation = "source-over"; ictx.drawImage(im, 0, 0, ink.width, ink.height); res(); }; im.onerror = () => res(); im.src = url;
+  });
   function hasInk() {
     const d = ictx.getImageData(0, 0, ink.width, ink.height).data;
     for (let i = 3; i < d.length; i += 64) if (d[i]) return true; return false;
@@ -130,5 +139,5 @@ export function createBoard(canvas, { pad = 12 } = {}) {
     }
   }
 
-  return { setGeom, render, inkSeg, clearInk, hasInk, toWorld, ink, retheme: () => { col = null; } };
+  return { setGeom, render, inkSeg, clearInk, hasInk, toWorld, ink, snapshot, restore, inkURL, setInk, retheme: () => { col = null; } };
 }

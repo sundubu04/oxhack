@@ -1,5 +1,5 @@
 // Turn polylines into the most effective pen path: fit to the board, order the strokes to minimise
-// pen-up travel (greedy nearest-neighbour with reversal), resample, and flatten to a toolpath.
+// pen-up travel (nearest first, then 2-opt and Or-opt, each stroke either way round), resample, and flatten.
 import { GEOM, drawCentre } from "./ik.js";
 
 export function bbox(strokes) {
@@ -17,6 +17,13 @@ export function fitStrokes(strokes, half, cx, cy) {
   return strokes.map(s => s.map(p => ({ x: (p.x - mx) * sc + cx, y: -(p.y - my) * sc + cy })));
 }
 
+// Place a drawing by its own frame (an SVG's viewBox, 0 to 100 by default) into a box in board mm, keeping its
+// shape and flipping y. Unlike fitStrokes, an edited drawing lands where the original was.
+export function toBox(strokes, box, vb = { x: 0, y: 0, w: 100, h: 100 }) {
+  const s = Math.min(box.w / vb.w, box.h / vb.h), ox = box.x + (box.w - vb.w * s) / 2, oy = box.y + (box.h - vb.h * s) / 2;
+  return strokes.map((st) => st.map((p) => ({ x: ox + (p.x - vb.x) * s, y: oy + (vb.y + vb.h - p.y) * s })));
+}
+
 export function resample(stroke, step) {
   if (stroke.length < 2) return stroke.slice();
   const out = [stroke[0]]; let acc = 0;
@@ -29,32 +36,103 @@ export function resample(stroke, step) {
   return out;
 }
 
-// Greedy nearest-neighbour ordering from the top-left, allowing each stroke to be drawn either way,
-// to cut the pen-up travel between strokes.
-export function order(strokes) {
-  if (strokes.length <= 1) return strokes.slice();
-  const left = strokes.map((s, i) => i);
-  const end = s => s[s.length - 1];
-  const out = [];
-  // start at the stroke whose start is nearest the top-left of the group
-  const bb = bbox(strokes), corner = { x: bb.minx, y: bb.miny };
-  let bi = 0, bd = Infinity;
-  left.forEach(i => { const d = Math.hypot(strokes[i][0].x - corner.x, strokes[i][0].y - corner.y); if (d < bd) { bd = d; bi = i; } });
-  let cur = strokes[bi]; out.push(cur); left.splice(left.indexOf(bi), 1);
-  let tip = end(cur);
-  while (left.length) {
-    let best = -1, rev = false, dist = Infinity;
+// ---- the order to draw strokes in, each either way round, for the least pen-up travel ----
+// A tour is [{i, rev}]: stroke i, drawn backwards when rev. Travel is the sum of pen-up hops between strokes,
+// plus the hop from `from` (the pen's position) when given.
+const hop = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const headOf = (S, k) => (k.rev ? S[k.i][S[k.i].length - 1] : S[k.i][0]);
+const tailOf = (S, k) => (k.rev ? S[k.i][0] : S[k.i][S[k.i].length - 1]);
+export function tourTravel(S, tour, from = null) {
+  let d = from && tour.length ? hop(from, headOf(S, tour[0])) : 0;
+  for (let k = 1; k < tour.length; k++) d += hop(tailOf(S, tour[k - 1]), headOf(S, tour[k]));
+  return d;
+}
+
+// Nearest stroke end next, from the pen's position (or the top-left of the drawing).
+function greedy(S, from) {
+  const left = new Set(S.map((_, i) => i)), tour = [];
+  let at = from;
+  if (!at) { const bb = bbox(S); at = { x: bb.minx, y: bb.maxy }; }
+  while (left.size) {
+    let best = null, bd = Infinity;
     for (const i of left) {
-      const s = strokes[i];
-      const d0 = Math.hypot(s[0].x - tip.x, s[0].y - tip.y);
-      const d1 = Math.hypot(end(s).x - tip.x, end(s).y - tip.y);
-      if (d0 < dist) { dist = d0; best = i; rev = false; }
-      if (d1 < dist) { dist = d1; best = i; rev = true; }
+      const d0 = hop(at, S[i][0]), d1 = hop(at, S[i][S[i].length - 1]);
+      if (d0 < bd) { bd = d0; best = { i, rev: false }; }
+      if (d1 < bd) { bd = d1; best = { i, rev: true }; }
     }
-    let s = strokes[best]; if (rev) s = s.slice().reverse();
-    out.push(s); left.splice(left.indexOf(best), 1); tip = end(s);
+    tour.push(best); left.delete(best.i); at = tailOf(S, best);
   }
-  return out;
+  return tour;
+}
+
+// Then improve it until no move helps: 2-opt (turn a run of strokes round, which also flips each stroke) and
+// Or-opt (lift one stroke out and put it back elsewhere, either way round). Each move is scored by the two or
+// three hops it changes, so a pass over n strokes costs n².
+function improve(S, tour, from) {
+  const n = tour.length, H = (k) => headOf(S, k), T = (k) => tailOf(S, k);
+  const before = (a) => (a > 0 ? T(tour[a - 1]) : from);
+  let better = true, guard = 0;
+  while (better && guard++ < 60) {
+    better = false;
+    for (let a = 0; a < n - 1; a++) for (let b = a + 1; b < n; b++) {
+      const p = before(a), q = b + 1 < n ? H(tour[b + 1]) : null;
+      const old = (p ? hop(p, H(tour[a])) : 0) + (q ? hop(T(tour[b]), q) : 0);
+      const neu = (p ? hop(p, T(tour[b])) : 0) + (q ? hop(H(tour[a]), q) : 0);
+      if (neu < old - 1e-9) {
+        const seg = tour.slice(a, b + 1).reverse().map((k) => ({ i: k.i, rev: !k.rev }));
+        tour.splice(a, seg.length, ...seg); better = true;
+      }
+    }
+    for (let a = 0; a < n; a++) {
+      const k = tour[a], p = before(a), q = a + 1 < n ? H(tour[a + 1]) : null;
+      const out = (p ? hop(p, H(k)) : 0) + (q ? hop(T(k), q) : 0) - (p && q ? hop(p, q) : 0);
+      let bestGain = 1e-9, bestAt = -1, bestRev = false;
+      const rest = tour.filter((_, x) => x !== a);
+      for (let j = 0; j <= rest.length; j++) {
+        const pp = j > 0 ? T(rest[j - 1]) : from, qq = j < rest.length ? H(rest[j]) : null;
+        for (const rev of [false, true]) {
+          const kk = { i: k.i, rev }, ins = (pp ? hop(pp, H(kk)) : 0) + (qq ? hop(T(kk), qq) : 0) - (pp && qq ? hop(pp, qq) : 0);
+          if (out - ins > bestGain) { bestGain = out - ins; bestAt = j; bestRev = rev; }
+        }
+      }
+      if (bestAt >= 0) { rest.splice(bestAt, 0, { i: k.i, rev: bestRev }); tour.splice(0, n, ...rest); better = true; }
+    }
+  }
+  return tour;
+}
+
+// strokes -> a tour: ordered and turned round for the least travel. how: "greedy", "heuristic" (greedy then
+// 2-opt and Or-opt), or "best" (the default): the exact optimum up to EXACT strokes, the heuristic above.
+const EXACT = 12;
+export function orderTour(S, { from = null, how = "best" } = {}) {
+  if (S.length <= 1) return S.map((_, i) => ({ i, rev: false }));
+  if (how === "best" && S.length <= EXACT) return exactTour(S, from).tour;
+  const tour = greedy(S, from);
+  return how === "greedy" ? tour : improve(S, tour, from);
+}
+export function order(strokes, opts = {}) {
+  return orderTour(strokes, opts).map((k) => (k.rev ? strokes[k.i].slice().reverse() : strokes[k.i]));
+}
+
+// The true least travel, by dynamic programming over subsets (Held–Karp, with each stroke either way round):
+// 2^n · n² steps, a few milliseconds for 12 strokes. -> { travel, tour }
+export function exactTour(S, from = null) {
+  const n = S.length, N = 1 << n, INF = 1e18;
+  const cost = new Float64Array(N * n * 2).fill(INF), back = new Int32Array(N * n * 2).fill(-1);
+  const at = (m, i, r) => (m * n + i) * 2 + r, end = (i, r) => (r ? S[i][0] : S[i][S[i].length - 1]), beg = (i, r) => (r ? S[i][S[i].length - 1] : S[i][0]);
+  for (let i = 0; i < n; i++) for (const r of [0, 1]) cost[at(1 << i, i, r)] = from ? hop(from, beg(i, r)) : 0;
+  for (let m = 1; m < N; m++) for (let i = 0; i < n; i++) for (const r of [0, 1]) {
+    const c = cost[at(m, i, r)]; if (c >= INF || !(m & (1 << i))) continue;
+    for (let j = 0; j < n; j++) if (!(m & (1 << j))) for (const t of [0, 1]) {
+      const m2 = m | (1 << j), c2 = c + hop(end(i, r), beg(j, t));
+      if (c2 < cost[at(m2, j, t)]) { cost[at(m2, j, t)] = c2; back[at(m2, j, t)] = at(m, i, r); }
+    }
+  }
+  let best = INF, k = -1;
+  for (let i = 0; i < n; i++) for (const r of [0, 1]) if (cost[at(N - 1, i, r)] < best) { best = cost[at(N - 1, i, r)]; k = at(N - 1, i, r); }
+  const tour = [];
+  for (; k >= 0; k = back[k]) { const i = Math.floor(k / 2) % n; tour.unshift({ i, rev: k % 2 === 1 }); }
+  return { travel: best, tour };
 }
 
 // strokes (image coords) -> { toolpath:[{x,y,pen}], ink, travel, strokes:ordered(mm) }
@@ -62,11 +140,15 @@ export function order(strokes) {
 export function plan(strokes, g = GEOM, opts = {}) {
   const half = opts.half ?? 90;               // drawing half-size in mm (180 mm box ~ 200 mm clock)
   const { cx, cy } = drawCentre(g);
-  const step = opts.step ?? 2;
-  let s = fitStrokes(strokes, half, cx, cy);
-  s = order(s).map(st => resample(st, step));
-  const toolpath = []; let ink = 0, travel = 0; let prev = null;
-  const lead = opts.leadIn ?? 0;
+  return drawPath(fitStrokes(strokes, half, cx, cy), opts);
+}
+
+// Strokes already in board mm -> the toolpath that draws them: ordered for least travel from `from`, resampled
+// every `step` mm, each with a pen-up lead-in.
+export function drawPath(strokes, opts = {}) {
+  const step = opts.step ?? 2, lead = opts.leadIn ?? 0;
+  const s = order(strokes.filter((st) => st.length > 1), { from: opts.from || null, how: opts.how }).map((st) => resample(st, step));
+  const toolpath = []; let ink = 0, travel = 0; let prev = opts.from || null;
   for (const st of s) {
     // lead-in: stop short of the stroke and glide onto its start pen-up, moving the way the stroke goes, so the
     // servos' dead band and gear play are already taken up when the pen touches down

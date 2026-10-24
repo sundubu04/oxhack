@@ -20,8 +20,11 @@ export const DEFAULT_CONFIG = {
   servos: {
     model: "TowerPro SG92R", speed: 600, resolution: 1, backlash: 0, compensate: true,
     // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
-    base: { min: 0, max: 180, offset: 0, dir: 1, ratio: 1 },
-    elbow: { min: 0, max: 180, offset: 0, dir: 1, ratio: 1 },
+    // zero offsets centre each joint's working range on its servo's travel (base -16 to 80 deg, elbow 45 to 157
+    // deg for the drawing square with the pen across the forearm): mount the base so its middle points 32 deg up
+    // from +x, and the elbow so its middle is 100 deg round from link 1
+    base: { min: 0, max: 180, offset: 58, dir: 1, ratio: 1 },
+    elbow: { min: 0, max: 180, offset: -10, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
 };
@@ -53,7 +56,7 @@ export function geomFrom(cfg) {
 // The tilts and the two ends' offsets across the forearm come from the pen's measurements.
 function penFields(p) {
   const pg = penGeometry(p);
-  return { pen: pg, tilt: { draw: pg.draw, lift: pg.lift, erase: pg.erase }, nibSide: pg.side, eraserSide: -pg.side };
+  return { pen: pg, tilt: { draw: pg.draw, lift: pg.lift, erase: pg.erase, liftErase: -pg.lift }, nibSide: pg.side, eraserSide: -pg.side };
 }
 
 // Geometry angle -> the angle the servo is commanded to, through its calibration.

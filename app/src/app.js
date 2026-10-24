@@ -1,23 +1,27 @@
-// Clockwork: ask for a drawing, watch the simulated arm draw it to scale, send the same angles to the real arm.
-// Pipeline: words -> a picture (Gemini, through the dev server) -> the shortest pen path -> joint angles ->
-// a live sim through the servos' limits. Everything after the picture is deterministic.
-import { toAngles, R2D } from "./ik.js";
+// Clockwork: talk to a drawing arm. Each simulation is a whiteboard you change by chatting: ask for a drawing, an
+// edit, or a game. Every change is planned as the difference from what is already on the board (optimize.js):
+// only what changed is wiped and drawn, in the order the sim times as fastest. The sim plays it to scale through
+// the servos' limits, and the real arm gets the same commands.
+import { toAngles } from "./ik.js";
 import { parseSVG } from "./svg.js";
-import { plan, erasePlan } from "./pathplan.js";
-import { imageToStrokes } from "./vectorize.js";
+import { plan } from "./pathplan.js";
+import { planChange } from "./optimize.js";
 import * as voice from "./voice.js";
 import * as arm from "./arm.js";
 import { SAMPLES, clockSVG } from "./sample.js";
-import { loadConfig, saveConfig, geomFrom, withDefaults, DEFAULT_CONFIG, servoAngle } from "./config.js";
+import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
 import { createBoard } from "./board.js";
 import { nibHeight } from "./pen.js";
+import { emptyScene, sceneStrokes, applyActions, describeGame, cellName, boxMm, sceneSVG, FULL } from "./scene.js";
+import { parseCell } from "./games/tictactoe.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const params = new URLSearchParams(location.search);
 const now = () => (params.get("at") ? new Date(params.get("at")) : new Date());   // ?at= fixes the clock for screenshots
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 // ---------- icons (Lucide, from the kit's icons.json) ----------
 let ICONS = {};
@@ -35,18 +39,20 @@ const secs = (s) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min 
 const mm = (v) => `${Math.round(v).toLocaleString("en-GB")} mm`;
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "now" : m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`; };
 const modelName = (m = "") => m.replace(/^gemini-/, "Gemini ").replace(/-/g, " ").replace(/\b(flash|pro|lite|image|preview)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
+const hhmm = (t) => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
 
 // ---------- state ----------
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
 let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
-const S = load("clockwork.prefs", { narrate: false, route: "svg", physics: true, reach: true, voice: "" });
-let recent = load("clockwork.recent", []);
-let drawing = null;       // { prompt, strokes, picture, meta, sample }
-let planned = null;       // { plan, angles, job } for the drawing
-let active = null;        // the job the sim is running: the drawing, an erase, or erase + clock
-let lastAsk = "";
-let playing = false, speed = 1, view = "board", keepTime = false, keptMinute = -1, sending = null, erasing = false, cleaned = false;
+const S = load("clockwork.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
+let sims = [], doc = null;           // the saved simulations, and the open one
+let scene = emptyScene();            // what should be on the board
+let boardStrokes = [];               // what is on it once the current job finishes (board mm)
+let messages = [], thinking = false;
+let planned = null;                  // { toolpath, angles, job, res, ink, wiped } for the last change
+let active = null, inkBefore = null; // the job the sim is running, and the ink it started on
+let playing = false, speed = 1, view = "board", keepTime = false, keptMinute = -1, sending = null;
 
 function load(k, d) {
   try { const v = JSON.parse(localStorage.getItem(k) || "null"); if (v == null) return d; return Array.isArray(d) ? (Array.isArray(v) ? v : d) : { ...d, ...v }; }
@@ -54,36 +60,9 @@ function load(k, d) {
 }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
-// ---------- notices ----------
 function toast(msg, name = "check") {
   const t = document.createElement("div"); t.className = "dl-toast"; t.setAttribute("role", "status");
   t.innerHTML = `${icon(name)}<span>${esc(msg)}</span>`; $("#toasts").append(t); setTimeout(() => t.remove(), 3200);
-}
-function showError(msg) { $("#error-text").textContent = msg; $("#error").hidden = false; $("#empty").hidden = true; }
-function hideError() { $("#error").hidden = true; }
-
-// A new ask replaces what is on the board: nothing from the last drawing stays on screen as if it were this one's.
-function clearDrawing(title, subtitle) {
-  pause(); planned = null; active = null; drawing = null;
-  sim.reset(); board.clearInk(); draw();
-  $("#title").textContent = title.charAt(0).toUpperCase() + title.slice(1); $("#title").title = title; $("#subtitle").textContent = subtitle;
-  $("#stats").hidden = true; $("#stats-skel").hidden = false; $("#m-answer").hidden = true; $("#empty").hidden = true;
-  ["#download", "#copy"].forEach((s) => { $(s).disabled = true; });
-  renderPicture(); renderAngles(); syncSend(); syncTransport(); syncLive(true);
-}
-
-// ---------- the arm's voice (ElevenLabs when its key is in app/.env) ----------
-function narrate(kind, d = {}) {
-  if (!S.narrate) return;
-  const lines = {
-    start: () => `Drawing ${d.prompt}. About ${d.secs} seconds.${d.out ? ` ${d.out} points are out of my reach.` : ""}`,
-    done: () => `Done, in ${d.secs} seconds.`,
-    clean: () => "Board clean.",
-    time: () => `It's ${d.time}.`,
-    connected: () => "Arm connected. Ready when you are.",
-    failed: () => d.msg,
-  };
-  voice.say(lines[kind](), { voice: S.voice || undefined });
 }
 
 // ---------- state words: one vocabulary, colour only for what needs attention ----------
@@ -93,8 +72,6 @@ function status(el, text, { tone = "", mark = "" } = {}) {
   if (mark) el.dataset.mark = mark; else delete el.dataset.mark;
 }
 const planStatus = (text, o) => status($("#plan-status"), text, o);
-
-// ---------- pipeline steps ----------
 const steps = {
   reset() { $$("#steps .dl-step").forEach((li) => { li.dataset.state = "next"; li.querySelector(".dl-step__time").textContent = ""; }); this.bar(0); $("#steps").dataset.state = "running"; },
   set(name, state, text) { const li = $(`#steps [data-step="${name}"]`); li.dataset.state = state; if (text != null) li.querySelector(".dl-step__time").textContent = text; },
@@ -102,112 +79,186 @@ const steps = {
   bar(p) { $("#steps-fill").style.setProperty("--dl-p", p); },
 };
 
-// ---------- the pipeline ----------
-function sampleFor(text) {
-  const lc = text.trim().toLowerCase();
-  if (SAMPLES[lc]) return lc;
-  if (/^(the )?(clock|time)( now)?$/.test(lc)) return "clock";
+// ---------- simulations: each a board and a conversation, saved by the dev server ----------
+async function listSims() {
+  try { sims = await fetch("./api/sims").then((r) => r.json()); } catch (e) { sims = []; }
+  renderSims();
+}
+function renderSims() {
+  const mine = doc && !sims.some((s) => s.id === doc.id) ? [{ id: doc.id, title: doc.title, updated: doc.updated }] : [];
+  $("#sims").innerHTML = [...mine, ...sims].map((s) => `<a class="dl-nav__item" href="#studio" data-sim="${esc(s.id)}" title="${esc(s.title)}" ${doc && s.id === doc.id ? 'aria-current="true"' : ""}>${icon("pencil")}<span class="dl-nav__label">${esc(s.title)}</span><span class="dl-nav__count">${ago(s.updated)}</span></a>`).join("");
+}
+const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+async function newSim({ focus = true } = {}) {
+  await leaveSim();
+  doc = { id: newId(), title: "New simulation", created: Date.now(), updated: Date.now() };
+  await enter({ ...doc, messages: [], scene: emptyScene(), ink: null });
+  await saveNow(); listSims(); go("studio"); if (focus) $("#prompt").focus();
+}
+async function openSim(id) {
+  if (doc && id === doc.id) { go("studio"); return; }
+  await leaveSim();
+  const s = await fetch(`./api/sims/${id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!s) { toast("That simulation couldn't be opened", "circle-alert"); return; }
+  await enter(s); renderSims(); go("studio");
+}
+async function enter(s) {
+  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now() };
+  messages = s.messages || []; scene = s.scene || emptyScene();
+  pause(); active = null; planned = null; inkBefore = null; setKeepTime(false);
+  await board.setInk(s.ink); inkDirty = true;
+  boardStrokes = sceneStrokes(scene, g);
+  sim.reset();
+  renderTitle(); renderThread(); renderPicture(); renderAngles(); renderPlanEmpty();
+  $("#empty").hidden = !!(scene.items.length || scene.game);
+  syncTransport(); syncLive(true); draw(); try { localStorage.setItem("clockwork.open", doc.id); } catch (e) {}
+}
+// before leaving a simulation, finish what is drawing and keep the board as it ends
+async function leaveSim() { if (!doc) return; finishJob(); clearTimeout(saveTimer); await saveNow(); }
+let saveTimer = 0;
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700); }
+async function saveNow() {
+  if (!doc) return;
+  doc.updated = Date.now();
+  // the ink as it will be when the job ends, so a reopened simulation shows the finished board
+  const ink = active && !sim.done ? null : board.inkURL();
+  const body = { ...doc, messages, scene, ...(ink ? { ink } : { ink: doc.ink || null }) };
+  if (ink) doc.ink = ink;
+  // read the reply too: an unread response keeps the request open in the browser
+  try { await fetch(`./api/sims/${doc.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.text()); } catch (e) {}
+  const row = sims.find((s) => s.id === doc.id); if (row) { row.title = doc.title; row.updated = doc.updated; } else sims.unshift({ id: doc.id, title: doc.title, updated: doc.updated });
+  renderSims();
+}
+function renderTitle() {
+  $("#title").textContent = doc?.title || "New simulation"; $("#title").title = doc?.title || "";
+  const n = scene.items.length + (scene.game ? 1 : 0);
+  $("#subtitle").textContent = n ? (scene.game ? `Noughts and crosses${scene.items.length ? ` and ${scene.items.length} ${scene.items.length === 1 ? "drawing" : "drawings"}` : ""}` : `${n} ${n === 1 ? "drawing" : "drawings"} on the board`) : "The board is empty";
+}
+
+// ---------- the chat ----------
+const STARTERS = ["Draw the time", "Draw a cat", "Play noughts and crosses", "Draw the Oxford logo"];
+function renderThread() {
+  const t = $("#thread");
+  if (!messages.length && !thinking) {
+    t.innerHTML = `<div class="cw-hello"><p class="dl-msg dl-msg--assistant">Ask me to draw something, change what's on the board, or play a game.</p><div class="cw-starters">${STARTERS.map((s) => `<button class="dl-chip" type="button" data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`;
+    return;
+  }
+  t.innerHTML = messages.map((m) => m.role === "user"
+    ? `<p class="dl-msg dl-msg--user">${esc(m.text)}</p>`
+    : `<div class="dl-msg dl-msg--assistant"><p class="${m.error ? "cw-msg-fail" : ""}">${m.error ? icon("circle-alert") + " " : ""}${esc(m.text)}</p>${m.note ? `<p class="dl-msg__note">${esc(m.note)}</p>` : ""}${m.error && m.retry ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-retry>Try again</button></div>` : ""}</div>`).join("")
+    + (thinking ? `<p class="dl-msg dl-msg--assistant cw-thinking"><span class="dl-spinner" aria-hidden="true"></span>Drawing it up</p>` : "");
+  t.scrollTop = t.scrollHeight;
+}
+
+// What the app does itself, without asking Gemini: clearing, the time, the samples, and the game.
+function localTurn(text) {
+  const t = text.toLowerCase().replace(/[.!?]+$/, "").trim();
+  if (/^(please )?(clear|wipe|erase|rub out|clean)( (it|everything|all|the board|board|it all))*$/.test(t)) return { reply: "Wiping the board.", actions: [{ type: "clear" }] };
+  if (/^(draw |show )?(me )?(the )?(time|clock)( now)?$/.test(t) || /what time is it/.test(t)) {
+    const has = scene.items.some((i) => i.id === "clock");
+    const others = scene.items.some((i) => i.id !== "clock");
+    return { reply: `Drawing the time: ${hhmm(now())}.`, actions: [{ type: has ? "edit" : "draw", id: "clock", name: "clock", box: others ? undefined : FULL, svg: clockSVG(now()) }] };
+  }
+  const sm = t.match(/^(draw |show )?(me )?(a |an |the )?(cat|house|star|flower)$/);
+  if (sm) return { reply: `Drawing a ${sm[4]}.`, actions: [{ type: "draw", id: sm[4], name: sm[4], svg: SAMPLES[sm[4]] }] };
+  if (/(tic.?tac.?toe|noughts and crosses|naughts and crosses)/.test(t)) return { reply: "Noughts and crosses.", actions: [{ type: "game", game: "tictactoe", first: /\b(you|robot) (go |start )?first\b/.test(t) ? "robot" : "person" }] };
+  if (scene.game) {
+    if (/\b(again|new game|restart|rematch|another)\b/.test(t)) return { reply: "New game.", actions: [{ type: "game", game: "tictactoe" }] };
+    const c = parseCell(t); if (c >= 0 && t.split(/\s+/).length <= 6) return { reply: "", actions: [{ type: "move", cell: c }] };
+  }
   return null;
 }
 
-async function rasterToStrokes(url) {
-  const img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-  const N = 256, c = document.createElement("canvas"); c.width = c.height = N; const x = c.getContext("2d");
-  x.fillStyle = "#fff"; x.fillRect(0, 0, N, N); const s = Math.min(N / img.width, N / img.height);
-  x.drawImage(img, (N - img.width * s) / 2, (N - img.height * s) / 2, img.width * s, img.height * s);
-  return imageToStrokes(x.getImageData(0, 0, N, N), { threshold: 140, minLen: 14, simplify: 1.5 });
-}
-
-async function run(text) {
+let lastAsk = "";
+async function send(text) {
   text = (text || "").trim();
-  if (!text) { $("#prompt").focus(); return; }
-  hideError(); setKeepTime(false); busy(true); go("studio");
-  $("#prompt").value = text; lastAsk = text;
-  clearDrawing(text, sampleFor(text) ? "Sample" : "Gemini");
-  planStatus("Working", { mark: "ring" });
-  steps.reset(); steps.set("picture", "now", "making");
-  const sample = sampleFor(text), t0 = performance.now();
-  try {
-    let strokes, picture, meta;
-    if (sample === "clock") { const svg = clockSVG(now()); strokes = parseSVG(svg); picture = { svg }; meta = "Sample, the time now"; }
-    else if (sample) { strokes = parseSVG(SAMPLES[sample]); picture = { svg: SAMPLES[sample] }; meta = "Sample"; }
-    else {
-      if (!services.gemini.ready) throw new Error("No Gemini key yet. Add GEMINI_API_KEY to app/.env and restart the server, or pick a sample.");
-      const r = await fetch("./api/draw", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text, route: S.route }) });
+  if (!text || thinking) return;
+  if (!doc) await newSim({ focus: false });
+  setKeepTime(false);
+  messages.push({ role: "user", text }); lastAsk = text;
+  if (doc.title === "New simulation") { doc.title = cap(text).slice(0, 48); renderTitle(); renderSims(); }
+  $("#prompt").value = ""; autosize(); selectTab("chat");
+  let reply = "", actions = [], note = "", t0 = performance.now();
+  const local = localTurn(text);
+  steps.reset(); steps.set("picture", "now", local ? "on the arm" : "asking Gemini"); planStatus("Working", { mark: "ring" });
+  if (local) ({ reply, actions } = local);
+  else {
+    thinking = true; renderThread(); busy(true);
+    try {
+      const r = await fetch("./api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        messages: messages.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text })),
+        board: scene.items.map(({ id, name, box, svg }) => ({ id, name, box, svg })),
+        game: describeGame(scene.game),
+      }) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(friendly(j.error || `The server answered ${r.status}`));
-      if (j.svg) { strokes = parseSVG(j.svg); picture = { svg: j.svg }; } else { strokes = await rasterToStrokes(j.image); picture = { image: j.image }; }
-      meta = `${modelName(j.model)}, ${(j.ms / 1000).toFixed(1)} s`;
+      if (!r.ok) throw new Error(j.error || `The server answered ${r.status}`);
+      reply = j.reply; actions = j.actions || []; note = `${modelName(j.model)}, ${(j.ms / 1000).toFixed(1)} s`;
+    } catch (e) {
+      thinking = false; busy(false);
+      messages.push({ role: "assistant", text: friendly(e.message), error: true, retry: true }); renderThread();
+      steps.fail("picture", "failed"); planStatus("Failed", { tone: "stop" }); saveSoon(); return;
     }
-    if (!strokes?.length) throw new Error("That picture has no lines the arm can draw. Try fewer, simpler words.");
-    steps.set("picture", "done", sample ? "sample" : `${((performance.now() - t0) / 1000).toFixed(1)} s`);
-    setDrawing({ prompt: text, strokes, picture, meta, sample }, { remember: !sample });
-    narrate("start", { prompt: text, secs: whole(planned.job.total), out: planned.angles.unreachable });
-    play();
-  } catch (e) {
-    steps.fail("picture", "failed");
-    planStatus("Failed", { tone: "stop" });
-    $("#stats-skel").hidden = true;
-    showError(e.message || String(e));
-    narrate("failed", { msg: /busy/.test(e.message) ? "Gemini is busy. Try a sample." : "I couldn't make that picture." });
-  } finally { busy(false); }
+    thinking = false; busy(false);
+  }
+  steps.set("picture", "done", note || "on the arm");
+  const { scene: next, notes } = applyActions(scene, actions);
+  const said = [reply, ...notes].filter(Boolean).join(" ") || "Done.";
+  const summary = change(next);
+  messages.push({ role: "assistant", text: said, note: [summary, note].filter(Boolean).join(" · ") });
+  renderThread(); saveSoon();
+  if (S.narrate) voice.say(said, { voice: S.voice || undefined });
 }
 
 function friendly(msg) {
-  if (/503|high demand|overloaded|took over/i.test(msg)) return "Gemini is busy. Pick a sample, or";
-  if (/429|quota/i.test(msg)) return S.route === "image" ? "The image models need billing on the Gemini project. Switch Picture to vector drawing in Arm setup." : "Gemini's free quota is used up for now. Try again in a minute.";
+  if (/503|high demand|overloaded|took over/i.test(msg)) return "Gemini is busy right now. Try again in a moment.";
+  if (/quota/i.test(msg)) return msg.replace(/^Gemini \d+: /, "");
   return msg;
 }
+function busy(on) { const b = $("#draw"); b.setAttribute("aria-busy", String(on)); b.disabled = on; $("#ask").setAttribute("aria-busy", String(on)); }
+function autosize() { const t = $("#prompt"); t.style.height = "auto"; t.style.height = `${Math.min(132, t.scrollHeight)}px`; }
 
-function busy(on) {
-  const b = $("#draw");
-  b.setAttribute("aria-busy", String(on));
-  b.innerHTML = on ? `<span class="dl-spinner" aria-hidden="true"></span>Draw` : "Draw";
+// ---------- a change: from what is on the board to the next scene ----------
+// The planner picks what to keep, wipe and draw; the sim plays it from the arm's pose now, on top of the board's ink.
+function change(next) {
+  finishJob();
+  const t0 = performance.now();
+  const nextStrokes = sceneStrokes(next, g);
+  const from = sim.tip("draw");
+  const res = planChange(boardStrokes, nextStrokes, g, { from });
+  scene = next; boardStrokes = nextStrokes;
+  renderTitle(); renderPicture();
+  $("#empty").hidden = !!(scene.items.length || scene.game);
+  const tp = res.best.toolpath;
+  if (!tp.length) { steps.set("path", "done", "nothing to change"); planStatus("Ready", { mark: "dot" }); return "Nothing on the board needs to change."; }
+  const angles = toAngles(tp, g), job = makeJob(tp, angles, g);
+  const lenOf = (S) => S.reduce((d, s) => d + s.reduce((a, p, i) => a + (i ? Math.hypot(p.x - s[i - 1].x, p.y - s[i - 1].y) : 0), 0), 0);
+  planned = { toolpath: tp, angles, job, res, ink: lenOf(res.add), wiped: lenOf(res.remove) };
+  steps.set("path", "done", `${res.best.name === "none" ? "" : `${res.best.name} wipe, `}${(performance.now() - t0).toFixed(0)} ms`);
+  steps.set("angles", "done", `${tp.length} points`); steps.set("sim", "next", ""); steps.bar(0.75);
+  renderAngles(); renderPlanStats(); startJob(job); play();
+  if (arm.connected() && S.follow) sendToArm(job);
+  const parts = [];
+  if (res.remove.length) parts.push(`wipes ${res.remove.length} ${res.remove.length === 1 ? "stroke" : "strokes"}`);
+  if (res.add.length) parts.push(`draws ${res.add.length}`);
+  if (res.keep.length && (res.remove.length || res.add.length)) parts.push(`keeps ${res.keep.length}`);
+  return `${cap(parts.join(", "))}, ${secs(whole(job.total))}`;
 }
-
-// Plan, solve and load a drawing into the sim. Deterministic: the same strokes always give the same angles.
-function setDrawing(d, { remember = false } = {}) {
-  drawing = d;
-  const t1 = performance.now();
-  const p = plan(d.strokes, g, { half: g.half, leadIn: g.leadIn });
-  steps.set("path", "done", `${p.strokes.length} strokes`);
-  const angles = toAngles(p.toolpath, g);
-  steps.set("angles", "done", `${p.toolpath.length} points`);
-  steps.set("sim", "next", "");
-  planned = { plan: p, angles, job: makeJob(p.toolpath, angles, g), ms: performance.now() - t1 };
-  $("#steps").dataset.state = "running"; steps.bar(0.75);
-  $("#title").textContent = d.prompt.charAt(0).toUpperCase() + d.prompt.slice(1);
-  $("#title").title = d.prompt;
-  $("#subtitle").textContent = d.meta;
-  renderPicture(); renderAngles(); renderPlanStats(); $("#empty").hidden = true;
-  startJob(planned.job, { clear: true });
-  ["#download", "#copy"].forEach((s) => { $(s).disabled = false; });
-  syncSend();
-  if (remember) remember_(d);
-}
-
-function remember_(d) {
-  const strokes = d.strokes.map((s) => s.map((p) => ({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 })));
-  recent = [{ id: Date.now().toString(36), prompt: d.prompt, strokes, svg: d.picture?.svg || null, meta: d.meta, at: Date.now() }, ...recent.filter((r) => r.prompt !== d.prompt)].slice(0, 8);
-  store("clockwork.recent", recent); renderRecent();
-}
-
-function replan() { if (drawing) setDrawing(drawing); else { sim.reset(); draw(); } }
+// geometry changed: draw the whole scene again, from a clean board
+function replan() { board.clearInk(); boardStrokes = []; sim.reset(); const s = scene; scene = emptyScene(); if (s.items.length || s.game) change(s); else draw(); }
 
 // ---------- the sim ----------
 const onInk = (a, b, mode) => { board.inkSeg(a, b, mode); inkDirty = true; };
-
-function startJob(job, { clear = false } = {}) {
+function startJob(job) {
   pause();
-  if (clear) { board.clearInk(); sim.reset(); }
-  active = job; sim.load(job); sim.physics = S.physics;
+  active = job; inkBefore = board.snapshot(); sim.load(job); sim.physics = S.physics;
   syncTransport(); draw();
 }
-
+// run what is left of the job at once, so the board matches what was planned
+function finishJob() { if (active && !sim.done) { pause(); sim.advance(active.total - sim.t + 0.05, onInk); syncTransport(); draw(); } }
 function play() {
   if (!active) return;
-  if (sim.done) { seek(0); }
-  playing = true; sim.manual = null; cleaned = false;
+  if (sim.done) seek(0);
+  playing = true; sim.manual = null;
   $("#play").setAttribute("aria-label", "Pause"); $("#play").title = "Pause"; setIcon($("#play"), "pause");
   steps.set("sim", "now"); $("#steps").dataset.state = "running";
   kick();
@@ -217,36 +268,25 @@ function pause() {
   $("#play").setAttribute("aria-label", "Play"); $("#play").title = "Play"; setIcon($("#play"), "play");
   showPaused();
 }
-// a job stopped part way: the step stops turning and says where it stopped
 function showPaused() {
   if (!active || !planned || sim.done || !$("#steps")) return;
   if (sim.t > 0) { steps.set("sim", "now", `paused at ${clock(sim.t)}`); $("#steps").dataset.state = "stopped"; }
   else { steps.set("sim", "next", ""); $("#steps").dataset.state = "ready"; }
 }
+// replay the job from its start, on the ink it started on
 function seek(t) {
   if (!active) return;
-  board.clearInk(); sim.reset(); sim.load(active); sim.physics = S.physics;
+  board.restore(inkBefore); sim.reset(); sim.load(active); sim.physics = S.physics; inkDirty = true;
   sim.advance(Math.max(0, Math.min(t, active.total)), onInk);
   syncTransport(); draw(); if (!playing) showPaused();
 }
-function eraseBoard() {
-  if (!board.hasInk()) { toast("The board is already clean", "info"); return; }
-  setKeepTime(false);
-  const ep = erasePlan(g), an = toAngles(ep.toolpath, g);
-  startJob(makeJob(ep.toolpath, an, g)); erasing = true; play();
-}
-
 function finished() {
-  if (planned && active === planned.job) { planned.seen = true; syncSend(); if (!keepTime) narrate("done", { secs: whole(active.total) }); }
-  if (erasing) narrate("clean");
   pause();
   steps.set("sim", "done", sim.dev.n ? `${(sim.dev.sum / sim.dev.n).toFixed(1)} mm off on average` : "done");
   $("#steps").dataset.state = "ready"; steps.bar(1);
-  // after an erase, the drawing is ready to draw again on the clean board
-  if (erasing && planned) { erasing = false; active = planned.job; sim.load(active); sim.manual = { ...sim.j }; cleaned = true; syncTransport(); }
+  planned && (planned.seen = true); syncSend(); saveSoon();
 }
 
-// One animation loop while something moves; nothing runs at rest.
 let raf = 0, lastTs = 0;
 function kick() { if (!raf) { lastTs = performance.now(); raf = requestAnimationFrame(frame); } }
 function frame(ts) {
@@ -265,7 +305,7 @@ function draw() {
   if (view === "3d") { draw3d(); return; }
   board.render({
     toolpath: active?.toolpath, joints: sim.j, mode: sim.mode(), showReach: S.reach, hover,
-    unreachable: planned && active === planned.job ? planned.plan.toolpath.filter((_, i) => planned.angles.path[i].out_of_reach) : null,
+    unreachable: planned ? planned.toolpath.filter((_, i) => planned.angles.path[i].out_of_reach) : null,
   });
 }
 
@@ -287,7 +327,7 @@ function syncLive(force) {
   }
   const mode = sim.mode(), ps = $("#pen-status");
   if (playing) status(ps, mode === "draw" ? "Drawing" : mode === "erase" ? "Erasing" : "Moving, pen up", { mark: mode === "draw" ? "dot" : mode === "erase" ? "ring" : "" });
-  else if (!active || sim.t === 0) status(ps, cleaned ? "Board clean" : sim.manual ? "Moved by hand" : "Parked");
+  else if (!active || sim.t === 0) status(ps, sim.manual ? "Moved by hand" : "Parked");
   else status(ps, sim.done ? "Done" : "Paused", { mark: sim.done ? "dot" : "" });
   if (planned && active === planned.job) $("#st-err").textContent = `${sim.dev.max.toFixed(1)} mm`;
   syncTransport();
@@ -305,38 +345,44 @@ function syncTransport() {
   ["#play", "#rewind", "#scrub"].forEach((s) => { $(s).disabled = !active; });
 }
 
+function renderPlanEmpty() {
+  $("#stats").hidden = true; $("#stats-skel").hidden = true; $("#m-answer").hidden = true;
+  planStatus("Nothing yet");
+  $$("#steps .dl-step").forEach((li) => { li.dataset.state = "next"; li.querySelector(".dl-step__time").textContent = ""; }); steps.bar(0);
+  ["#download", "#copy"].forEach((s) => { $(s).disabled = true; }); syncSend();
+}
 function renderPlanStats() {
-  const { plan: p, angles, job } = planned;
+  const { angles, job, res } = planned;
   $("#st-time").textContent = secs(whole(job.total));
-  $("#st-ink").textContent = mm(p.ink);
-  $("#st-travel").textContent = mm(p.travel);
+  $("#st-ink").textContent = mm(planned.ink);
+  $("#st-travel").textContent = mm(planned.wiped);
   $("#st-err").textContent = "0.0 mm";
   $("#stats").hidden = false; $("#stats-skel").hidden = true;
   const rs = $("#reach-status");
   if (angles.unreachable) status(rs, `${angles.unreachable} points out of reach`, { tone: "stop" });
   else if (angles.outOfRange) status(rs, `${angles.outOfRange} points past servo limits`, { tone: "warn" });
   else status(rs, "All in reach", { mark: "dot" });
-  $("#m-answer").textContent = `${secs(whole(job.total))} to draw, ${rs.textContent.charAt(0).toLowerCase() + rs.textContent.slice(1)}`; $("#m-answer").hidden = false;
+  $("#m-answer").textContent = `${secs(whole(job.total))} to finish, ${rs.textContent.charAt(0).toLowerCase() + rs.textContent.slice(1)}`; $("#m-answer").hidden = false;
   planStatus("Ready", { mark: "dot" });
+  ["#download", "#copy"].forEach((s) => { $(s).disabled = false; }); syncSend();
 }
 
 function renderPicture() {
-  const pic = drawing?.picture, el = $("#picture");
-  if (!pic) { el.innerHTML = `<div class="dl-empty"><span class="dl-empty__title">No picture yet</span><span>Describe a drawing above, or pick a sample.</span></div>`; return; }
+  const el = $("#picture");
+  if (!scene.items.length && !scene.game) { el.innerHTML = `<div class="dl-empty"><span class="dl-empty__title">Nothing on the board</span><span>Ask for a drawing in the chat.</span></div>`; return; }
   // an <img> never runs anything inside a model's SVG
-  const src = pic.svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pic.svg)}` : pic.image;
-  el.innerHTML = `<img src="${src}" alt="${esc(drawing.prompt)}, the picture the arm traces">`;
+  el.innerHTML = `<img src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(sceneSVG(scene, g))}" alt="What should be on the board">`;
 }
 
 function renderAngles() {
   const el = $("#angles");
-  if (!planned) { el.innerHTML = `<div class="dl-empty"><span class="dl-empty__title">No angles yet</span><span>They appear once a drawing is planned.</span></div>`; return; }
-  const tp = planned.plan.toolpath, path = planned.angles.path, T = planned.job.tTilt;
+  if (!planned) { el.innerHTML = `<div class="dl-empty"><span class="dl-empty__title">No angles yet</span><span>They appear once a change is planned.</span></div>`; return; }
+  const tp = planned.toolpath, path = planned.angles.path, T = planned.job.tTilt;
   const rows = tp.map((p, i) => {
     const a = path[i], tool = p.tool || (p.pen ? "draw" : "lift");
     return a.out_of_reach
       ? `<tr data-i="${i}"><td class="dl-num">${i + 1}</td><td class="dl-num">${T[i].toFixed(2)}</td><td class="dl-num">${p.x.toFixed(1)}</td><td class="dl-num">${p.y.toFixed(1)}</td><td><span class="dl-status" data-tone="stop">Out of reach</span></td><td></td><td></td><td></td></tr>`
-      : `<tr data-i="${i}"><td class="dl-num">${i + 1}</td><td class="dl-num">${T[i].toFixed(2)}</td><td class="dl-num">${p.x.toFixed(1)}</td><td class="dl-num">${p.y.toFixed(1)}</td><td>${tool === "draw" ? "Draw" : tool === "erase" ? "Erase" : "Lift"}</td><td class="dl-num">${a.base.toFixed(2)}°</td><td class="dl-num">${a.elbow.toFixed(2)}°</td><td class="dl-num">${a.tilt}°</td></tr>`;
+      : `<tr data-i="${i}"><td class="dl-num">${i + 1}</td><td class="dl-num">${T[i].toFixed(2)}</td><td class="dl-num">${p.x.toFixed(1)}</td><td class="dl-num">${p.y.toFixed(1)}</td><td>${tool === "draw" ? "Draw" : tool === "erase" ? "Erase" : "Lift"}</td><td class="dl-num">${a.base.toFixed(2)}°</td><td class="dl-num">${a.elbow.toFixed(2)}°</td><td class="dl-num">${a.tilt.toFixed(1)}°</td></tr>`;
   }).join("");
   el.innerHTML = `<table class="dl-table"><thead><tr><th>#</th><th>Time s</th><th>x mm</th><th>y mm</th><th>Pen</th><th>Base</th><th>Elbow</th><th>Tilt</th></tr></thead><tbody>${rows}</tbody></table>`;
   lastRow = -1;
@@ -346,7 +392,7 @@ function renderAngles() {
 async function open3d() {
   if (!v3) {
     try { const { createView3d } = await import("./view3d.js"); v3 = createView3d($("#view3d"), board.ink); v3.setGeom(g, cfg.pen); }
-    catch (e) { showError(`The 3D view needs WebGL: ${e.message}`); setView("board"); return; }
+    catch (e) { toast(`The 3D view needs WebGL: ${e.message}`, "circle-alert"); setView("board"); return; }
   }
   v3.show(true); inkDirty = true; draw3d();
 }
@@ -357,7 +403,6 @@ function draw3d() {
   const hNib = mode === "erase" ? nibHeight(pg, -sim.j.tilt) : nibHeight(pg, sim.j.tilt);
   $("#read3d").textContent = `Tilt ${sim.j.tilt.toFixed(0)}° from flat · ${end} ${hNib <= 0.5 ? "on the board" : `${hNib.toFixed(1)} mm off the board`} · shaft ${pg.height.toFixed(0)} mm up · pen meets the board at ${pg.beta.toFixed(0)}°`;
 }
-
 function setView(v) {
   view = v;
   $$("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
@@ -367,28 +412,26 @@ function setView(v) {
   if (v === "board") draw();
   if (v === "angles") { lastRow = -1; syncLive(true); }
 }
+function selectTab(which) {
+  for (const t of ["chat", "plan"]) {
+    const on = t === which; $(`#tab-${t}`).setAttribute("aria-selected", String(on)); $(`#tab-${t}`).tabIndex = on ? 0 : -1; $(`#panel-${t}`).hidden = !on;
+  }
+}
 
-// ---------- keep time: erase and redraw the clock every minute ----------
+// ---------- keep time: the clock, changed each minute (only the hands that moved are wiped and redrawn) ----------
 function setKeepTime(on) {
   keepTime = on; $("#sw-time").setAttribute("aria-checked", String(on));
   if (on) { keptMinute = -1; tickTime(); }
 }
 function tickTime() {
-  if (!keepTime) return;
+  if (!keepTime || thinking) return;
   const t = now(), m = t.getHours() * 60 + t.getMinutes();
   if (m === keptMinute || playing) return;
   keptMinute = m;
-  const svg = clockSVG(t), strokes = parseSVG(svg);
-  drawing = { prompt: "The time now", strokes, picture: { svg }, meta: `Redraws every minute, ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`, sample: "clock" };
-  const p = plan(strokes, g, { half: g.half, leadIn: g.leadIn });
-  const wipe = board.hasInk() ? erasePlan(g).toolpath : [];
-  const tp = [...wipe, ...p.toolpath], angles = toAngles(tp, g), job = makeJob(tp, angles, g);
-  const own = toAngles(p.toolpath, g);
-  planned = { plan: p, angles: own, job: makeJob(p.toolpath, own, g) };
-  $("#title").textContent = drawing.prompt; $("#subtitle").textContent = drawing.meta;
-  renderPicture(); renderAngles(); renderPlanStats(); $("#empty").hidden = true;
-  startJob(job); play();
-  narrate("time", { time: `${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, "0")}` });
+  const items = scene.items.filter((i) => i.id !== "clock");
+  const summary = change({ items: [...items, { id: "clock", name: "clock", box: FULL, svg: clockSVG(t) }], game: null });
+  messages.push({ role: "assistant", text: `It's ${hhmm(t)}.`, note: summary }); renderThread(); saveSoon();
+  if (S.narrate) voice.say(`It's ${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, "0")}.`, { voice: S.voice || undefined });
 }
 setInterval(tickTime, 1000);
 
@@ -397,80 +440,62 @@ function setArm(on) {
   status($("#arm-status"), on ? (arm.version() >= 2 ? "Connected" : "Connected, simple mode") : "Not connected", { mark: on ? "dot" : "" });
   syncSend(); renderServices();
 }
-// the arm's one action, in one place: Connect arm until it is connected, then Send to arm
 function syncSend() {
   const b = $("#send"), on = arm.connected();
   if (sending) return;
   setIcon(b, on ? "send" : "usb"); b.querySelector("span").textContent = on ? "Send to arm" : "Connect arm";
-  b.disabled = on && !planned;
+  b.disabled = on && !active;
   const next = !!planned?.seen;
   b.classList.toggle("dl-btn--primary", next); b.classList.toggle("dl-btn--secondary", !next);
 }
 async function connectArm() {
-  try {
-    await arm.connect(); setArm(true); narrate("connected");
-    toast(arm.version() >= 2 ? "Arm connected" : "Arm connected, but it didn't answer as Clockwork firmware");
-    arm.jog(homePose(g), g);
-  }
-  catch (e) { if (e.name !== "NotFoundError") showError(e.message); }
+  try { await arm.connect(); setArm(true); toast(arm.version() >= 2 ? "Arm connected" : "Arm connected, but it didn't answer as Clockwork firmware"); arm.jog(homePose(g), g); }
+  catch (e) { if (e.name !== "NotFoundError") toast(e.message, "circle-alert"); }
 }
-async function sendToArm() {
-  if (!planned) return;
+// the arm runs exactly the job the sim is running
+async function sendToArm(job = active) {
+  if (!job) return;
   if (!arm.connected()) { await connectArm(); if (!arm.connected()) return; }
+  if (sending) sending.abort();
   const b = $("#send"), label = b.querySelector("span"); b.setAttribute("aria-busy", "true");
-  sending = new AbortController();
+  const ctl = new AbortController(); sending = ctl;
   setIcon(b, "x"); label.textContent = "Stop the arm";
   try {
-    // the sim plays alongside at real speed, so the screen shows what the arm is doing
     speed = 1; $$("#speed button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.speed === "1")));
-    seek(0); play();
-    await arm.send(planned.job, g, { signal: sending.signal });
-    toast(sending.signal.aborted ? "Arm stopped" : "The arm has finished");
-  } catch (e) { showError(e.message); }
-  finally { sending = null; b.removeAttribute("aria-busy"); syncSend(); syncLive(true); }
+    if (job === active) { seek(0); play(); }
+    await arm.send(job, g, { signal: ctl.signal });
+    if (sending === ctl) toast(ctl.signal.aborted ? "Arm stopped" : "The arm has finished");
+  } catch (e) { toast(e.message, "circle-alert"); }
+  finally { if (sending === ctl) { sending = null; b.removeAttribute("aria-busy"); syncSend(); syncLive(true); } }
 }
 function stream() {
-  const { plan: p, angles, job } = planned;
+  const { angles, job } = planned;
   return {
     arm: cfg.name, measured: cfg.measured, links_mm: cfg.links, board_mm: cfg.board, pen: cfg.pen, servos: cfg.servos,
-    drawing: drawing.prompt, strokes: p.strokes.length, ink_mm: p.ink, travel_mm: p.travel, duration_s: +job.total.toFixed(2),
-    worst_dexterity: angles.worstDex, out_of_reach: angles.unreachable, past_servo_limits: angles.outOfRange,
+    simulation: doc?.title, duration_s: +job.total.toFixed(2), out_of_reach: angles.unreachable, past_servo_limits: angles.outOfRange,
     protocol: "one line per waypoint at its send time t: base,elbow,tilt,pressure; SKIP when out of reach; HOME at the end",
     path: angles.path.map((a, i) => ({ t: +job.tTilt[i].toFixed(3), ...a })),
     keyframes: arm.keyframes(job, g),
   };
 }
 
-// ---------- rail: samples, recent, services ----------
-const SAMPLE_LIST = [["clock", "The time now", "clock"], ["house", "House", "house"], ["cat", "Cat", "image"], ["star", "Star", "star"], ["flower", "Flower", "image"]];
-function renderSamples() {
-  $("#samples").innerHTML = SAMPLE_LIST.map(([k, n, ic]) => `<a class="dl-nav__item" href="#studio" data-sample="${k}">${icon(ic)}<span class="dl-nav__label">${n}</span></a>`).join("");
-}
-function renderRecent() {
-  $("#recent-head").hidden = !recent.length;
-  $("#recent").innerHTML = recent.map((r) => `<a class="dl-nav__item" href="#studio" data-recent="${esc(r.id)}" title="${esc(r.prompt)}">${icon("history")}<span class="dl-nav__label">${esc(r.prompt)}</span><span class="dl-nav__count">${ago(r.at)}</span></a>`).join("");
-}
-function openRecent(id) {
-  const r = recent.find((x) => x.id === id); if (!r) return;
-  hideError(); setKeepTime(false); go("studio"); $("#prompt").value = r.prompt;
-  steps.reset(); steps.set("picture", "done", "saved");
-  setDrawing({ prompt: r.prompt, strokes: r.strokes, picture: r.svg ? { svg: r.svg } : null, meta: `${r.meta}, saved ${ago(r.at)} ago`.replace(", saved now ago", ", saved just now") });
-  play();
-}
 function renderServices() {
   const gm = services.gemini.ready, vp = services.voice.provider;
   const voiceWord = { elevenlabs: "ElevenLabs", gemini: "Gemini voice", browser: "Browser voice" }[vp];
+  const cooling = (services.gemini.cooling || []).map((c) => c.model);
+  const models = (services.gemini.models || []).map((m) => m.split(":")[0]);
+  const usable = models.filter((m) => !cooling.includes(m));
   $("#services").innerHTML =
-    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${gm ? 'data-mark="dot"' : 'data-tone="warn"'}>${gm ? "Ready" : "No key"}</span></div>` +
+    `<div class="cw-service"><span>Gemini</span><span class="dl-status" ${gm && usable.length ? 'data-mark="dot"' : 'data-tone="warn"'}>${!gm ? "No key" : usable.length ? "Ready" : "Out of quota"}</span></div>` +
     `<div class="cw-service"><span>Voice</span><span>${voiceWord}</span></div>`;
   $("#service-kv").innerHTML =
-    `<dt>Gemini</dt><dd>${gm ? `Ready, ${esc(modelName(services.gemini.model))}` : "No key: add GEMINI_API_KEY to app/.env"}</dd>` +
+    `<dt>Gemini</dt><dd>${!gm ? "No key: add GEMINI_API_KEY to app/.env" : `Tries ${models.map(modelName).join(", then ")}${cooling.length ? `; ${cooling.map(modelName).join(" and ")} out of quota for now` : ""}`}</dd>` +
     `<dt>Voice</dt><dd>${vp === "elevenlabs" ? "ElevenLabs" : `${voiceWord}, until an ElevenLabs key is added`}</dd>` +
     `<dt><label for="voice-id">ElevenLabs voice</label></dt><dd class="cw-voice"><input class="dl-input dl-mono" id="voice-id" placeholder="${esc(services.voice.voice || "")}" spellcheck="false"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="voice-test">${icon("volume-2")}Hear it</button></dd>` +
-    `<dt>Arm</dt><dd>${arm.connected() ? "Connected over USB" : "Not connected"}</dd>` +
-    `<dt><label for="route">Picture</label></dt><dd><span class="dl-select"><select class="dl-input" id="route"><option value="svg">Vector drawing</option><option value="image">Image, then traced</option></select>${icon("chevron-down")}</span></dd>`;
-  $("#route").value = S.route; $("#voice-id").value = S.voice || "";
+    `<dt>Arm</dt><dd>${arm.connected() ? "Connected over USB" : "Not connected"}</dd>`;
+  $("#voice-id").value = S.voice || "";
 }
+function refreshStatus() { fetch("./api/status").then((r) => r.json()).then((s) => { services = s; renderServices(); }).catch(() => renderServices()); }
 
 // ---------- pages ----------
 function go(page) {
@@ -496,7 +521,6 @@ const FIELDS = [
 ];
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
 const put = (o, path, v) => { const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k) => { a = a[k] ??= {}; }); a[ks.at(-1)] = v; };
-
 function buildSetup() {
   const id = (p) => `f-${p.replace(/\./g, "-")}`;
   $("#setup").innerHTML = FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="g-${legend}"><h2 class="dl-kicker" id="g-${legend}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit]) =>
@@ -518,7 +542,6 @@ function readSetup() {
   return withDefaults(c);
 }
 function dirty() { return JSON.stringify(readSetup()) !== JSON.stringify(cfg); }
-
 let clockStrokes = null;
 function renderSetup() {
   if ($("#page-arm").hidden) return;
@@ -527,20 +550,19 @@ function renderSetup() {
   clockStrokes ??= parseSVG(clockSVG(now()));
   const p = plan(clockStrokes, gg, { half: gg.half, leadIn: gg.leadIn }), an = toAngles(p.toolpath, gg), job = makeJob(p.toolpath, an, gg);
   setupBoard.render({ toolpath: p.toolpath, joints: setupSim.j, mode: null, showReach: true, hover: setupHover });
-  // what these numbers give, measured over a grid across the drawing square
   let ok = 0, n = 0, worst = 1;
-  const { cx, cy } = { cx: 0, cy: gg.standoff + gg.board / 2 };
+  const cy = gg.standoff + gg.board / 2;
   for (let i = 0; i <= 20; i++) for (let k = 0; k <= 20; k++) {
-    const x = cx - gg.half + (i / 20) * 2 * gg.half, y = cy - gg.half + (k / 20) * 2 * gg.half; n++;
+    const x = -gg.half + (i / 20) * 2 * gg.half, y = cy - gg.half + (k / 20) * 2 * gg.half; n++;
     const a = toAngles([{ x, y, pen: 1 }], gg); if (a.unreachable || a.outOfRange) continue;
     ok++; const r2 = x * x + y * y, c2 = (r2 - gg.L1 ** 2 - gg.L2 ** 2) / (2 * gg.L1 * gg.L2); worst = Math.min(worst, Math.sqrt(Math.max(0, 1 - c2 * c2)));
   }
-  const cover = Math.round((ok / n) * 100), step = (gg.L1 + gg.L2) * gg.servo.resolution * Math.PI / 180;
+  const cover = Math.round((ok / n) * 100), stepMm = (gg.L1 + gg.L2) * gg.servo.resolution * Math.PI / 180;
   $("#derived").innerHTML =
     `<dt>Reach</dt><dd>${mm(gg.L1 + gg.L2)}, inner limit ${mm(Math.abs(gg.L1 - gg.L2))}</dd>` +
     `<dt>Drawing square</dt><dd>${cover}% reachable within servo limits</dd>` +
     `<dt>Worst dexterity</dt><dd>${ok ? worst.toFixed(2) : "none reachable"}</dd>` +
-    `<dt>Servo step at the tip</dt><dd>${step.toFixed(1)} mm at full stretch</dd>` +
+    `<dt>Servo step at the tip</dt><dd>${stepMm.toFixed(1)} mm at full stretch</dd>` +
     `<dt>Clock takes</dt><dd>${secs(job.total)}${an.unreachable ? `, ${an.unreachable} points out of reach` : ""}</dd>` +
     `<dt>Pen meets the board at</dt><dd>${gg.pen.beta.toFixed(0)}°${+c.pen.angle > 0 ? `, best is ${Math.ceil(gg.pen.best)}°` : ", the best for this pen"}</dd>` +
     `<dt>Tilt shaft above the board</dt><dd>${gg.pen.height.toFixed(1)} mm</dd>` +
@@ -552,46 +574,41 @@ function renderSetup() {
   $("#save").disabled = !dirty(); $("#revert").disabled = !dirty();
 }
 let setupHover = null;
-
 async function save() {
   const c = readSetup(); c.measured = true;
   const b = $("#save"); b.setAttribute("aria-busy", "true"); b.innerHTML = `<span class="dl-spinner" aria-hidden="true"></span>Save`;
-  try {
-    cfg = await saveConfig(c); applyConfig(); fillSetup(cfg); renderSetup();
-    toast("Saved to arm.config.json");
-  } catch (e) { $("#save-note").textContent = e.message; }
+  try { cfg = await saveConfig(c); applyConfig(); fillSetup(cfg); renderSetup(); toast("Saved to arm.config.json"); }
+  catch (e) { $("#save-note").textContent = e.message; }
   finally { b.removeAttribute("aria-busy"); b.textContent = "Save"; renderSetup(); }
 }
-function applyConfig() {
-  g = geomFrom(cfg); board.setGeom(g); sim.setGeom(g); v3?.setGeom(g, cfg.pen);
-  buildJoints(); replan();
-}
+function applyConfig() { g = geomFrom(cfg); board.setGeom(g); sim.setGeom(g); v3?.setGeom(g, cfg.pen); buildJoints(); replan(); }
 
 // ---------- command palette ----------
 let palItems = [], palIndex = 0;
 function commandList(q) {
   const list = [
-    ...SAMPLE_LIST.map(([k, n, ic]) => ({ label: `Draw: ${n.toLowerCase()}`, icon: ic, run: () => run(k === "clock" ? "the time now" : k) })),
-    { label: playing ? "Pause" : "Play the drawing", icon: playing ? "pause" : "play", hint: "", run: () => (playing ? pause() : play()), off: !active },
-    { label: "Start again", icon: "rotate-ccw", run: () => seek(0), off: !active },
-    { label: "Erase the board", icon: "eraser", run: eraseBoard },
+    { label: "New simulation", icon: "plus", run: () => newSim() },
+    ...STARTERS.map((s) => ({ label: s, icon: "pencil", run: () => { go("studio"); send(s); } })),
+    { label: playing ? "Pause" : "Play the change", icon: playing ? "pause" : "play", run: () => (playing ? pause() : play()), off: !active },
+    { label: "Start the change again", icon: "rotate-ccw", run: () => seek(0), off: !active },
+    { label: "Clear the board", icon: "eraser", run: () => send("Clear the board") },
     { label: keepTime ? "Stop keeping time" : "Keep time: redraw the clock every minute", icon: "clock", run: () => { go("studio"); setKeepTime(!keepTime); } },
     { label: S.physics ? "Ideal servos" : "Real servo limits", icon: "sliders-horizontal", run: () => togglePhysics() },
     { label: S.reach ? "Hide the reach" : "Show the reach", icon: "crosshair", run: () => toggleReach() },
     { label: "Board view", icon: "layout-grid", run: () => { go("studio"); setView("board"); } },
+    { label: "3D view", icon: "move", run: () => { go("studio"); setView("3d"); } },
     { label: "Picture view", icon: "image", run: () => { go("studio"); setView("picture"); } },
     { label: "Angles view", icon: "list-checks", run: () => { go("studio"); setView("angles"); } },
     { label: "Arm setup", icon: "ruler", run: () => go("arm") },
     { label: arm.connected() ? "Send to arm" : "Connect the arm", icon: arm.connected() ? "send" : "usb", run: () => (arm.connected() ? sendToArm() : connectArm()) },
     { label: "Download the angles", icon: "download", run: () => $("#download").click(), off: !planned },
-    { label: "Copy the angles", icon: "copy", run: () => $("#copy").click(), off: !planned },
     { label: S.narrate ? "Mute the arm" : "Let the arm speak", icon: S.narrate ? "volume-x" : "volume-2", run: () => toggleNarrate() },
   ].filter((c) => !c.off);
   const t = q.trim().toLowerCase();
   if (!t) return list;
   const hits = list.filter((c) => c.label.toLowerCase().includes(t));
-  const drawIt = { label: `Draw “${q.trim()}”`, icon: "pencil", hint: "Gemini", run: () => run(q) };
-  return hits.length && hits[0].label.toLowerCase().startsWith(t) ? [...hits, drawIt] : [drawIt, ...hits];
+  const say = { label: `Ask: “${q.trim()}”`, icon: "message-square", run: () => { go("studio"); send(q); } };
+  return hits.length && hits[0].label.toLowerCase().startsWith(t) ? [...hits, say] : [say, ...hits];
 }
 function openPalette() {
   const d = $("#palette"); if (d.open) { d.close(); return; }
@@ -599,7 +616,7 @@ function openPalette() {
 }
 function renderPalette() {
   palItems = commandList($("#palette-input").value); palIndex = 0;
-  $("#palette-list").innerHTML = palItems.map((c, i) => `<li class="cw-palette__item" role="option" id="pal-${i}" data-i="${i}" aria-selected="${i === 0}">${icon(c.icon)}<span>${esc(c.label)}</span>${c.hint ? `<span class="cw-palette__hint">${c.hint}</span>` : ""}</li>`).join("");
+  $("#palette-list").innerHTML = palItems.map((c, i) => `<li class="cw-palette__item" role="option" id="pal-${i}" data-i="${i}" aria-selected="${i === 0}">${icon(c.icon)}<span>${esc(c.label)}</span></li>`).join("");
   $("#palette-input").setAttribute("aria-activedescendant", palItems.length ? "pal-0" : "");
 }
 function movePalette(d) {
@@ -614,16 +631,47 @@ function runPalette(i = palIndex) { const c = palItems[i]; if (!c) return; $("#p
 // ---------- toggles ----------
 function togglePhysics() { S.physics = !S.physics; store("clockwork.prefs", S); sim.physics = S.physics; $("#sw-physics").setAttribute("aria-checked", String(S.physics)); if (active) seek(sim.t); }
 function toggleReach() { S.reach = !S.reach; store("clockwork.prefs", S); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); draw(); }
+function toggleFollow() { S.follow = !S.follow; store("clockwork.prefs", S); $("#sw-follow").setAttribute("aria-checked", String(S.follow)); }
 function toggleNarrate() {
   S.narrate = !S.narrate; store("clockwork.prefs", S);
   const b = $("#narrate"); b.setAttribute("aria-pressed", String(S.narrate)); setIcon(b, S.narrate ? "volume-2" : "volume-x");
   b.title = b.ariaLabel = S.narrate ? "Arm speaks: on" : "Arm speaks: off";
-  if (S.narrate) voice.say("I'll talk you through each drawing.", { voice: S.voice || undefined });
+  if (S.narrate) voice.say("I'll talk you through each change.", { voice: S.voice || undefined });
+}
+
+// ---------- the board: drag to move the pen; in a game, tap a square ----------
+function cellAt(p) {
+  if (!scene.game || scene.game.over) return -1;
+  const b = boxMm(scene.game.box, g), col = Math.floor((p.x - b.x) / (b.w / 3)), row = 2 - Math.floor((p.y - b.y) / (b.h / 3));
+  return col >= 0 && col < 3 && row >= 0 && row < 3 ? row * 3 + col : -1;
+}
+function jogOn(canvas, getBoard, getSim, setHover, allowed, redraw, onTap) {
+  let down = false, start = null;
+  const at = (e) => { const p = getBoard().toWorld(e.clientX, e.clientY); const s = getSim(); const ok = !!s && toAngles([{ ...p, pen: 0 }], s.g).unreachable === 0; return { ...p, ok }; };
+  canvas.addEventListener("pointerdown", (e) => {
+    const p = at(e); start = p;
+    if (onTap && onTap(p, true)) return;   // a tap the game takes isn't a drag
+    if (!allowed()) return; down = true; canvas.setPointerCapture(e.pointerId); if (p.ok) getSim().jog(p.x, p.y); setHover(p); redraw();
+  });
+  canvas.addEventListener("pointermove", (e) => { const p = at(e); setHover(p); if (down && p.ok) getSim().jog(p.x, p.y); redraw(); });
+  canvas.addEventListener("pointerup", () => { down = false; });
+  canvas.addEventListener("pointerleave", () => { setHover(null); redraw(); });
 }
 
 // ---------- events ----------
 function wire() {
-  $("#ask").addEventListener("submit", (e) => { e.preventDefault(); if ($("#draw").getAttribute("aria-busy") !== "true") run($("#prompt").value); });
+  $("#ask").addEventListener("submit", (e) => { e.preventDefault(); send($("#prompt").value); });
+  $("#prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send($("#prompt").value); } });
+  $("#prompt").addEventListener("input", autosize);
+  $("#thread").addEventListener("click", (e) => {
+    const s = e.target.closest("[data-say]"); if (s) send(s.dataset.say);
+    if (e.target.closest("[data-retry]")) { const last = messages.at(-1); if (last?.error) messages.pop(); const u = messages.at(-1); if (u?.role === "user") { messages.pop(); send(u.text); } }
+  });
+  $("#tab-chat").addEventListener("click", () => selectTab("chat"));
+  $("#tab-plan").addEventListener("click", () => selectTab("plan"));
+  $(".cw-tabs").addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const to = $("#tab-chat").getAttribute("aria-selected") === "true" ? "plan" : "chat"; selectTab(to); $(`#tab-${to}`).focus(); } });
+  $("#new-sim").addEventListener("click", () => newSim());
+  $("#sims").addEventListener("click", (e) => { const a = e.target.closest("[data-sim]"); if (!a) return; e.preventDefault(); openSim(a.dataset.sim); });
   $("#views").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
   $("#cams").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b || !v3) return;
@@ -632,22 +680,19 @@ function wire() {
   $("#speed").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; speed = +b.dataset.speed; $$("#speed button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); });
   $("#play").addEventListener("click", () => (playing ? pause() : play()));
   $("#rewind").addEventListener("click", () => seek(0));
-  $("#erase").addEventListener("click", eraseBoard);
+  $("#erase").addEventListener("click", () => send("Clear the board"));
   $("#scrub").addEventListener("input", () => { pause(); seek((($("#scrub").value | 0) / 1000) * (active?.total || 0)); syncLive(true); });
   $("#sw-physics").addEventListener("click", togglePhysics);
   $("#sw-reach").addEventListener("click", toggleReach);
   $("#sw-time").addEventListener("click", () => setKeepTime(!keepTime));
+  $("#sw-follow").addEventListener("click", toggleFollow);
   $("#narrate").addEventListener("click", toggleNarrate);
-  $("#send").addEventListener("click", () => {
-    if (sending) { sending.abort(); pause(); return; }
-    arm.connected() ? sendToArm() : connectArm();
-  });
-  $("#download").addEventListener("click", () => arm.download(stream(), `clockwork-${(drawing?.prompt || "drawing").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.json`));
+  $("#send").addEventListener("click", () => { if (sending) { sending.abort(); pause(); return; } arm.connected() ? sendToArm() : connectArm(); });
+  $("#download").addEventListener("click", () => arm.download(stream(), `clockwork-${(doc?.title || "change").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.json`));
   $("#copy").addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(JSON.stringify(stream(), null, 2)); toast("Angles copied"); } catch (e) { showError("The browser would not copy. Use the download instead."); }
+    try { await navigator.clipboard.writeText(JSON.stringify(stream(), null, 2)); toast("Angles copied"); } catch (e) { toast("The browser would not copy. Use the download instead.", "circle-alert"); }
   });
 
-  // mic: say it, and it draws when you stop
   let mic = null;
   const micBtn = $("#mic");
   if (!voice.canListen()) { micBtn.disabled = true; micBtn.title = "Speech input needs Chrome"; }
@@ -655,29 +700,17 @@ function wire() {
     if (mic) { mic.stop(); return; }
     try {
       micBtn.setAttribute("aria-pressed", "true");
-      mic = voice.listen({ onResult: (t) => { $("#prompt").value = t; }, onEnd: (t) => { mic = null; micBtn.setAttribute("aria-pressed", "false"); if (t) run(t); } });
-    } catch (e) { micBtn.setAttribute("aria-pressed", "false"); showError(e.message); }
+      mic = voice.listen({ onResult: (t) => { $("#prompt").value = t; autosize(); }, onEnd: (t) => { mic = null; micBtn.setAttribute("aria-pressed", "false"); if (t) send(t); } });
+    } catch (e) { micBtn.setAttribute("aria-pressed", "false"); toast(e.message, "circle-alert"); }
   });
 
-  // rail
-  $("#samples").addEventListener("click", (e) => { const a = e.target.closest("[data-sample]"); if (!a) return; e.preventDefault(); run(a.dataset.sample === "clock" ? "the time now" : a.dataset.sample); });
-  $("#recent").addEventListener("click", (e) => { const a = e.target.closest("[data-recent]"); if (!a) return; e.preventDefault(); openRecent(a.dataset.recent); });
   $$("[data-open-palette]").forEach((b) => b.addEventListener("click", openPalette));
   $("#nav-open").addEventListener("click", () => $("#app").toggleAttribute("data-nav-open"));
   $(".dl-scrim").addEventListener("click", () => $("#app").removeAttribute("data-nav-open"));
   addEventListener("hashchange", () => showPage(location.hash.slice(1)));
-  document.addEventListener("change", (e) => {
-    if (e.target.id === "route") { S.route = e.target.value; store("clockwork.prefs", S); }
-    if (e.target.id === "voice-id") { S.voice = e.target.value.trim(); store("clockwork.prefs", S); }
-  });
-  document.addEventListener("click", (e) => {
-    if (e.target.closest("#voice-test")) voice.say("Hello. I'm the Clockwork arm, and this is how I sound.", { voice: ($("#voice-id").value || "").trim() || undefined });
-  });
-
-  // keyboard: ⌘K opens the palette from anywhere
-  document.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); }
-  });
+  document.addEventListener("change", (e) => { if (e.target.id === "voice-id") { S.voice = e.target.value.trim(); store("clockwork.prefs", S); } });
+  document.addEventListener("click", (e) => { if (e.target.closest("#voice-test")) voice.say("Hello. I'm the Clockwork arm, and this is how I sound.", { voice: ($("#voice-id").value || "").trim() || undefined }); });
+  document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); } });
   $("#palette-input").addEventListener("input", renderPalette);
   $("#palette-input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); movePalette(1); }
@@ -688,25 +721,14 @@ function wire() {
   $("#palette-list").addEventListener("pointermove", (e) => { const li = e.target.closest("[data-i]"); if (li && +li.dataset.i !== palIndex) movePalette(+li.dataset.i - palIndex); });
   $("#palette").addEventListener("click", (e) => { if (e.target === $("#palette")) $("#palette").close(); });
 
-  // jog: drag on the board to move the pen by hand
-  jogOn($("#board"), () => board, () => sim, (h) => { hover = h; }, () => !playing && !sending, () => { draw(); syncLive(true); kick(); if (sim.manual) arm.jog(sim.manual, g); });
+  jogOn($("#board"), () => board, () => sim, (h) => { hover = h; }, () => !playing && !sending, () => { draw(); syncLive(true); kick(); if (sim.manual) arm.jog(sim.manual, g); },
+    (p) => { const c = cellAt(p); if (c < 0 || thinking) return false; send(cap(cellName(c))); return true; });
   jogOn($("#setup-board"), () => setupBoard, () => setupSim, (h) => { setupHover = h; }, () => true, () => { renderSetup(); kickSetup(); });
 
-  // setup form
   $("#setup").addEventListener("input", () => { setupSim.manual = null; renderSetup(); $("#save-note").textContent = dirty() ? "Not saved yet" : ""; });
   $("#save").addEventListener("click", save);
   $("#revert").addEventListener("click", () => { fillSetup(cfg); renderSetup(); });
-
   new ResizeObserver(() => { draw(); renderSetup(); }).observe($("#main"));
-}
-
-function jogOn(canvas, getBoard, getSim, setHover, allowed, redraw) {
-  let down = false;
-  const at = (e) => { const p = getBoard().toWorld(e.clientX, e.clientY); const s = getSim(); const ok = !!s && toAngles([{ ...p, pen: 0 }], s.g).unreachable === 0; return { ...p, ok }; };
-  canvas.addEventListener("pointerdown", (e) => { if (!allowed()) return; down = true; cleaned = false; canvas.setPointerCapture(e.pointerId); const p = at(e); if (p.ok) getSim().jog(p.x, p.y); setHover(p); redraw(); });
-  canvas.addEventListener("pointermove", (e) => { const p = at(e); setHover(p); if (down && p.ok) getSim().jog(p.x, p.y); redraw(); });
-  canvas.addEventListener("pointerup", () => { down = false; });
-  canvas.addEventListener("pointerleave", () => { setHover(null); redraw(); });
 }
 let setupRaf = 0, setupTs = 0;
 function kickSetup() {
@@ -725,14 +747,15 @@ async function start() {
   board = createBoard($("#board")); board.setGeom(g);
   sim = new Sim(g); sim.physics = S.physics;
   setupBoard = createBoard($("#setup-board"), { pad: 8 }); setupSim = new Sim(g);
-  buildJoints(); buildSetup(); renderSamples(); renderRecent(); renderPicture(); renderAngles();
-  $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach));
+  buildJoints(); buildSetup();
+  $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  $$("#steps .dl-step").forEach((li) => { li.dataset.state = "next"; });
-  $("#retry").addEventListener("click", () => run(lastAsk));
-  wire(); renderServices(); syncTransport(); syncLive(true); syncSend();
+  wire(); renderServices(); refreshStatus(); setInterval(refreshStatus, 60000);
+  await listSims();
+  let want = params.get("sim"); try { want ||= localStorage.getItem("clockwork.open"); } catch (e) {}
+  const pick = sims.find((s) => s.id === want) || sims[0];
+  if (pick && !params.has("fresh")) await openSim(pick.id); else await newSim({ focus: false });
   showPage(location.hash.slice(1));
-  fetch("./api/status").then((r) => r.json()).then((s) => { services = s; renderServices(); }).catch(() => renderServices());
-  const ask = params.get("draw"); if (ask) run(ask);
+  const ask = params.get("say"); if (ask) send(ask);
 }
 start();

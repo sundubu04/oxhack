@@ -107,8 +107,9 @@ export async function send(job, g, { onProgress, signal } = {}) {
   for (let i = 0; i < job.n; i++) {
     if (signal?.aborted) break;
     const wait = job.tTilt[i] * 1000 - (performance.now() - t0); if (wait > 2) await new Promise((r) => setTimeout(r, wait));
-    const p = job.path[i];
-    await write(p.out_of_reach ? "SKIP" : `${p.base},${p.elbow},${p.tilt},${p.pressure}`);
+    // the same commands as protocol 2: compensated, in each servo's own frame
+    const p = (job.cmd || job.path)[i], sv = (j, a) => Math.max(0, Math.min(180, servoAngle(j, a, g))).toFixed(2);
+    await write(p.out_of_reach ? "SKIP" : `${sv("base", p.base)},${sv("elbow", p.elbow)},${sv("tilt", p.tilt)},${p.pressure}`);
     onProgress && onProgress((i + 1) / job.n);
   }
   await write("HOME");

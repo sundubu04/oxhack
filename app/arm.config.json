@@ -39,14 +39,14 @@
     "base": {
       "min": 0,
       "max": 180,
-      "offset": 0,
+      "offset": 58,
       "dir": 1,
       "ratio": 1
     },
     "elbow": {
       "min": 0,
       "max": 180,
-      "offset": 0,
+      "offset": -10,
       "dir": 1,
       "ratio": 1
     },

@@ -1,8 +1,9 @@
 # Clockwork
 
-Control app for the OxHack drawing arm. Ask for a drawing in words or by voice; Clockwork draws the picture,
-plans the shortest pen path, solves the joint angles and plays them through a to-scale simulation of the arm
-with the servos' real limits. Then it sends the same angles to the arm, at the same pace.
+Control app for the OxHack drawing arm. Each **simulation** is a whiteboard you change by chatting: ask for a
+drawing, change it ("make the cat grumpy"), clear it, or play noughts and crosses. Every change is planned as the
+difference from what's already on the board, so the arm wipes and redraws only what changed. The sim plays it to
+scale through the servos' real limits, and the arm gets exactly the same commands.
 
 ```
 words or voice
@@ -30,10 +31,14 @@ Open it in Chrome. The samples (the time now, house, cat, star, flower) work wit
 
 They live in `app/.env`, which git ignores. The dev server reads them and calls the APIs itself; the browser never sees a key.
 
-- **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). The free tier covers the vector drawings and the Gemini voice. `gemini-2.5-flash` is closed to new keys, so the default is `gemini-3.5-flash`, then `gemini-3.1-flash-lite`, then `gemini-3.8-flash`, each given 20 s before the next is tried. The image route (Nano Banana) needs billing on the key's project.
+- **Gemini**: Google AI Studio, *Get API key* ([mlh.link/gemini-aistudio](https://mlh.link/gemini-aistudio)). `GEMINI_MODELS` lists the models to try, best first: `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`. On the free tier each flash model allows **20 requests a day** and the pro model none; the server skips a model that's out of quota until its reset, and one that's busy for two minutes. Turning on billing for the Gemini project (the MLH credits) makes the pro model answer, and the drawings much better: the flash models draw a recognisable Oxford crest, the lite one doesn't.
 - **ElevenLabs**: redeem the MLH promo code from the event email, sign up, then *Developers → API keys*. Put it in `ELEVENLABS_API_KEY` and restart: the arm then speaks with ElevenLabs (Flash model), and Arm setup lets you pick a voice by id and hear it. Until then it speaks with Gemini's voice. Spoken lines are cached, so repeats cost no credits.
 
 ## Using it
+
+- **Simulations** (left): *New simulation* starts a clean board and conversation; each is saved in `app/data/sims/` (gitignored) with its board, chat and ink.
+- **Chat** (right): ask in words or with the mic. Clearing the board, the time, the samples and noughts and crosses moves run in the app without Gemini; everything else asks Gemini, which answers with a reply and actions (draw in a box, edit a drawing, erase one, clear, start a game, play a move). In a game, tap a square on the board or say where.
+- **Plan** tab: time to finish, reach, what was drawn and wiped, the steps, the joints, the arm connection, and the switches (servo limits, reach, keep time, the real arm follows each change).
 
 - **Studio**: type or say what to draw (⏎ or Draw). The board shows the plan faintly and the simulated ink as the arm lays it. Play, start again, erase, scrub and speed sit under the board.
 - **Board, 3D, Picture, Angles**: the sim, the same sim in 3D (drag to orbit, scroll to zoom; *Along the arm* shows the pen's tilt side-on, with the board as the floor), the picture Gemini made, and every waypoint with its time and angles.
@@ -43,9 +48,19 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 - Drag on the board to move the pen by hand when nothing is playing.
 - **Smoothing** (Arm setup): the servos' dead band and gear play, compensated in every command, plus a 3 mm lead-in to each stroke. Why, and what to do with the motors: [`docs/hardware-link.md`](../docs/hardware-link.md#smoothing-the-line).
 
+## How a change is planned (`src/optimize.js`)
+
+1. **Diff**: strokes already on the board within 1.5 mm of a wanted stroke are kept.
+2. **Wipe**: four ways are timed with the sim's own schedule (follow each stroke, rows over only the cells with ink, one zigzag over its box, the whole drawing area) and the fastest is used. Kept ink the eraser brushes is redrawn, only where it was touched.
+3. **Draw**: what's new, plus anything brushed, in the order with the least pen-up travel: exact (Held–Karp) up to 12 strokes, nearest-first then 2-opt and Or-opt above that, each stroke either way round, with a lead-in.
+
+`node tools/optimize-test.mjs` checks it: stroke order against the true optimum, every way of erasing on real changes, and the board afterwards through the SG92R sim (no ink left that should be gone, none missing). `node tools/verify-motors.mjs` replays the keyframes the Arduino gets through a copy of its interpolation and compares every 20 ms frame with the sim.
+
 ## The arm's dimensions
 
 The pen is entered as the marker itself: its length (165 mm, the team's), barrel width and how far the nib sticks out. From those, `src/pen.js` picks the best angle for it to meet the board (the lowest that keeps the barrel 5 mm clear), the tilt shaft's height above the board, the draw, lift and erase tilts, and how far the nib and eraser touch either side of the forearm's tip. Arm setup shows all of them; the reasoning is in [`docs/pages/pen-mount.html`](../docs/pages/pen-mount.html).
+
+**Servo mounting:** the base needs −16° to 80° and the elbow 45° to 157° (with the pen across the forearm), so the default zero offsets centre those ranges on each servo's travel: mount the base so that at its middle (1500 µs) link 1 points 32° above the board's bottom edge, and the elbow so that at its middle the forearm is 100° round from link 1. Without that the base runs into its end stop in the bottom-right of the drawing.
 
 `app/arm.config.json` is the one place for them: link lengths, board size and how far the base sits below it,
 drawing size, pen tilts and eraser width, speeds, and each servo's range, zero offset and direction. Edit it
@@ -64,7 +79,10 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | Path | What |
 |---|---|
 | `index.html`, `style.css` | the screens; components come from the team kit (`ui/kit.css`, `ui/icons.json`, copied from `.claude/skills/oxh-ui-kit`) |
-| `src/app.js` | the pipeline, sim loop, palette, history and setup page |
+| `src/app.js` | simulations, chat, changes, sim loop, palette and setup page |
+| `src/scene.js` | what should be on the board: drawings in boxes, and a game |
+| `src/optimize.js` | diff, the four ways to wipe, kept ink to redraw, the fastest plan |
+| `src/games/tictactoe.js` | grid and marks as strokes, a computer player that never loses |
 | `src/sim.js` | the arm simulation: schedule, servo speed and resolution, servo end stops, wobble measurement |
 | `src/board.js` | draws the board, plan, ink and arm to scale |
 | `src/view3d.js` | the 3D view, on three.js 0.170 (MIT, `ui/vendor/`, licence beside it) |
@@ -78,3 +96,4 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |
 | `tools/compare-servos.mjs` | the clock under each servo model, side by side |
+| `tools/optimize-test.mjs`, `tools/verify-motors.mjs` | planner optimality and correctness; sim against the firmware |

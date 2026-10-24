@@ -62,3 +62,57 @@ export function parseSVG(text) {
 
 // For node tests (no DOMParser): parse a single path d string.
 export { samplePathD };
+
+// In the browser: let Chrome lay the SVG out and trace every shape itself, so arcs, transforms and every element
+// type come out right. The model's SVG is rebuilt from an allow-list of shapes and geometry attributes first, so
+// nothing in it can run. -> { strokes in the viewBox's own units, vb: {x, y, w, h} }
+const SHAPES = new Set(["svg", "g", "path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
+const GEOMETRY = new Set(["d", "points", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "width", "height", "transform", "viewBox"]);
+const NS = "http://www.w3.org/2000/svg";
+export function parseSVGDom(text, { step = 0.5 } = {}) {
+  const src = new DOMParser().parseFromString(text || "", "image/svg+xml").documentElement;
+  if (!src || src.nodeName.toLowerCase() !== "svg") return { strokes: parseSVG(text), vb: { x: 0, y: 0, w: 100, h: 100 } };
+  const copy = (n) => {
+    const tag = n.nodeName.toLowerCase(); if (!SHAPES.has(tag)) return null;
+    const el = document.createElementNS(NS, tag);
+    for (const a of n.attributes) if (GEOMETRY.has(a.name)) el.setAttribute(a.name, a.value);
+    for (const c of n.children) { const k = copy(c); if (k) el.appendChild(k); }
+    return el;
+  };
+  const svg = copy(src);
+  const vbs = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+  const vb = vbs.length === 4 && vbs.every(isFinite) ? { x: vbs[0], y: vbs[1], w: vbs[2], h: vbs[3] } : { x: 0, y: 0, w: +svg.getAttribute("width") || 100, h: +svg.getAttribute("height") || 100 };
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); svg.setAttribute("width", vb.w); svg.setAttribute("height", vb.h);
+  const host = document.createElement("div");
+  host.style.cssText = "position:absolute;left:-10000px;top:0;visibility:hidden;pointer-events:none";
+  host.appendChild(svg); document.body.appendChild(host);
+  const strokes = [];
+  try {
+    const toRoot = svg.getScreenCTM().inverse();
+    for (const el of svg.querySelectorAll("path,line,polyline,polygon,rect,circle,ellipse")) {
+      const total = el.getTotalLength(); if (!(total > 0)) continue;
+      const m = toRoot.multiply(el.getScreenCTM()), n = Math.max(2, Math.ceil(total / step));
+      let cur = [], prev = null;
+      for (let i = 0; i <= n; i++) {
+        const p = el.getPointAtLength((total * i) / n).matrixTransform(m);
+        // a jump means a new subpath ("M" in the middle of a path)
+        if (prev && Math.hypot(p.x - prev.x, p.y - prev.y) > step * 4) { if (cur.length > 1) strokes.push(cur); cur = []; }
+        cur.push({ x: p.x, y: p.y }); prev = p;
+      }
+      if (cur.length > 1) strokes.push(cur);
+    }
+  } finally { host.remove(); }
+  return { strokes: strokes.map((s) => thin(s, step * 0.25)), vb };
+}
+
+// drop points that sit on the line between their neighbours, keeping corners
+function thin(pts, eps) {
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = out[out.length - 1], b = pts[i + 1], p = pts[i], dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+    if (Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / L > eps) out.push(p);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
