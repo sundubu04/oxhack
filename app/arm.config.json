@@ -13,7 +13,7 @@
   "drawing": {
     "size": 180
   },
-  "elbow": "up",
+  "elbow": "down",
   "pen": {
     "length": 165,
     "barrel": 17,
@@ -28,25 +28,28 @@
   "motion": {
     "drawSpeed": 150,
     "travelSpeed": 300,
-    "leadIn": 3
+    "leadIn": 3,
+    "accel": 1000,
+    "cornerSpeed": 15
   },
   "servos": {
     "model": "TowerPro SG92R",
     "speed": 600,
+    "accel": 1500,
     "resolution": 1,
     "backlash": 0,
     "compensate": true,
     "base": {
       "min": 0,
       "max": 180,
-      "offset": 58,
+      "offset": -77,
       "dir": 1,
       "ratio": 1
     },
     "elbow": {
       "min": 0,
       "max": 180,
-      "offset": -10,
+      "offset": 193,
       "dir": 1,
       "ratio": 1
     },

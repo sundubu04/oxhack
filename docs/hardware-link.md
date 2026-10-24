@@ -46,13 +46,15 @@ One line each way, angles in centi-degrees of servo travel (0 to 18000), times i
 |---|---|---|
 | `?` | `CLOCKEDIN 2 48` | handshake: protocol and buffer size |
 | `K <t> <base> <elbow> <tilt>` | `F <free>` | one keyframe; the reply says how many slots are free |
-| `G` | `RUN` | start the clock (the app sends it once 12 keyframes are buffered) |
+| `G` | `RUN` | glide to the first keyframe, then start the clock (the app sends it once 12 keyframes are buffered) |
 | `E` | `DONE` when finished | no more keyframes |
-| `S` | `STOPPED` | stop where it is, drop the buffer (the Stop the arm button) |
-| `J <base> <elbow> <tilt>` | `F <free>` | go there now (dragging the pen on the board moves the real arm) |
-| `P` | `F <free>` | park |
+| `S` | `STOPPED` | ease to a halt along the path over `STOP_MS`, drop the buffer (the Stop the arm button) |
+| `J <base> <elbow> <tilt>` | `F <free>` | glide there (dragging the pen on the board moves the real arm) |
+| `P` | `F <free>` | glide to the park pose |
 | | `T <t> <free>` | progress, when slots free up |
 | | `LATE` | the buffer ran dry; the arm holds until more arrive |
+
+Nothing the board does starts or stops at once, because a hobby servo told to stop dead overshoots. The keyframes already speed up and slow down (the app plans every move at Arm setup's Acceleration, Corner speed and Servo acceleration, and eases each tilt), and the board's own glides (`G`, `J`, `P`) speed up and slow down at `SERVO_ACCEL` from `arm_config.h`.
 
 The app counts its unanswered `K` lines against the last free count, so it never sends into a full buffer.
 Keyframes come from the sim's own schedule: the arm holds still while the tilt changes, then reaches each waypoint

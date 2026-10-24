@@ -1,6 +1,7 @@
 // Clockedin motor test: drive each servo by hand from the Serial Monitor, no app needed. 115200 baud, newline.
-// Every move is a glide at a set speed (60 deg/s to start), never a jump, and stays inside the limits in
-// arm_config.h. Type "help" for the commands. The arm's numbers come from app/arm.config.json through
+// Every move is a glide at a set speed (60 deg/s to start), never a jump: each servo speeds up and slows down at
+// a set acceleration (SERVO_ACCEL from the app's config to start), because a servo told to stop dead overshoots.
+// Moves stay inside the limits in arm_config.h. Type "help" for the commands. The arm's numbers come from app/arm.config.json through
 // arm_config.h; regenerate it with "./firmware/arm config".
 //
 //   b 90 | e 45 | t 120      one servo to that many degrees of its travel (0 to 180)
@@ -8,12 +9,15 @@
 //   park | mid               the park pose (pen up) | every servo at 90
 //   pen draw|lift|erase      tilt the pen to touch the nib, lift it, or touch the eraser
 //   sweep b|e|t|all [lo hi]  swing between the limits (or lo and hi) twice
-//   ga 30 100                joint angles as the app counts them (base from +x, elbow from the upper arm)
+//   ga 90 -90                joint angles as the app counts them (base from +x, elbow from the upper arm, - clockwise)
 //   xy 0 215                 the nib to a board point in mm from the base (x right, y away from it)
 //   square 100 | circle 40   draw one, pen down, at the middle of the drawing area (size in mm)
 //   speed 60                 glide speed in deg/s          where     positions now
+//   accel 1500               how fast a glide speeds up and slows down, deg/s². To tune: "speed 300", then
+//                            "sweep b 60 120" at a few accels; the highest with no overshoot at the ends, less
+//                            a third, goes in Arm setup as Servo acceleration
 //   us b 1500                raw pulse in microseconds, to calibrate US_MIN / US_MAX (no limits: go gently)
-//   stop                     hold where it is
+//   stop                     slow to a halt and hold
 #include <Servo.h>
 #include "arm_config.h"
 
@@ -21,8 +25,8 @@ const char *NAME[3] = {"base", "elbow", "tilt"};
 const uint16_t FRAME_MS = 20;
 
 Servo servo[3];
-float pos[3], target[3];        // degrees of servo travel
-float speed = 60;               // deg/s
+float pos[3], target[3], vel[3];   // degrees of servo travel, and deg/s
+float speed = 60, accel = SERVO_ACCEL;   // deg/s, deg/s²
 int8_t sweepJoint = -1;          // -1 none, 0..2 one servo, 3 base and elbow together
 float sweepLo[3], sweepHi[3];
 uint8_t sweepLeft = 0;
@@ -30,8 +34,8 @@ uint8_t sweepLeft = 0;
 const uint8_t PATH_MAX = 49;
 float pathX[PATH_MAX], pathY[PATH_MAX];
 uint8_t pathN = 0, pathI = 0;
-float pathT = 0;                 // 0..1 along the current segment
-const float PATH_SPEED = 40;     // mm/s, slow on purpose
+float pathT = 0, pathV = 0;      // 0..1 along the current segment, and the pen's speed now
+const float PATH_SPEED = 40;     // mm/s, slow on purpose; it speeds up and slows down at PEN_ACCEL
 uint8_t pathStage = 0;           // 0 off, 1 gliding to the start (pen up), 2 pen going down, 3 drawing, 4 pen going up
 char line[48];
 uint8_t len = 0;
@@ -40,7 +44,7 @@ uint32_t lastFrame = 0;
 float lo(uint8_t j) { return LIMIT_MIN[j] / 100.0; }
 float hi(uint8_t j) { return LIMIT_MAX[j] / 100.0; }
 void put(uint8_t j, float deg) { servo[j].writeMicroseconds(US_MIN[j] + (long)((US_MAX[j] - US_MIN[j]) * constrain(deg, 0, 180) / 180.0)); }
-bool settled() { for (uint8_t j = 0; j < 3; j++) if (fabs(pos[j] - target[j]) > 0.05) return false; return true; }
+bool settled() { for (uint8_t j = 0; j < 3; j++) if (fabs(pos[j] - target[j]) > 0.05 || vel[j]) return false; return true; }
 
 // Ask for a servo position; anything past a limit is held at the limit, and says so.
 void aim(uint8_t j, float deg, bool say = true) {
@@ -57,7 +61,7 @@ bool solve(float x, float y, float &base, float &elbow) {
   if (r > L1 + L || r < fabs(L1 - L)) return false;
   float c2 = constrain((r2 - L1 * L1 - L * L) / (2 * L1 * L), -1, 1), s2 = sqrt(1 - c2 * c2) * (ELBOW_UP ? 1 : -1);
   float t2 = atan2(s2, c2), t1 = atan2(y, x) - atan2(L * s2, L1 + L * c2);
-  base = t1 * 180 / PI; while (base > 180) base -= 360; while (base < -180) base += 360;
+  base = t1 * 180 / PI;   // unwrapped, as the app's IK gives it: the zero offsets are set for these angles
   elbow = (t2 - gamma) * 180 / PI;
   return true;
 }
@@ -81,15 +85,22 @@ void loop() {
     else if (len < sizeof(line) - 1) line[len++] = c;
   }
   uint32_t now = millis();
-  if (now - lastFrame >= FRAME_MS) { float dt = (now - lastFrame) / 1000.0; lastFrame = now; frame(dt); }
+  if (now - lastFrame >= FRAME_MS) { float dt = min((now - lastFrame) / 1000.0, 0.1); lastFrame = now; frame(dt); }
 }
 
-// One servo frame: step each servo toward its target, then move the sweep or the shape along.
+// The fastest speed that can still stop on the spot d away, slowing by a*dt each frame (not the smooth-motion
+// sqrt(2ad), which arrives too fast for 20 ms frames and stops dead in the last one).
+float braking(float d, float a, float dt) { return a * dt * (sqrt(0.25 + 2 * fabs(d) / (a * dt * dt)) - 0.5); }
+
+// One servo frame: each servo speeds up toward its target and slows down in time to stop on it, then the sweep
+// or the shape moves along.
 void frame(float dt) {
-  float step = speed * dt;
   for (uint8_t j = 0; j < 3; j++) {
-    float d = target[j] - pos[j];
-    pos[j] += constrain(d, -step, step);
+    float d = target[j] - pos[j], want = min(speed, braking(d, accel, dt));
+    vel[j] += constrain((d < 0 ? -want : want) - vel[j], -accel * dt, accel * dt);
+    float step = vel[j] * dt;
+    if (fabs(d) < 0.05 || (d > 0 && step >= d) || (d < 0 && step <= d)) { pos[j] = target[j]; vel[j] = 0; }
+    else pos[j] += step;
     put(j, pos[j]);
   }
   if (sweepJoint >= 0 && settled()) {
@@ -103,10 +114,15 @@ void frame(float dt) {
 
 void followPath(float dt) {
   if (pathStage == 1 && settled()) { aim(2, TILT_DRAW / 100.0); pathStage = 2; return; }
-  if (pathStage == 2 && settled()) { pathStage = 3; pathI = 0; pathT = 0; return; }
+  if (pathStage == 2 && settled()) { pathStage = 3; pathI = 0; pathT = 0; pathV = 0; return; }
   if (pathStage == 3) {
     float dx = pathX[pathI + 1] - pathX[pathI], dy = pathY[pathI + 1] - pathY[pathI], d = sqrt(dx * dx + dy * dy);
-    pathT += d > 0 ? PATH_SPEED * dt / d : 1;
+    // full speed, but slowing to a stop at the end and at any corner sharper than 30 deg
+    bool corner = pathI + 2 >= pathN;
+    if (!corner) { float ex = pathX[pathI + 2] - pathX[pathI + 1], ey = pathY[pathI + 2] - pathY[pathI + 1], e = sqrt(ex * ex + ey * ey); corner = e > 0 && d > 0 && (dx * ex + dy * ey) / (d * e) < 0.866; }
+    float vWant = corner ? min(PATH_SPEED, sqrt(2 * PEN_ACCEL * (1 - pathT) * d)) : PATH_SPEED;
+    pathV = max(2.0f, pathV + constrain(vWant - pathV, -PEN_ACCEL * dt, PEN_ACCEL * dt));
+    pathT += d > 0 ? pathV * dt / d : 1;
     while (pathT >= 1 && pathI + 1 < pathN - 1) { pathT -= 1; pathI++; }
     if (pathT >= 1) { aimXY(pathX[pathN - 1], pathY[pathN - 1], false); pos[0] = target[0]; pos[1] = target[1]; aim(2, TILT_LIFT / 100.0); pathStage = 4; return; }
     // the pen walks the line itself, so the servos are put straight on it each frame
@@ -135,7 +151,7 @@ void handle(char *s) {
   if (!cmd) return;
   for (char *p = cmd; *p; p++) *p = tolower(*p);
   float v1 = a1 ? atof(a1) : 0, v2 = a2 ? atof(a2) : 0, v3 = a3 ? atof(a3) : 0;
-  if (strcmp(cmd, "speed") && strcmp(cmd, "where")) pathStage = 0;   // any move ends a shape being drawn
+  if (strcmp(cmd, "speed") && strcmp(cmd, "accel") && strcmp(cmd, "where")) pathStage = 0;   // any move ends a shape being drawn
   uint8_t j = joint(cmd);
   if (j < 3 && strlen(cmd) <= 5 && a1) { sweepJoint = -1; aim(j, v1); }
   else if (!strcmp(cmd, "all") && a3) { sweepJoint = -1; aim(0, v1); aim(1, v2); aim(2, v3); }
@@ -162,6 +178,7 @@ void handle(char *s) {
     startPath();
   }
   else if (!strcmp(cmd, "speed") && a1) { speed = constrain(v1, 5, 600); Serial.print(F("speed ")); Serial.println(speed); }
+  else if (!strcmp(cmd, "accel") && a1) { accel = constrain(v1, 50, 20000); Serial.print(F("accel ")); Serial.println(accel); }
   else if (!strcmp(cmd, "us") && a2) {
     uint8_t k = joint(a1);
     if (k > 2) { Serial.println(F("us b, e or t, then microseconds")); return; }
@@ -170,7 +187,7 @@ void handle(char *s) {
     Serial.print(NAME[k]); Serial.print(F(" pulse ")); Serial.println((int)v2);
     return;
   }
-  else if (!strcmp(cmd, "stop")) { sweepJoint = -1; for (uint8_t k = 0; k < 3; k++) target[k] = pos[k]; }
+  else if (!strcmp(cmd, "stop")) { sweepJoint = -1; for (uint8_t k = 0; k < 3; k++) target[k] = constrain(pos[k] + vel[k] * fabs(vel[k]) / (2 * accel), lo(k), hi(k)); }   // where it can stop
   else if (!strcmp(cmd, "where")) {}
   else { help(); return; }
   where();
@@ -182,5 +199,6 @@ void where() {
 
 void help() {
   Serial.println(F("b|e|t <deg>  all <b> <e> <t>  park  mid  pen draw|lift|erase  sweep b|e|t|all [lo hi]"));
-  Serial.println(F("ga <base> <elbow>  xy <x mm> <y mm>  square [mm]  circle [radius mm]  speed <deg/s>  us b|e|t <us>  stop  where"));
+  Serial.println(F("ga <base> <elbow>  xy <x mm> <y mm>  square [mm]  circle [radius mm]  speed <deg/s>  accel <deg/s2>"));
+  Serial.println(F("us b|e|t <us>  stop  where"));
 }

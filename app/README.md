@@ -50,6 +50,8 @@ They live in `app/.env`, which git ignores. The dev server reads them and calls 
 - **⌘K**: every command, and "Draw …" for anything you type.
 - Drag on the board to move the pen by hand when nothing is playing.
 - **Smoothing** (Arm setup): the servos' dead band and gear play, compensated in every command, plus a 3 mm lead-in to each stroke. Why, and what to do with the motors: [`docs/hardware-link.md`](../docs/hardware-link.md#smoothing-the-line).
+- **Acceleration** (Arm setup, Motion): a hobby servo told to stop dead overshoots, so the pen speeds up and slows down at 1000 mm/s², takes a right-angle corner at 15 mm/s (sharper ones slower), and no joint speeds up faster than 1500 °/s²; pen tilts ease in and out. On the clock this cuts the biggest jump in joint speed between 20 ms frames from 161 to 20 °/s, and doubles the draw time (9.4 to 19.3 s). Tune it on the arm with the motor test's `accel` (`firmware/README.md`).
+- **Servo zeros** (Arm setup, Servos): each servo turns 180°, and the joints need more than that for the whole board. Best zeros picks the base and elbow zeros that keep the most of the board in reach (99% with the elbow on the left) with the drawing, the wipe and the park pose always inside.
 
 ## How a change is planned (`src/optimize.js`)
 
@@ -86,7 +88,8 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `src/scene.js` | what should be on the board: drawings in boxes, and a game |
 | `src/optimize.js` | diff, the four ways to wipe, kept ink to redraw, the fastest plan |
 | `src/games/tictactoe.js` | grid and marks as strokes, a computer player that never loses |
-| `src/sim.js` | the arm simulation: schedule, servo speed and resolution, servo end stops, wobble measurement |
+| `src/sim.js` | the arm simulation: schedule (speeding up and slowing down, corners, eased tilts), servo speed and resolution, servo end stops, wobble measurement |
+| `src/zeros.js` | each servo's best zero: the most of the board inside 180° of travel |
 | `src/board.js` | draws the board, plan, ink and arm to scale |
 | `src/view3d.js` | the 3D view, on three.js 0.170 (MIT, `ui/vendor/`, licence beside it) |
 | `src/pen.js` | the marker on the tilt servo: best angle, shaft height, tilts, offsets |

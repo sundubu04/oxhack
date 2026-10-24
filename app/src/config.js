@@ -9,22 +9,28 @@ export const DEFAULT_CONFIG = {
   links: { L1: 160, L2: 200 },   // the build: upper arm 16 cm, forearm 20 cm
   board: { width: 350, height: 350, standoff: 40 },
   drawing: { size: 180 },
-  elbow: "up",   // up: the elbow bends to the right of the line from base to pen, as on the build (Arm setup says Right)
+  elbow: "down",   // the build's elbow sits to the left of the line from base to pen ("up" would put it on the right)
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
   pen: { length: 165, barrel: 17, nib: 12, angle: 0, margin: 5, press: 1, lift: 3, pressure: 60, eraserWidth: 20 },
-  motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3 },   // leadIn: mm of pen-up glide onto each stroke
+  // leadIn: mm of pen-up glide onto each stroke. A hobby servo told to stop dead overshoots, so the pen speeds up
+  // and slows down at accel (mm/s²: 150 mm/s to a stop in 11 mm) and takes a right-angle corner at cornerSpeed
+  // (mm/s; sharper corners slower). Starting points to tune on the arm: lower accel if lines end in a hook.
+  motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3, accel: 1000, cornerSpeed: 15 },
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
-  // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both.
+  // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both. accel caps
+  // how fast any joint speeds up or slows down, in deg/s²: well under what an SG92R can give the loaded arm, so it
+  // tracks without overshoot (find the real figure with "accel" in the motor test).
   servos: {
-    model: "TowerPro SG92R", speed: 600, resolution: 1, backlash: 0, compensate: true,
+    model: "TowerPro SG92R", speed: 600, accel: 1500, resolution: 1, backlash: 0, compensate: true,
     // ratio: servo degrees per joint degree, for a belt or gear reduction between servo and link
-    // zero offsets keep each joint's working range inside its servo's travel (base -31 to 76 deg, elbow 41 to 158
-    // deg for the drawing square, the wipe and the park pose, so servo 27 to 134 and 31 to 148): mount the base so
-    // servo 90 points 32 deg up from +x, and the elbow so servo 90 is 100 deg round from link 1
-    base: { min: 0, max: 180, offset: 58, dir: 1, ratio: 1 },
-    elbow: { min: 0, max: 180, offset: -10, dir: 1, ratio: 1 },
+    // zero offsets: each servo turns 180 deg and the joints need more for the whole board, so the zeros keep the most
+    // of it (99%) with the drawing, the wipe and the park pose inside (zeros.js, Best zeros in Arm setup). Mount the
+    // base so servo 90 points the upper arm 167 deg round from +x (left, 13 deg above level), and the elbow so servo
+    // 90 turns the forearm 103 deg clockwise from the upper arm's line
+    base: { min: 0, max: 180, offset: -77, dir: 1, ratio: 1 },
+    elbow: { min: 0, max: 180, offset: 193, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
   // The Arduino: signal pins for base, elbow and tilt, each servo's pulse width at 0 and 180 deg (the Servo
@@ -52,8 +58,8 @@ export function geomFrom(cfg) {
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     ...penFields(c.pen),
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
-    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn,
-    servo: { speed: +c.servos.speed, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
+    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,
+    servo: { speed: +c.servos.speed, accel: +c.servos.accel, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
   };
 }
 

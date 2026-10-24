@@ -3,6 +3,7 @@
 // own 20 ms frame, so browser timing never reaches the line. A board that doesn't answer the handshake gets
 // protocol 1: one "base,elbow,tilt,pressure" line per waypoint, paced by the app.
 import { servoAngle } from "./config.js";
+import { ease, homePose } from "./sim.js";
 
 let port = null, writer = null, protocol = 0, slots = 0;
 const listeners = new Set();
@@ -55,16 +56,21 @@ export async function disconnect() {
   port = writer = null; protocol = 0;
 }
 
-// Keyframes for protocol 2, from the sim's schedule: the arm holds still while the tilt changes, then moves to
-// each waypoint by the time it should arrive. Angles go out in the servo's own frame, after calibration.
+// Keyframes for protocol 2, from the sim's schedule: the job starts from the park pose, the arm holds still while
+// the tilt changes, then moves to each waypoint by the time it should arrive. Angles go out in the servo's own
+// frame, after calibration.
 export function keyframes(job, g) {
   const cd = (j, a) => Math.round(Math.max(0, Math.min(180, servoAngle(j, a, g))) * 100);
-  const out = []; let prev = null, lastTilt = null;
+  const h = homePose(g);
+  let prev = [cd("base", h.base), cd("elbow", h.elbow), cd("tilt", h.tilt)], lastTilt = h.tilt;
+  const out = [{ t: 0, a: prev }];
   for (let i = 0; i < job.n; i++) {
     const a = (job.cmd || job.path)[i]; if (a.out_of_reach) continue;
     const s = [cd("base", a.base), cd("elbow", a.elbow), cd("tilt", a.tilt)];
     if (prev && a.tilt !== lastTilt) {
-      out.push({ t: job.tTilt[i], a: [prev[0], prev[1], s[2]] });
+      // the tilt eases in and out (a step would overshoot), in steps of about 5 deg, then holds while it settles
+      const T0 = job.tTilt[i], T1 = job.tLand?.[i] ?? T0, k = Math.max(4, Math.ceil(Math.abs(a.tilt - lastTilt) / 5));
+      for (let m = 1; m <= k; m++) out.push({ t: T0 + (T1 - T0) * m / k, a: [prev[0], prev[1], cd("tilt", lastTilt + (a.tilt - lastTilt) * ease(m / k))] });
       out.push({ t: job.tGo[i], a: [prev[0], prev[1], s[2]] });
     }
     out.push({ t: job.tCmd[i], a: s });

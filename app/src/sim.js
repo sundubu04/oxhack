@@ -1,33 +1,93 @@
 // Live simulation of the arm: the angle stream played through the servos' limits (top speed and resolution),
 // so the line on screen is the one the real arm would leave, wobble and lag included. Pure: no DOM.
-import { fk, ik, ikTool, toolPoint, R2D } from "./ik.js";
+import { fk, ik, ikTool, toolPoint, toAngles, R2D } from "./ik.js";
 
 const D2R = Math.PI / 180;
 const NEAR = 1.5;   // deg: how close the tilt servo must be to a pose for the marker or eraser to touch
+const STEP = 2;     // mm: longer moves are split this fine, so the speed can ramp along them
+const SETTLE = 0.05;   // s the arm holds after a tilt, while the marker settles
 
-// When each waypoint is commanded. The pen moves at drawSpeed and travels at travelSpeed, but never faster than
-// the servos can turn; when the tilt changes the arm holds still while the marker settles (the way the firmware
-// should do it), so strokes start clean. tTilt[i]: the tilt for waypoint i is sent; tGo[i]: the arm sets off
-// for it; tCmd[i]: it should have arrived.
+// When each waypoint is commanded. A hobby servo told to stop dead overshoots, so nothing starts or stops at once:
+// the pen speeds up and slows down at `accel` (mm/s²), takes a right-angle corner at `cornerSpeed` (sharper ones
+// slower, gentler ones faster) and stops before each tilt; no joint turns faster than the servo can or speeds up
+// faster than `servo.accel` (deg/s²). Tilts ease in and out. The pen draws at drawSpeed and travels at
+// travelSpeed. Long moves are split every STEP mm first, so the job's toolpath and path are longer than the plan's.
+// tTilt[i]: the tilt for waypoint i starts; tLand[i]: it is there; tGo[i]: the arm sets off for waypoint i;
+// tCmd[i]: it should have arrived.
 export function makeJob(toolpath, angles, g) {
-  const n = toolpath.length, tCmd = new Float64Array(n), tGo = new Float64Array(n), tTilt = new Float64Array(n);
-  let lastTilt = null, last = null;
+  ({ toolpath, angles } = densify(toolpath, angles, g));
+  const n = toolpath.length, path = angles.path;
+  const tCmd = new Float64Array(n), tGo = new Float64Array(n), tTilt = new Float64Array(n), tLand = new Float64Array(n);
+  const A = +g.accel || Infinity, Aj = +g.servo.accel || Infinity, wj = g.servo.speed / 1.2;
+  // move i runs from the waypoint before it (the park pose for the first) to waypoint i
+  const len = new Float64Array(n), vTop = new Float64Array(n), acc = new Float64Array(n), turn = new Float64Array(n), dir = [], tilt = [];
+  const home = homePose(g), start = toolPoint(home.base * D2R, home.elbow * D2R, g, firstTool(toolpath));
+  let last = home, lastTilt = home.tilt;
   for (let i = 0; i < n; i++) {
-    const a = angles.path[i];
-    const tilt = a.out_of_reach ? lastTilt : a.tilt;
-    const prev = i ? tCmd[i - 1] : 0;
-    const dwell = lastTilt != null && tilt !== lastTilt ? Math.abs(tilt - lastTilt) / g.servo.speed + 0.05 : 0;
-    // the first move comes from the park pose, at travel speed
-    const p = i ? toolpath[i - 1] : homeTip(g), q = toolpath[i], tool = i ? q.tool || (q.pen ? "draw" : "lift") : "lift";
-    let move = Math.hypot(q.x - p.x, q.y - p.y) / (tool === "lift" ? g.travelSpeed : g.drawSpeed);
-    const from = last || homePose(g);
-    if (!a.out_of_reach) move = Math.max(move, 1.2 * Math.max(Math.abs(a.base - from.base), Math.abs(a.elbow - from.elbow)) / g.servo.speed);
-    tTilt[i] = prev; tGo[i] = prev + dwell; tCmd[i] = tGo[i] + move;
-    if (tilt != null) lastTilt = tilt;
-    if (!a.out_of_reach) last = a;
+    const a = path[i], p = i ? toolpath[i - 1] : start, q = toolpath[i];
+    const d = Math.hypot(q.x - p.x, q.y - p.y), dj = a.out_of_reach ? 0 : Math.max(Math.abs(a.base - last.base), Math.abs(a.elbow - last.elbow));
+    const v = (q.tool || (q.pen ? "draw" : "lift")) === "lift" ? g.travelSpeed : g.drawSpeed;
+    len[i] = d; dir[i] = d > 1e-9 && [(q.x - p.x) / d, (q.y - p.y) / d];
+    if (d > 1e-9) { const k = dj / d; vTop[i] = k ? Math.min(v, wj / k) : v; acc[i] = k ? Math.min(A, Aj / k) : A; }
+    else turn[i] = dj;   // the joints turn with the pen on one spot (rare): a move of its own, from rest to rest
+    tilt[i] = a.out_of_reach ? lastTilt : a.tilt;
+    if (!a.out_of_reach) { last = a; lastTilt = a.tilt; }
   }
-  return { toolpath, path: angles.path, cmd: compensate(angles.path, g), tCmd, tGo, tTilt, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
+  // the speed at each waypoint: zero where the arm must be still, the corner's speed elsewhere, then no more than
+  // it can reach from the speed before (forward) or shed by the speed after (backward)
+  const vAt = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const still = i === n - 1 || tilt[i + 1] !== tilt[i] || path[i].out_of_reach || path[i + 1].out_of_reach || turn[i] || turn[i + 1] || !dir[i] || !dir[i + 1];
+    vAt[i] = still ? 0 : Math.min(vTop[i], vTop[i + 1], cornerSpeed(dir[i], dir[i + 1], g));
+  }
+  for (let i = 0; i < n; i++) vAt[i] = Math.min(vAt[i], Math.sqrt((i ? vAt[i - 1] ** 2 : 0) + 2 * acc[i] * len[i]));
+  for (let i = n - 2; i >= 0; i--) vAt[i] = Math.min(vAt[i], Math.sqrt(vAt[i + 1] ** 2 + 2 * acc[i + 1] * len[i + 1]));
+  let before = home.tilt;
+  for (let i = 0; i < n; i++) {
+    const prev = i ? tCmd[i - 1] : 0, ease = tilt[i] !== before ? easeTime(Math.abs(tilt[i] - before), g) : 0;
+    const move = turn[i] ? rampTime(turn[i], 0, 0, wj, Aj) : rampTime(len[i], i ? vAt[i - 1] : 0, vAt[i], vTop[i] || g.travelSpeed, acc[i] || A);
+    tTilt[i] = prev; tLand[i] = prev + ease; tGo[i] = prev + (ease && ease + SETTLE); tCmd[i] = tGo[i] + move;
+    before = tilt[i];
+  }
+  return { toolpath, path, cmd: compensate(path, g), tCmd, tGo, tTilt, tLand, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
 }
+
+// Split every move longer than STEP; the joints for the new points come from the IK, so a long move is a straight
+// line on the board too. The first move, from the park pose, is a pen-up travel move.
+function densify(toolpath, angles, g) {
+  const out = []; let split = false;
+  const home = homePose(g), start = toolPoint(home.base * D2R, home.elbow * D2R, g, firstTool(toolpath));
+  toolpath.forEach((q, i) => {
+    const p = i ? toolpath[i - 1] : start, k = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / STEP);
+    for (let s = 1; s < k; s++) out.push({ ...(i ? q : { pen: 0, tool: "lift" }), x: p.x + (q.x - p.x) * s / k, y: p.y + (q.y - p.y) * s / k });
+    if (k > 1) split = true;
+    out.push(q);
+  });
+  return split ? { toolpath: out, angles: toAngles(out, g) } : { toolpath, angles };
+}
+function firstTool(tp) { const q = tp.find((p) => p.tool === "erase" || p.pen); return q?.tool === "erase" ? "erase" : "draw"; }
+
+// How fast the pen may pass from one move into the next: unlimited in a straight line, `cornerSpeed` at a right
+// angle, nothing for a full reversal (the junction-deviation rule plotters and 3D printers use, scaled so a right
+// angle gives cornerSpeed).
+function cornerSpeed(u, w, g) {
+  const s = Math.sqrt(Math.max(0, (1 + u[0] * w[0] + u[1] * w[1]) / 2));   // cos of half the turn
+  return s > 0.999999 ? Infinity : (+g.cornerSpeed || 0) * Math.sqrt(s / ((1 - s) * (1 + Math.SQRT2)));
+}
+
+// Time to cover d at up to vTop, starting at v0 and ending at v1, speeding up and slowing down at a.
+function rampTime(d, v0, v1, vTop, a) {
+  if (d <= 1e-9) return 0;
+  if (!isFinite(a)) return d / vTop;
+  const vp = Math.min(vTop, Math.sqrt(a * d + (v0 * v0 + v1 * v1) / 2));
+  return (vp - v0) / a + (vp - v1) / a + Math.max(0, d - (2 * vp * vp - v0 * v0 - v1 * v1) / (2 * a)) / vp;
+}
+
+// A tilt eases in and out along half a cosine: as slow as it must be for the servo's top speed and acceleration.
+export function easeTime(deg, g) {
+  return Math.max((Math.PI * deg) / (2 * g.servo.speed), Math.PI * Math.sqrt(deg / (2 * (+g.servo.accel || Infinity))));
+}
+export const ease = (u) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, u)))) / 2;
 
 // What to command so the link lands where the plan wants it. A hobby servo stops half its dead band short of a
 // command, and gear play leaves the link half the play behind the motor, both on the side it came from; so
@@ -107,14 +167,19 @@ export class Sim {
     // compensated commands are for real servos; ideal ones follow the plan itself
     const P = (this.physics && job.cmd) || job.path, a = P[k], b = P[m];
     if (a.out_of_reach) return { base: this.j.base, elbow: this.j.elbow, tilt: b.out_of_reach ? this.j.tilt : b.tilt };
-    let base = a.base, elbow = a.elbow;
+    let base = a.base, elbow = a.elbow, tilt = b.out_of_reach ? this.j.tilt : b.tilt;
+    if (this.smooth && job.tLand && !b.out_of_reach && this.t < job.tLand[m]) {
+      let q = m - 1; while (q > 0 && P[q].out_of_reach) q--;
+      const from = q >= 0 && !P[q].out_of_reach ? P[q].tilt : homePose(this.g).tilt, T0 = job.tTilt[m], T1 = job.tLand[m];
+      tilt = from + (b.tilt - from) * ease((this.t - T0) / (T1 - T0));
+    }
     // between set-off and arrival the command slides from the last waypoint to this one, as the firmware does
-    const p = P[k - 1];
-    if (this.smooth && k > 0 && p && !p.out_of_reach && k === this.i) {
+    const p = k > 0 ? P[k - 1] : homePose(this.g);   // the first move starts from the park pose
+    if (this.smooth && p && !p.out_of_reach && k === this.i) {
       const span = job.tCmd[k] - job.tGo[k], u = span > 0 ? Math.max(0, Math.min(1, (this.t - job.tGo[k]) / span)) : 1;
       base = p.base + (a.base - p.base) * u; elbow = p.elbow + (a.elbow - p.elbow) * u;
     }
-    return { base, elbow, tilt: b.out_of_reach ? this.j.tilt : b.tilt };
+    return { base, elbow, tilt };
   }
 
   // Advance by dt seconds in small steps. onInk(from, to, mode) gets every piece of line the tip leaves.

@@ -11,6 +11,7 @@ import * as arm from "./arm.js";
 import { SAMPLES, clockSVG } from "./sample.js";
 import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
+import { bestZeros, boardShare } from "./zeros.js";
 import { createBoard } from "./board.js";
 import { nibHeight } from "./pen.js";
 import { emptyScene, sceneStrokes, applyActions, describeGame, cellName, boxMm, sceneSVG, FULL } from "./scene.js";
@@ -483,7 +484,7 @@ function renderPicture() {
 function renderAngles() {
   const el = $("#angles");
   if (!planned) { el.innerHTML = `<div class="dl-empty"><span class="dl-empty__title">No angles yet</span><span>They appear once a change is planned.</span></div>`; return; }
-  const tp = planned.toolpath, path = planned.angles.path, T = planned.job.tTilt;
+  const tp = planned.job.toolpath, path = planned.job.path, T = planned.job.tTilt;
   const rows = tp.map((p, i) => {
     const a = path[i], tool = p.tool || (p.pen ? "draw" : "lift");
     return a.out_of_reach
@@ -564,7 +565,7 @@ function stream() {
     arm: cfg.name, measured: cfg.measured, links_mm: cfg.links, board_mm: cfg.board, pen: cfg.pen, servos: cfg.servos,
     simulation: doc?.title, duration_s: +job.total.toFixed(2), out_of_reach: angles.unreachable, past_servo_limits: angles.outOfRange,
     protocol: "one line per waypoint at its send time t: base,elbow,tilt,pressure; SKIP when out of reach; HOME at the end",
-    path: angles.path.map((a, i) => ({ t: +job.tTilt[i].toFixed(3), ...a })),
+    path: job.path.map((a, i) => ({ t: +job.tTilt[i].toFixed(3), ...a })),
     keyframes: arm.keyframes(job, g),
   };
 }
@@ -623,7 +624,7 @@ const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["board.standoff", "Base below board", "mm"], ["drawing.size", "Drawing size", "mm"]]],
   ["Pen", [["pen.length", "Length, nib to eraser", "mm"], ["pen.barrel", "Barrel width", "mm"], ["pen.nib", "Nib sticks out", "mm"], ["pen.angle", "Meets the board at (0 = best)", "°"], ["pen.margin", "Barrel kept off the board", "mm"], ["pen.press", "Press in", "mm"], ["pen.lift", "Lift clear", "mm"], ["pen.eraserWidth", "Eraser width", "mm"]]],
-  ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"]]],
+  ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
@@ -634,9 +635,9 @@ function buildSetup() {
     `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id(p)}" data-path="${p}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`).join("")}</div></div>`).join("") +
     `<div class="cw-group" role="group" aria-labelledby="g-servos"><h2 class="dl-kicker" id="g-servos">Servos</h2><div class="cw-fields">
       <div class="dl-field"><label class="dl-label" for="f-model">Model</label><input class="dl-input" id="f-model" data-path="servos.model" data-text></div>
-      <div class="dl-field"><label class="dl-label" for="f-elbow">Elbow side</label><span class="dl-select"><select class="dl-input" id="f-elbow" data-path="elbow" data-text><option value="up">Right</option><option value="down">Left</option></select>${icon("chevron-down")}</span></div>
       <table class="dl-table cw-servos"><colgroup><col><col><col><col><col><col class="cw-dir"></colgroup><thead><tr><th>Joint</th><th>Min °</th><th>Max °</th><th>Zero °</th><th>Ratio</th><th>Direction</th></tr></thead><tbody>${["base", "elbow", "tilt"].map((j) =>
         `<tr><td>${j[0].toUpperCase() + j.slice(1)}</td>${["min", "max", "offset", "ratio"].map((k) => `<td><input class="dl-input dl-num" type="number" step="any" data-path="servos.${j}.${k}" aria-label="${j} ${{ offset: "zero offset", ratio: "gear ratio" }[k] || k}"></td>`).join("")}<td><span class="dl-select"><select class="dl-input" data-path="servos.${j}.dir" aria-label="${j} direction"><option value="1">Normal</option><option value="-1">Reversed</option></select>${icon("chevron-down")}</span></td></tr>`).join("")}</tbody></table>
+      <div><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="best-zeros">Best zeros</button></div>
     </div></div>`;
 }
 function fillSetup(c) {
@@ -668,6 +669,7 @@ function renderSetup() {
   $("#derived").innerHTML =
     `<dt>Reach</dt><dd>${mm(gg.L1 + gg.L2)}, inner limit ${mm(Math.abs(gg.L1 - gg.L2))}</dd>` +
     `<dt>Drawing square</dt><dd>${cover}% reachable within servo limits</dd>` +
+    `<dt>Whole board</dt><dd>${Math.round(boardShare(gg) * 100)}% of what the arm reaches is within servo limits</dd>` +
     `<dt>Worst dexterity</dt><dd>${ok ? worst.toFixed(2) : "none reachable"}</dd>` +
     `<dt>Servo step at the tip</dt><dd>${stepMm.toFixed(1)} mm at full stretch</dd>` +
     `<dt>Clock takes</dt><dd>${secs(job.total)}${an.unreachable ? `, ${an.unreachable} points out of reach` : ""}</dd>` +
@@ -837,6 +839,14 @@ function wire() {
   $("#setup").addEventListener("input", () => { setupSim.manual = null; renderSetup(); $("#save-note").textContent = dirty() ? "Not saved yet" : ""; });
   $("#save").addEventListener("click", save);
   $("#revert").addEventListener("click", () => { fillSetup(cfg); renderSetup(); });
+  // each servo turns 180 deg: put its zero where it keeps the most of the board, with the drawing always inside
+  $("#setup").addEventListener("click", (e) => {
+    if (!e.target.closest("#best-zeros")) return;
+    const z = bestZeros(geomFrom(readSetup()));
+    if (!z) { $("#save-note").textContent = "The drawing needs more than 180° of a servo: make it smaller"; return; }
+    $('[data-path="servos.base.offset"]').value = z.base; $('[data-path="servos.elbow.offset"]').value = z.elbow;
+    $("#setup").dispatchEvent(new Event("input"));
+  });
   new ResizeObserver(() => { draw(); renderSetup(); }).observe($("#main"));
 }
 let setupRaf = 0, setupTs = 0;

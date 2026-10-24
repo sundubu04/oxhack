@@ -4,40 +4,65 @@
 // Protocol (115200 baud, one line each, angles in centi-degrees of servo travel, 0 to 18000):
 //   ?                      -> CLOCKEDIN 2 <slots>
 //   K <t_ms> <b> <e> <w>   keyframe at t ms after G      -> F <free slots> (one reply per K, in order)
-//   G                      start the clock               -> RUN
+//   G                      glide to the first keyframe, then start the clock -> RUN
 //   E                      no more keyframes; finish     -> DONE when the last one is reached
-//   S                      stop where it is, drop the buffer -> STOPPED
-//   J <b> <e> <w>          go there now (jog)            -> F <free slots>
-//   P                      park                          -> F <free slots>
+//   S                      ease to a stop along the path, drop the buffer -> STOPPED
+//   J <b> <e> <w>          glide there (jog)             -> F <free slots>
+//   P                      glide to the park pose        -> F <free slots>
 // While running it reports T <t_ms> <free> whenever slots free up (at most every 100 ms), and LATE if the
 // buffer runs dry. The app counts its unanswered K lines against <free>, so the buffer never overfills.
+// A hobby servo told to stop dead overshoots, so nothing here starts or stops at once: the app's keyframes speed up
+// and slow down already, glides (G, J, P) ramp at SERVO_ACCEL, and S slows the job's clock to zero over STOP_MS.
 #include <Servo.h>
 #include "arm_config.h"                          // pins, pulse widths and the park pose, from app/arm.config.json
 
 const uint8_t SLOTS = 48;                        // keyframes held (10 bytes each)
 const uint16_t FRAME_MS = 20;                    // a hobby servo reads one pulse every 20 ms
+const float GLIDE_SPEED = 120;                   // deg/s for glides
 
 struct Key { uint32_t t; int16_t a[3]; };
 Key buf[SLOTS];
 uint8_t head = 0, count = 0;
 Servo servo[3];
-bool running = false, ended = false, late = false;
-uint32_t t0 = 0, lastFrame = 0, lastReport = 0;
+bool running = false, ended = false, late = false, approaching = false, stopping = false;
+float tJob = 0, rate = 1;                        // the job's clock (ms) and how fast it runs; S brings rate to 0
+float pos[3], vel[3], aim[3];                    // centi-degrees (per s) where each servo is, how fast, where it glides to
+uint32_t lastFrame = 0, lastReport = 0;
 char line[48];
 uint8_t len = 0;
 
 void put(uint8_t j, long cdeg) {
   cdeg = constrain(cdeg, 0, 18000);
+  pos[j] = cdeg;
   servo[j].writeMicroseconds(map(cdeg, 0, 18000, US_MIN[j], US_MAX[j]));
 }
 void putAll(const int16_t a[3]) { for (uint8_t j = 0; j < 3; j++) put(j, a[j]); }
+void glideTo(const int16_t a[3]) { for (uint8_t j = 0; j < 3; j++) aim[j] = a[j]; }
+
+// The fastest speed that can still stop on the spot d away, slowing by a*dt each frame (not the smooth-motion
+// sqrt(2ad), which arrives too fast for 20 ms frames and stops dead in the last one).
+float braking(float d, float a, float dt) { return a * dt * (sqrt(0.25 + 2 * fabs(d) / (a * dt * dt)) - 0.5); }
+
+// One frame of a glide: each servo speeds up toward its aim and slows down in time to stop on it.
+bool follow(float dt) {
+  const float A = SERVO_ACCEL * 100, V = GLIDE_SPEED * 100;
+  bool still = true;
+  for (uint8_t j = 0; j < 3; j++) {
+    float d = aim[j] - pos[j], want = min(V, braking(d, A, dt));
+    vel[j] += constrain((d < 0 ? -want : want) - vel[j], -A * dt, A * dt);
+    float step = vel[j] * dt;
+    if (fabs(d) < 1 || (d > 0 && step >= d) || (d < 0 && step <= d)) { vel[j] = 0; put(j, aim[j]); }
+    else { put(j, pos[j] + step); still = false; }
+  }
+  return still;
+}
 uint8_t freeSlots() { return SLOTS - count; }
 void credit() { Serial.print(F("F ")); Serial.println(freeSlots()); }
 
 void setup() {
   Serial.begin(115200);
   for (uint8_t j = 0; j < 3; j++) servo[j].attach(PIN[j], US_MIN[j], US_MAX[j]);
-  putAll(PARK);
+  putAll(PARK); glideTo(PARK);
 }
 
 // Read one line at a time without blocking the servo frames.
@@ -48,7 +73,7 @@ void loop() {
     else if (len < sizeof(line) - 1) line[len++] = c;
   }
   uint32_t now = millis();
-  if (now - lastFrame >= FRAME_MS) { lastFrame = now; frame(now); }
+  if (now - lastFrame >= FRAME_MS) { float dt = min((now - lastFrame) / 1000.0, 0.1); lastFrame = now; frame(now, dt); }
 }
 
 void handle(char *s) {
@@ -66,25 +91,38 @@ void handle(char *s) {
       }
       credit();
       break;
-    case 'G': running = true; ended = false; t0 = millis(); Serial.println(F("RUN")); break;
+    case 'G': if (count) { approaching = true; ended = false; glideTo(buf[head].a); } break;
     case 'E': ended = true; break;
-    case 'S': running = false; count = 0; head = 0; Serial.println(F("STOPPED")); break;
-    case 'J': { int16_t a[3] = {(int16_t)v[0], (int16_t)v[1], (int16_t)v[2]}; if (!running) putAll(a); credit(); break; }
-    case 'P': if (!running) putAll(PARK); credit(); break;
+    case 'S':
+      if (running) { stopping = true; break; }   // STOPPED once the clock has eased to a halt
+      approaching = false; count = 0; head = 0;
+      for (uint8_t j = 0; j < 3; j++) aim[j] = pos[j] + vel[j] * fabs(vel[j]) / (2 * SERVO_ACCEL * 100);   // where a glide can stop
+      Serial.println(F("STOPPED")); break;
+    case 'J': { int16_t a[3] = {(int16_t)v[0], (int16_t)v[1], (int16_t)v[2]}; if (!running) glideTo(a); credit(); break; }
+    case 'P': if (!running) glideTo(PARK); credit(); break;
   }
 }
 
-// One servo frame: find the two keyframes either side of now and move to the point between them.
-void frame(uint32_t now) {
-  if (!running || !count) return;
-  uint32_t t = now - t0;
+// One servo frame: glide, or find the two keyframes either side of the job's clock and move to the point between.
+void frame(uint32_t now, float dt) {
+  if (!running) {
+    bool there = follow(dt);
+    if (approaching && there) { approaching = false; running = true; stopping = false; tJob = 0; rate = 1; Serial.println(F("RUN")); }
+    return;
+  }
+  if (stopping) {
+    rate -= dt * 1000 / STOP_MS;
+    if (rate <= 0) { running = stopping = false; count = 0; head = 0; for (uint8_t j = 0; j < 3; j++) { aim[j] = pos[j]; vel[j] = 0; } Serial.println(F("STOPPED")); return; }
+  }
+  tJob += dt * 1000 * rate;
+  uint32_t t = tJob;
   uint8_t freed = 0;
   while (count >= 2 && buf[(head + 1) % SLOTS].t <= t) { head = (head + 1) % SLOTS; count--; freed++; }
   Key &a = buf[head];
   if (count == 1 || t <= a.t) {
     putAll(a.a);
     if (count == 1 && t >= a.t) {
-      if (ended) { running = false; count = 0; head = 0; Serial.println(F("DONE")); return; }
+      if (ended) { running = false; count = 0; head = 0; for (uint8_t j = 0; j < 3; j++) { aim[j] = pos[j]; vel[j] = 0; } Serial.println(F("DONE")); return; }
       if (!late) Serial.println(F("LATE"));   // the app fell behind: hold here until more keyframes arrive
       late = true;
     }

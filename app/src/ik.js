@@ -36,13 +36,22 @@ export function toolPoint(t1, t2, g, tool = "draw") {
   return { x: f.px, y: f.py };
 }
 
-// Default geometry — the build (160 mm upper arm, 200 mm forearm, base 40 mm below a 350 mm board, clock centred).
+// Default geometry — the build (160 mm upper arm, 200 mm forearm, elbow on the left, base 40 mm below a 350 mm board, clock centred).
 export const GEOM = {
-  L1: 160, L2: 200, standoff: 40, board: 350, elbowUp: true, pressure: 60,
+  L1: 160, L2: 200, standoff: 40, board: 350, elbowUp: false, pressure: 60,
   tilt: { draw: -14, lift: -2, erase: 16 },
 };
 // where the drawing sits, in arm coords: centred on the board, base `standoff` below it.
 export function drawCentre(g = GEOM) { return { cx: 0, cy: g.standoff + g.board / 2 }; }
+
+// The base angle, a whole turn either way, that its servo can reach: with the elbow on the left the base works
+// around 180 deg, so a plain -180..180 wrap would send it to the far end of its travel.
+function baseTurn(deg, g) {
+  const s = g.servo?.base, w = (((deg + 180) % 360) + 360) % 360 - 180;
+  if (!s) return w;
+  const v = (a) => +s.offset + +s.dir * (+s.ratio || 1) * a, mid = (+s.min + +s.max) / 2;
+  return [w, w + 360, w - 360].reduce((best, a) => (Math.abs(v(a) - mid) < Math.abs(v(best) - mid) ? a : best));
+}
 
 // toolpath [{x,y,pen,tool?}] (mm, arm frame) -> angle stream for the Pi. tool is draw, lift or erase;
 // without one, pen 1 draws and pen 0 lifts. outOfRange counts waypoints past a servo's limits, when the
@@ -59,7 +68,7 @@ export function toAngles(toolpath, g = GEOM) {
     if (!s) { unreachable++; return { out_of_reach: true }; }
     worstDex = Math.min(worstDex, s.dex);
     const tool = tools[i];
-    const base = +((((s.t1 * R2D + 180) % 360) + 360) % 360 - 180).toFixed(2), elbow = +(s.t2 * R2D).toFixed(2);
+    const base = +baseTurn(s.t1 * R2D, g).toFixed(2), elbow = +(s.t2 * R2D).toFixed(2);
     if (!lim("base", base) || !lim("elbow", elbow)) outOfRange++;
     // lifted, the pen waits on the side of the end it uses next, so wipes don't swing it over to the nib and back
     const tilt = tool === "lift" && hand[i] === "erase" ? (g.tilt.liftErase ?? g.tilt.lift) : g.tilt[tool];

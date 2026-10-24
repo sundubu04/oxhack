@@ -33,12 +33,14 @@ If nothing moves at all: `./firmware/arm servos` (or upload `servo-check` from t
 
 1. **Servos off the arm.** `./firmware/arm test`, then `b 90`, `e 90`, `t 90`: each horn turns and stops. `sweep all` swings base and elbow through their range twice.
 2. **Ends of travel.** `us b 544`, then `us b 2400`: if the horn buzzes or strains at an end, step the number in until it stops, and put the two values in `arduino.usMin` / `usMax` in `app/arm.config.json`. Run `./firmware/arm config`.
-3. **Links on, pen off.** `park`, then `ga 90 90`: the upper arm should point straight up the board, away from the base, and the forearm to the left at a right angle to it. If not, change that servo's `offset` (and `dir` if it turns the wrong way) in Arm setup or the config, `./firmware/arm config`, and upload again.
+3. **Links on, pen off.** The elbow bends to the left of the line from base to pen. Fit the horns so that, with every servo at 90 (`mid`), the upper arm points left, 13° above level, and the forearm is turned 103° clockwise from the upper arm (Arm setup's Best zeros chose these to keep the most of the board in reach). Then `park`, and `ga 90 -90`: the upper arm should point straight up the board and the forearm to the right at a right angle to it. If not, change that servo's zero (and direction if it turns the wrong way) in Arm setup or the config, `./firmware/arm config`, and upload again.
 4. **Pen on.** `xy 0 215` puts the nib over the middle of the drawing area. `pen draw` touches it down, `pen lift` lifts it. Adjust the pen's measurements in Arm setup if the nib misses the board or presses too hard.
 5. **A first line.** `square 100` draws a 100 mm square, slowly, pen down. Then `./firmware/arm draw calibrate --speed 0.5` and `go`: the square's sides should be straight, the circle round and touching them, the cross through the middle.
 
-In the motor test every move glides (60 deg/s to start, `speed` changes it) and stays inside the limits in `arm_config.h`, except `us`, which is raw. `stop` holds the arm where it is.
+In the motor test every move glides (60 deg/s to start, `speed` changes it), speeding up and slowing down at `accel` (deg/s², the app's Servo acceleration to start), and stays inside the limits in `arm_config.h`, except `us`, which is raw. `stop` slows to a halt and holds.
+
+**Finding the acceleration.** A servo told to stop dead overshoots, so every move the app plans speeds up and slows down (Arm setup: Acceleration, Corner speed, Servo acceleration). To find what this arm takes: `speed 300`, then `sweep b 60 120` at `accel 500`, `1000`, `2000`, `4000`, watching the ends of each swing. Take the highest with no overshoot, less a third, as Servo acceleration; do the same with `sweep e 60 120`, and keep the lower. If drawn lines end in a hook or corners bulge, lower Acceleration or Corner speed.
 
 ## Playback commands
 
-`go` draws it, `stop` holds, `park` glides home, `loop` repeats it until you type `loop` again, `speed 50` plays at half speed (25 to 200), `info` says what is loaded. Set `AUTOSTART 1` at the top of `playback.ino` to draw 3 s after power-up with no computer attached.
+`go` draws it, `stop` eases to a halt and holds, `park` glides home, `loop` repeats it until you type `loop` again, `speed 50` plays at half speed (25 to 200), `info` says what is loaded. Set `AUTOSTART 1` at the top of `playback.ino` to draw 3 s after power-up with no computer attached.
