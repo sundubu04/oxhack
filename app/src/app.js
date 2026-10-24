@@ -45,6 +45,7 @@ const hhmm = (t) => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinu
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
 let services = { openai: { ready: false }, gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
+let pageNow = "studio";       // the page on show: "studio" or "arm"
 let serverState = "checking";   // "checking" | "up" | "offline": whether /api/status last answered
 const S = load("clockedin.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
 let sims = [], doc = null;           // the saved simulations, and the open one
@@ -87,7 +88,15 @@ async function listSims() {
 }
 function renderSims() {
   const mine = doc && !sims.some((s) => s.id === doc.id) ? [{ id: doc.id, title: doc.title, updated: doc.updated }] : [];
-  $("#sims").innerHTML = [...mine, ...sims].map((s) => `<a class="dl-nav__item" href="#studio" data-sim="${esc(s.id)}" title="${esc(s.title)}" ${doc && s.id === doc.id ? 'aria-current="true"' : ""}>${icon("pencil")}<span class="dl-nav__label">${esc(s.title)}</span><span class="dl-nav__count">${ago(s.updated)}</span></a>`).join("");
+  $("#sims").innerHTML = [...mine, ...sims].map((s) => `<a class="dl-nav__item" href="#studio" data-sim="${esc(s.id)}" title="${esc(s.title)}">${icon("pencil")}<span class="dl-nav__label">${esc(s.title)}</span><span class="dl-nav__count">${ago(s.updated)}</span></a>`).join("");
+  markCurrent();
+}
+// One item in the rail is current: the open simulation while the studio shows it, otherwise the page's own link.
+function markCurrent() {
+  const row = pageNow === "studio" && doc ? $(`#sims [data-sim="${CSS.escape(doc.id)}"]`) : null;
+  $$(".cw-rail [data-page], #sims [data-sim]").forEach((a) => a.removeAttribute("aria-current"));
+  (row || $(`.cw-rail [data-page="${pageNow}"]`))?.setAttribute("aria-current", "page");
+  row?.scrollIntoView({ block: "nearest" });
 }
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 async function newSim({ focus = true } = {}) {
@@ -523,9 +532,9 @@ function go(page) {
   showPage(page);
 }
 function showPage(page) {
-  page = page === "arm" ? "arm" : "studio";
+  page = pageNow = page === "arm" ? "arm" : "studio";
   $("#page-studio").hidden = page !== "studio"; $("#page-arm").hidden = page !== "arm";
-  $$(".cw-rail [data-page]").forEach((a) => (a.dataset.page === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
+  markCurrent();
   $("#app").removeAttribute("data-nav-open");
   if (page === "arm") { fillSetup(cfg); requestAnimationFrame(renderSetup); }
   else requestAnimationFrame(draw);
