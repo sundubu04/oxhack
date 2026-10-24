@@ -1,0 +1,508 @@
+<title>Clock arm simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* A 2-link (base + elbow) arm simulator and the software spec for the drawing clock. Pink house look. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --line: #e6e0e3; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --board: #ffffff; --arm: #2a2327; --arm2: #8a8186; --ink-line: #b23a6e;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --board: #211c1f; --arm: #e8e2e5; --arm2: #8c8388; --ink-line: #ec8fb6;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --board: #211c1f; --arm: #e8e2e5; --arm2: #8c8388; --ink-line: #ec8fb6;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--body); }
+.page { max-width: 60rem; margin: 0 auto; padding-block: 36px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+h1 { font: 600 1.9rem/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.25rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+h3 { font: 600 1rem/1.35 var(--display); margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.lede { font-size: 1.0625rem; color: var(--ink); }
+.meta { color: var(--ink-3); font-size: .85rem; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+section { display: grid; gap: 16px; min-width: 0; }
+a { color: var(--accent); }
+code { font: .85em var(--mono); }
+.muted { color: var(--ink-2); }
+.small { font-size: .875rem; }
+
+/* Simulator */
+.sim { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 720px) { .sim { grid-template-columns: 1fr; } }
+.stage { display: grid; gap: 10px; min-width: 0; }
+.canvas-wrap { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--board);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.badge { position: absolute; top: 10px; left: 10px; font: 600 .8rem/1 var(--display); padding: 5px 9px;
+  border-radius: 999px; background: var(--accent-wash); color: var(--accent); display: inline-flex; gap: 6px; align-items: center; }
+.badge[data-tone="warn"] { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.transport { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: 600 .9rem/1 var(--display); color: var(--ink); background: var(--wash); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 13px; cursor: pointer; }
+button:hover { background: var(--line); }
+button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+button.primary:hover { filter: brightness(1.05); }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.controls { display: grid; gap: 14px; align-content: start; }
+.ctl { display: grid; gap: 5px; }
+.ctl label { font: 600 .8rem/1.2 var(--display); color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+.ctl label .v { color: var(--accent); font-variant-numeric: tabular-nums; }
+select, textarea { font: inherit; color: var(--ink); background: var(--board); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 100%; }
+textarea { font: .8rem/1.4 var(--mono); resize: vertical; min-height: 64px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toggle { display: flex; align-items: center; gap: 8px; font: 600 .8rem/1.2 var(--display); color: var(--ink-2); }
+.toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; padding: 12px; background: var(--wash); border-radius: 10px; }
+.readout .k { font: 600 .72rem/1.2 var(--display); color: var(--ink-3); text-transform: none; }
+.readout .val { font: 600 1.25rem/1 var(--display); font-variant-numeric: tabular-nums; margin-top: 3px; }
+.readout .val small { font: 400 .7rem var(--body); color: var(--ink-3); }
+
+/* spec bits */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 8px; font: 600 .9rem/1.3 var(--display); }
+.flow span { background: var(--wash); border-radius: 999px; padding: 6px 12px; }
+.flow .hot { background: var(--accent-wash); color: var(--accent); }
+.flow .arrow { background: none; color: var(--accent); padding: 0 2px; }
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: s; }
+.ladder li { display: grid; grid-template-columns: 1.7rem minmax(0,1fr); gap: 12px; }
+.ladder li::before { counter-increment: s; content: counter(s); font: 600 .9rem/1.6 var(--display); color: var(--accent);
+  background: var(--accent-wash); border-radius: 7px; width: 1.7rem; height: 1.7rem; text-align: center; }
+.ladder b { font-weight: 600; }
+pre { margin: 0; overflow-x: auto; background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+pre code { font-size: .82rem; line-height: 1.5; color: var(--ink); }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.rows { overflow-x: auto; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 14px 7px 0; white-space: nowrap; }
+.rows td { padding: 7px 14px 7px 0; vertical-align: top; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>Clock arm simulator</h1>
+    <p class="lede">A 2-link arm — a <b>base</b> angle and an <b>elbow</b> angle — that draws, erases and redraws a clock. This page is the software spec and a live simulation: pick a drawing, tune the link lengths until it fits the arm's reach, and read out the exact <b>joint-angle stream</b> the Raspberry Pi needs. The sim is driven by the same angles the hardware gets, so what you see here is what the arm does.</p>
+    <p class="meta"><span>OxHack · hardware clock</span><span>2R planar arm</span><span>Output: base° , elbow° , pen</span></p>
+  </header>
+
+  <section aria-label="Simulator">
+    <div class="sim">
+      <div class="stage">
+        <div class="canvas-wrap">
+          <canvas id="cv" aria-label="Whiteboard: the two-link arm drawing the selected shape"></canvas>
+          <span class="badge" id="reach">reach: ok</span>
+        </div>
+        <div class="transport">
+          <button class="primary" id="run">Draw</button>
+          <button id="pause" hidden>Pause</button>
+          <button id="erase">Erase</button>
+          <button id="reset">Reset</button>
+          <button id="copy">Copy angle stream</button>
+        </div>
+        <div class="readout" aria-live="polite">
+          <div><div class="k">Base angle θ₁</div><div class="val"><span id="r-b">—</span><small>°</small></div></div>
+          <div><div class="k">Elbow angle θ₂</div><div class="val"><span id="r-e">—</span><small>°</small></div></div>
+          <div><div class="k">Pen</div><div class="val" id="r-p">up</div></div>
+          <div><div class="k">Pen X,Y</div><div class="val small" id="r-xy">—</div></div>
+          <div><div class="k">Waypoints</div><div class="val" id="r-n">—</div></div>
+          <div><div class="k">Out of reach</div><div class="val" id="r-u">0</div></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="ctl">
+          <label for="preset">Drawing (pretrained)</label>
+          <select id="preset">
+            <option value="clock">Clock (now)</option>
+            <option value="star">Star</option>
+            <option value="spiral">Spiral</option>
+            <option value="flower">Flower (continuous)</option>
+            <option value="custom">Paste a path (SVG d or JSON)</option>
+          </select>
+        </div>
+        <div class="ctl" id="custom-wrap" hidden>
+          <label for="custom">Vectors in — what "ask Claude" returns</label>
+          <textarea id="custom" placeholder='SVG path, e.g. M10 10 L90 10 L50 90 Z
+or JSON points: [[[10,10],[90,10],[50,90]]]'></textarea>
+        </div>
+        <div class="row2">
+          <div class="ctl"><label for="l1">Link 1 (base)<span class="v" id="l1v">150</span></label><input type="range" id="l1" min="60" max="260" value="150"></div>
+          <div class="ctl"><label for="l2">Link 2 (elbow)<span class="v" id="l2v">120</span></label><input type="range" id="l2" min="60" max="260" value="120"></div>
+        </div>
+        <div class="row2">
+          <div class="ctl"><label for="size">Drawing size<span class="v" id="sizev">120</span></label><input type="range" id="size" min="40" max="200" value="120"></div>
+          <div class="ctl"><label for="cy">Height from base<span class="v" id="cyv">170</span></label><input type="range" id="cy" min="80" max="260" value="170"></div>
+        </div>
+        <div class="ctl"><label for="speed">Draw speed (mm/s)<span class="v" id="speedv">140</span></label><input type="range" id="speed" min="20" max="400" value="140"></div>
+        <label class="toggle"><input type="checkbox" id="fourier"> Fourier mode (epicycles)</label>
+        <div class="ctl" id="fourier-wrap" hidden>
+          <label for="terms">Fourier terms<span class="v" id="termsv">40</span></label><input type="range" id="terms" min="2" max="120" value="40">
+          <label class="toggle" style="margin-top:6px"><input type="checkbox" id="showcircles" checked> Show rotating circles</label>
+        </div>
+        <label class="toggle"><input type="checkbox" id="elbow" checked> Elbow up</label>
+        <label class="toggle"><input type="checkbox" id="showwork" checked> Show reach area</label>
+      </div>
+    </div>
+    <p class="small muted">All lengths in mm; angles in degrees, CCW from the +x axis (elbow measured from link 1). Everything renders at rest so you can read the pose; press <b>Draw</b> to animate. Units are a convention — set them to your real link lengths and the reach area tells you if the clock fits.</p>
+  </section>
+
+  <section aria-labelledby="h-pipe">
+    <h2 id="h-pipe">The pipeline: from "ask Claude" to joint angles</h2>
+    <div class="flow" aria-label="prompt to Claude, to vector paths, to a toolpath, to inverse kinematics, to a joint-angle stream, to the Pi">
+      <span class="hot">ask Claude "draw a clock"</span><span class="arrow">→</span><span>SVG / polylines</span><span class="arrow">→</span><span>toolpath (x, y, pen)</span><span class="arrow">→</span><span class="hot">inverse kinematics</span><span class="arrow">→</span><span>base°, elbow°, pen</span><span class="arrow">→</span><span>Pi → servos</span>
+    </div>
+    <p>Work in <b>vectors</b>, not pixels. A raster image means edge-detection and contour-tracing (OpenCV / potrace) — slow and fiddly, and the output is still a set of polylines. Claude already speaks vectors: ask it for an SVG path or a JSON list of strokes and you skip the whole computer-vision step. Paste exactly that into the <em>Paste a path</em> box above to see it drawn. So:</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Input</th><th>How it becomes position coordinates</th><th>Use it?</th></tr></thead>
+        <tbody>
+          <tr><td><b>Preset</b> (clock)</td><td>Parametric: the circle, ticks and hands are maths, sampled to points</td><td>Start here — snappy and exact</td></tr>
+          <tr><td><b>Ask Claude</b></td><td>Prompt → SVG <code>d</code> or JSON polylines → parse → resample</td><td>The AI route; vectors straight out, no image step</td></tr>
+          <tr><td><b>Photo / online image</b></td><td>Threshold → <code>findContours</code> → simplify to polylines</td><td>Only if you must draw a real photo; most error</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">Snappy comes from caching: ask Claude once per drawing, store the toolpath, and replay the angle stream. The arm never waits on the model mid-draw.</p>
+  </section>
+
+  <section aria-labelledby="h-contract">
+    <h2 id="h-contract">What software hands the hardware</h2>
+    <p>Software owns the maths (point → angles). The Pi owns angle → servo, with your own calibration — that's the part you said you've got. The contract is a list of waypoints plus a header:</p>
+    <pre><code>{
+  "frame":  "base at origin; x right, y up; angles degrees, CCW from +x; elbow relative to link 1",
+  "links_mm": { "L1": 150, "L2": 120 },
+  "home":   { "base": 90, "elbow": 0 },      // calibration / park pose
+  "pen":    { "up": 0, "down": 1 },           // third actuator (servo or solenoid)
+  "feed_mm_s": 140,                            // pen speed; the Pi interpolates between waypoints
+  "path": [
+    { "base": 46.5, "elbow": 102.8, "pen": 0 },   // travel to the start, pen up
+    { "base": 48.1, "elbow": 99.4,  "pen": 1 },   // pen down, drawing
+    { "base": 50.0, "elbow": 96.1,  "pen": 1 }
+    // ... one entry per waypoint, in order
+  ]
+}</code></pre>
+    <p class="small muted">Use <b>Copy angle stream</b> above to grab this for the current drawing. The Pi reads <code>base</code>, <code>elbow</code>, <code>pen</code> in order and moves at <code>feed_mm_s</code>; it never does kinematics. Keep angular velocity under the servo's limit (slow near full extension, where small moves swing the pen a long way).</p>
+  </section>
+
+  <section aria-labelledby="h-ik">
+    <h2 id="h-ik">The maths (verified)</h2>
+    <p>Forward (angles → pen) and inverse (target → angles) for a 2-link planar arm. Reachable only when <code>|L1−L2| ≤ r ≤ L1+L2</code>; the reach area on the whiteboard is that annulus. There are two elbow solutions (up / down) — pick one and keep it, and watch the fully-extended singularity.</p>
+    <pre><code>// inverse kinematics: target (x,y) -> base θ₁, elbow θ₂
+r2 = x*x + y*y;  r = sqrt(r2);
+if (r &gt; L1+L2 || r &lt; |L1-L2|) return OUT_OF_REACH;
+c2 = (r2 - L1² - L2²) / (2·L1·L2);
+θ₂ = atan2( ±sqrt(1-c2²), c2 );                 // + elbow-up, − elbow-down
+θ₁ = atan2(y, x) - atan2(L2·sin θ₂, L1 + L2·cos θ₂);</code></pre>
+    <p class="small muted">Checked: forward∘inverse round-trips to ~1e-13 mm over a full clock; out-of-range points return cleanly. Fourier mode runs a DFT on the path and redraws it from the N largest epicycles (N≈40 is plenty for a clock).</p>
+  </section>
+
+  <section aria-labelledby="h-ladder">
+    <h2 id="h-ladder">Build it in steps</h2>
+    <ol class="ladder">
+      <li><b>Follow a line.</b> Send the arm two angles and watch it hold a point; then a straight segment between two points. Proves the servo + angle contract end to end.</li>
+      <li><b>Pi-turtle a polyline.</b> Convert a list of points to angles and draw an open path (a triangle, your initials). This is the <code>toolpath → IK → angles</code> core, no image needed.</li>
+      <li><b>Draw the clock.</b> The parametric preset: circle, ticks, two hands at the current time. Add pen up/down between strokes.</li>
+      <li><b>Erase and redraw.</b> Wipe the face and draw the next minute. See the erase options below.</li>
+      <li><b>Fourier arm.</b> Redraw a continuous contour from its epicycles — the "Fourier series" look, and smoother motion.</li>
+      <li><b>Ask Claude.</b> Prompt → SVG → toolpath → angles, cached so it stays snappy. Draw anything on request.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-erase">
+    <h2 id="h-erase">Erasing — pick one early, it's the real risk</h2>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Approach</th><th>How</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td><b>Sand table</b></td><td>A ball in sand; drawing a new path covers the old one</td><td>No eraser to fail — the safe build, if the aesthetic suits</td></tr>
+          <tr><td><b>Sponge on a 3rd servo</b></td><td>Pen lifts, sponge drops, the arm sweeps the drawing's bounding box in rows</td><td>Keep the drawing small so the wipe is quick; most faithful to Maarten Baas</td></tr>
+          <tr><td><b>Dual-tool head</b></td><td>Pen and eraser side by side; offset the toolpath by the tool gap</td><td>Tidy, but mind the offset in the maths</td></tr>
+          <tr><td><b>Dry-wipe / magnetic board</b></td><td>A slider or the arm clears a magnetic drawing board</td><td>Clean, but a different surface</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">In software, <b>erase is just another toolpath</b>: a back-and-forth (boustrophedon) fill over the last drawing's bounding box, with the pen flag set to the eraser tool. Same angle-stream format. The <b>Erase</b> button above animates it.</p>
+  </section>
+
+  <section aria-labelledby="h-front">
+    <h2 id="h-front">This page is the frontend sim</h2>
+    <p>It already does what you asked the frontend to do: select a pretrained drawing, control the arm (link lengths, drawing size and height, speed, elbow, Fourier), show the reach area so you can size the links, animate the draw, and <b>erase</b>. Crucially, it runs the pen through the same <code>IK → base°, elbow°</code> that the Pi will, so a drawing that completes here with "out of reach: 0" is one the real arm can make. Export the stream with <b>Copy angle stream</b> and send it down.</p>
+    <details>
+      <summary>Notes &amp; next</summary>
+      <p style="margin-top:8px">Single file, no libraries, Canvas 2D. The SVG parser handles M/L/H/V/C/Q/Z (absolute and relative); arcs (A) are skipped — ask Claude for line/curve paths. Next: wire a live "Ask Claude" box (an artifact can ask Claude for the SVG itself), add joint-speed limiting and acceleration smoothing to the exported stream, and a serial sender from the Pi. Say the word and I'll add them.</p>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+const $ = s => document.querySelector(s);
+const cv = $("#cv"), ctx = cv.getContext("2d");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---- arm maths ----
+function fk(t1,t2,L1,L2){const ex=L1*Math.cos(t1),ey=L1*Math.sin(t1);return{ex,ey,px:ex+L2*Math.cos(t1+t2),py:ey+L2*Math.sin(t1+t2)};}
+function ik(x,y,L1,L2,up){const r2=x*x+y*y,r=Math.sqrt(r2);
+  if(r>L1+L2+1e-6||r<Math.abs(L1-L2)-1e-6)return null;
+  let c2=(r2-L1*L1-L2*L2)/(2*L1*L2);c2=Math.min(1,Math.max(-1,c2));
+  const s2=Math.sqrt(1-c2*c2)*(up?1:-1),t2=Math.atan2(s2,c2);
+  const t1=Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2);return{t1,t2};}
+
+// ---- state ----
+const S={L1:150,L2:120,size:120,cy:170,speed:140,preset:"clock",fourier:false,terms:40,
+  showcircles:true,elbow:true,showwork:true,custom:""};
+let seq=[];           // {x,y,pen} waypoints in mm (base at origin)
+let angles=[];        // {t1,t2,ok} per waypoint
+let unreach=0;
+let anim={on:false,i:0,mode:"draw",last:0,acc:0};
+let eraseSeq=null;
+
+// ---- presets: return array of strokes, each {x,y}[] in a ~[-60,60] box ----
+function presetStrokes(name){
+  if(name==="clock"){
+    const R=58,st=[];
+    const ring=[];for(let i=0;i<=120;i++){const a=i/120*2*Math.PI;ring.push({x:R*Math.cos(a),y:R*Math.sin(a)});}st.push(ring);
+    for(let h=0;h<12;h++){const a=h/12*2*Math.PI;const r0=h%3===0?R*0.8:R*0.9;
+      st.push([{x:r0*Math.cos(a),y:r0*Math.sin(a)},{x:R*0.98*Math.cos(a),y:R*0.98*Math.sin(a)}]);}
+    const now=new Date();const hr=(now.getHours()%12)+now.getMinutes()/60, mn=now.getMinutes();
+    const ah=hr/12*2*Math.PI-Math.PI/2, am=mn/60*2*Math.PI-Math.PI/2;
+    st.push([{x:0,y:0},{x:R*0.5*Math.cos(ah),y:-R*0.5*Math.sin(ah)}]);
+    st.push([{x:0,y:0},{x:R*0.8*Math.cos(am),y:-R*0.8*Math.sin(am)}]);
+    return st;
+  }
+  if(name==="star"){const o=[];for(let i=0;i<=10;i++){const a=i/10*2*Math.PI-Math.PI/2,r=i%2?26:60;o.push({x:r*Math.cos(a),y:r*Math.sin(a)});}return[o];}
+  if(name==="spiral"){const o=[];for(let i=0;i<=360;i++){const a=i/360*6*Math.PI,r=6+i/360*54;o.push({x:r*Math.cos(a),y:r*Math.sin(a)});}return[o];}
+  if(name==="flower"){const o=[];for(let i=0;i<=600;i++){const t=i/600*2*Math.PI,r=58*Math.cos(5*t);o.push({x:r*Math.cos(t),y:r*Math.sin(t)});}return[o];}
+  if(name==="custom")return parsePath(S.custom);
+  return [];
+}
+
+// ---- minimal SVG path / JSON parser -> strokes ----
+function parsePath(src){
+  src=(src||"").trim();if(!src)return[];
+  if(src[0]==="["){try{let j=JSON.parse(src);if(Array.isArray(j[0][0]))return j.map(s=>s.map(p=>({x:p[0],y:p[1]})));return [j.map(p=>({x:p[0],y:p[1]}))];}catch(e){return[];}}
+  const strokes=[];let cur=[];let x=0,y=0,sx=0,sy=0;
+  const toks=src.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)||[];let i=0,cmd="";
+  const num=()=>parseFloat(toks[i++]);
+  const push=()=>{if(cur.length>1)strokes.push(cur);};
+  const bez=(p0,p1,p2,p3)=>{for(let t=1;t<=16;t++){const u=t/16,m=1-u;
+    cur.push({x:m*m*m*p0.x+3*m*m*u*p1.x+3*m*u*u*p2.x+u*u*u*p3.x,y:m*m*m*p0.y+3*m*m*u*p1.y+3*m*u*u*p2.y+u*u*u*p3.y});}};
+  const quad=(p0,p1,p2)=>{for(let t=1;t<=12;t++){const u=t/12,m=1-u;
+    cur.push({x:m*m*p0.x+2*m*u*p1.x+u*u*p2.x,y:m*m*p0.y+2*m*u*p1.y+u*u*p2.y});}};
+  while(i<toks.length){
+    let t=toks[i];
+    if(/[a-zA-Z]/.test(t)){cmd=t;i++;}
+    const rel=cmd===cmd.toLowerCase(),C=cmd.toUpperCase();
+    if(C==="M"){push();cur=[];let nx=num(),ny=num();if(rel){nx+=x;ny+=y;}x=nx;y=ny;sx=x;sy=y;cur.push({x,y});cmd=rel?"l":"L";}
+    else if(C==="L"){let nx=num(),ny=num();if(rel){nx+=x;ny+=y;}x=nx;y=ny;cur.push({x,y});}
+    else if(C==="H"){let nx=num();if(rel)nx+=x;x=nx;cur.push({x,y});}
+    else if(C==="V"){let ny=num();if(rel)ny+=y;y=ny;cur.push({x,y});}
+    else if(C==="C"){let p1={x:num(),y:num()},p2={x:num(),y:num()},p3={x:num(),y:num()};
+      if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;p3.x+=x;p3.y+=y;}bez({x,y},p1,p2,p3);x=p3.x;y=p3.y;}
+    else if(C==="Q"){let p1={x:num(),y:num()},p2={x:num(),y:num()};
+      if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;}quad({x,y},p1,p2);x=p2.x;y=p2.y;}
+    else if(C==="Z"){cur.push({x:sx,y:sy});x=sx;y=sy;push();cur=[];}
+    else {i++;}
+  }
+  push();
+  return strokes;
+}
+
+// fit strokes into a box of half-size `half`, centred, y flipped (SVG y-down -> up), then offset to (0, cy)
+function fitStrokes(strokes,half,cy){
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  for(const s of strokes)for(const p of s){minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y);}
+  if(!isFinite(minx))return[];
+  const w=maxx-minx||1,h=maxy-miny||1,sc=(2*half)/Math.max(w,h),cx=(minx+maxx)/2,cyy=(miny+maxy)/2;
+  return strokes.map(s=>s.map(p=>({x:(p.x-cx)*sc,y:-(p.y-cyy)*sc+cy})));
+}
+
+function resample(stroke,step){
+  if(stroke.length<2)return stroke.slice();
+  const out=[stroke[0]];let acc=0;
+  for(let i=1;i<stroke.length;i++){let a=stroke[i-1],b=stroke[i];let d=Math.hypot(b.x-a.x,b.y-a.y);
+    while(acc+d>=step){const t=(step-acc)/d;a={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};out.push(a);d=Math.hypot(b.x-a.x,b.y-a.y);acc=0;}
+    acc+=d;}
+  out.push(stroke[stroke.length-1]);return out;
+}
+
+// Fourier: one continuous closed path from all strokes -> DFT -> reconstruct with N epicycles
+let fourierC=null;
+function buildFourier(strokes){
+  const pts=[];for(const s of strokes)for(const p of s)pts.push(p);
+  const N=Math.min(512,Math.max(64,pts.length));const z=[];
+  for(let k=0;k<N;k++){const p=pts[Math.floor(k/N*pts.length)];z.push({re:p.x,im:p.y});}
+  const C=[];for(let k=0;k<N;k++){let re=0,im=0;for(let n=0;n<N;n++){const a=-2*Math.PI*k*n/N,c=Math.cos(a),s=Math.sin(a);re+=z[n].re*c-z[n].im*s;im+=z[n].re*s+z[n].im*c;}C.push({re:re/N,im:im/N,freq:k<=N/2?k:k-N});}
+  C.sort((a,b)=>Math.hypot(b.re,b.im)-Math.hypot(a.re,a.im));return C;
+}
+function fourierPoint(C,M,t){let re=0,im=0;const circ=[];let px=0,py=0;
+  for(let j=0;j<M&&j<C.length;j++){const c=C[j],a=2*Math.PI*c.freq*t;const nx=px+c.re*Math.cos(a)-c.im*Math.sin(a),ny=py+c.re*Math.sin(a)+c.im*Math.cos(a);
+    circ.push({x0:px,y0:py,x1:nx,y1:ny,r:Math.hypot(c.re,c.im)});px=nx;py=ny;}
+  return{x:px,y:py,circ};}
+
+// ---- build the toolpath + angles ----
+function build(){
+  let strokes=fitStrokes(presetStrokes(S.preset),S.size/2,S.cy);
+  seq=[];
+  if(S.fourier){
+    fourierC=buildFourier(strokes);
+    const M=S.terms,steps=720;let first=true;
+    for(let i=0;i<=steps;i++){const p=fourierPoint(fourierC,M,i/steps);seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}
+  } else {
+    fourierC=null;
+    for(const s of strokes){const rs=resample(s,2.0);let first=true;
+      for(const p of rs){seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}
+  }
+  angles=[];unreach=0;
+  for(const p of seq){const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);if(s)angles.push({t1:s.t1,t2:s.t2,ok:true});else{angles.push({t1:0,t2:0,ok:false});unreach++;}}
+  eraseSeq=null;
+  $("#r-n").textContent=seq.length;
+  $("#r-u").textContent=unreach;
+  const warn=unreach>0;
+  const rb=$("#reach");rb.textContent=warn?("out of reach: "+unreach):"reach: ok";rb.dataset.tone=warn?"warn":"";
+}
+
+// erase toolpath: boustrophedon over the drawing bbox, pen flag 2 (eraser)
+function buildErase(){
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  for(const p of seq){minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y);}
+  const pad=10,step=12,out=[];let y=maxy+pad,dir=1,first=true;
+  while(y>=miny-pad){const xs=dir>0?[minx-pad,maxx+pad]:[maxx+pad,minx-pad];
+    out.push({x:xs[0],y,pen:first?0:2});out.push({x:xs[1],y,pen:2});first=false;dir*=-1;y-=step;}
+  return out;
+}
+
+// ---- rendering ----
+let scale=1,ox=0,oy=0,trace=[];
+function fit(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  const reach=S.L1+S.L2;scale=Math.min(r.width/(2.3*reach),r.height/(1.25*reach));
+  ox=r.width/2;oy=r.height*0.9;draw();}
+function P(x,y){return[ox+x*scale,oy-y*scale];}
+
+function draw(){
+  const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);
+  // reach area (annulus)
+  if(S.showwork){const rin=Math.abs(S.L1-S.L2),rout=S.L1+S.L2;
+    ctx.fillStyle=css("--accent-wash");ctx.globalAlpha=.5;ctx.beginPath();
+    ctx.arc(ox,oy,rout*scale,0,2*Math.PI);ctx.arc(ox,oy,rin*scale,0,2*Math.PI,true);ctx.fill();ctx.globalAlpha=1;}
+  // trace drawn so far
+  ctx.lineWidth=2.2;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle=css("--ink-line");
+  ctx.beginPath();let penDown=false;
+  for(const s of trace){if(s.pen===1){const a=P(s.x0,s.y0),b=P(s.x,s.y);if(!penDown){ctx.moveTo(a[0],a[1]);penDown=true;}ctx.lineTo(b[0],b[1]);}else penDown=false;}
+  ctx.stroke();
+  // current pose
+  let pose=null;
+  if(anim.on){const cur=anim.mode==="erase"?eraseCur:angles[anim.i];pose=anim.mode==="erase"?eraseCur:angles[anim.i];}
+  else pose=angles.length?angles[angles.length-1]:null;
+  let penPt=null,t1=0,t2=0,penState=0;
+  if(anim.on&&anim.mode==="erase"&&eraseCur){t1=eraseCur.t1;t2=eraseCur.t2;penState=2;}
+  else if(pose&&pose.ok){t1=pose.t1;t2=pose.t2;penState=(anim.on?seq[anim.i].pen:(seq.length?seq[seq.length-1].pen:0));}
+  // epicycles
+  if(S.fourier&&S.showcircles&&fourierC&&anim.on){const tt=anim.i/(seq.length-1||1);const fp=fourierPoint(fourierC,S.terms,tt);
+    ctx.strokeStyle=css("--arm2");ctx.globalAlpha=.5;ctx.lineWidth=1;
+    for(const c of fp.circ){if(c.r*scale<1.5)continue;const a=P(c.x0,c.y0);ctx.beginPath();ctx.arc(a[0],a[1],c.r*scale,0,2*Math.PI);ctx.stroke();
+      const b=P(c.x1,c.y1);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
+    ctx.globalAlpha=1;}
+  // the arm
+  const f=fk(t1,t2,S.L1,S.L2);
+  const base=P(0,0),elb=P(f.ex,f.ey),pen=P(f.px,f.py);
+  ctx.strokeStyle=css("--arm");ctx.lineWidth=7;ctx.lineCap="round";
+  ctx.beginPath();ctx.moveTo(base[0],base[1]);ctx.lineTo(elb[0],elb[1]);ctx.stroke();
+  ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(elb[0],elb[1]);ctx.lineTo(pen[0],pen[1]);ctx.stroke();
+  for(const[pt,rr]of[[base,7],[elb,5]]){ctx.fillStyle=css("--board");ctx.strokeStyle=css("--arm");ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(pt[0],pt[1],rr,0,2*Math.PI);ctx.fill();ctx.stroke();}
+  ctx.fillStyle=penState===1?css("--accent"):(penState===2?css("--warn"):css("--arm2"));
+  ctx.beginPath();ctx.arc(pen[0],pen[1],penState===1?5:4,0,2*Math.PI);ctx.fill();
+  // readout
+  $("#r-b").textContent=(((t1*R2D)%360+360)%360).toFixed(1);
+  $("#r-e").textContent=(t2*R2D).toFixed(1);
+  $("#r-p").textContent=penState===2?"erase":(penState===1?"down":"up");
+  $("#r-xy").textContent=Math.round(f.px)+", "+Math.round(f.py);
+}
+
+// ---- animation ----
+let eraseCur=null,eraseList=null;
+function tick(ts){
+  if(!anim.on){return;}
+  const dt=Math.min(0.05,(ts-anim.last)/1000||0);anim.last=ts;
+  const list=anim.mode==="erase"?eraseList:seq;
+  const ang=anim.mode==="erase"?eraseAng:angles;
+  // advance by distance
+  anim.acc+=S.speed*dt;
+  while(anim.acc>0&&anim.i<list.length-1){
+    const a=list[anim.i],b=list[anim.i+1],d=Math.hypot(b.x-a.x,b.y-a.y)||0.001;
+    if(anim.acc>=d){anim.acc-=d;anim.i++;
+      if(anim.mode==="draw"){const s=angles[anim.i];if(seq[anim.i].pen===1&&seq[anim.i-1]&&seq[anim.i-1].pen!==0){}
+        trace.push({x:seq[anim.i].x,y:seq[anim.i].y,x0:seq[anim.i-1].x,y0:seq[anim.i-1].y,pen:seq[anim.i].pen});}
+      else {eraseCur=eraseAng[anim.i];
+        // erase: remove trace near the eraser row
+        const ey=eraseList[anim.i].y;trace=trace.filter(s=>s.y>ey+8||s.y0>ey+8);}
+    } else break;
+  }
+  if(anim.mode==="erase")eraseCur=eraseAng[Math.min(anim.i,eraseAng.length-1)];
+  draw();
+  if(anim.i>=list.length-1){anim.on=false;$("#run").hidden=false;$("#pause").hidden=true;
+    if(anim.mode==="erase"){trace=[];draw();}return;}
+  requestAnimationFrame(tick);
+}
+let eraseAng=[];
+function startDraw(){build();trace=[];anim={on:true,i:0,mode:"draw",last:performance.now(),acc:0};
+  $("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
+function startErase(){if(!seq.length)return;eraseList=buildErase();eraseAng=eraseList.map(p=>{const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);return s?{t1:s.t1,t2:s.t2,ok:true}:{t1:0,t2:0,ok:false};});
+  anim={on:true,i:0,mode:"erase",last:performance.now(),acc:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
+
+// ---- angle stream export ----
+function streamJSON(){
+  const path=seq.map((p,i)=>({base:+(((angles[i].t1*R2D)%360+360)%360).toFixed(2),elbow:+(angles[i].t2*R2D).toFixed(2),pen:p.pen}));
+  return JSON.stringify({frame:"base at origin; x right, y up; degrees CCW from +x; elbow relative to link 1",
+    links_mm:{L1:S.L1,L2:S.L2},home:{base:90,elbow:0},pen:{up:0,down:1},feed_mm_s:S.speed,path},null,2);
+}
+
+// ---- wire up ----
+function bindRange(id,key,fmt){const el=$("#"+id),v=$("#"+id+"v");
+  el.addEventListener("input",()=>{S[key]=+el.value;if(v)v.textContent=fmt?fmt(+el.value):el.value;build();if(!anim.on){trace=[];draw();}});}
+bindRange("l1","L1");bindRange("l2","L2");bindRange("size","size");bindRange("cy","cy");bindRange("speed","speed");bindRange("terms","terms");
+$("#preset").addEventListener("change",e=>{S.preset=e.target.value;$("#custom-wrap").hidden=e.target.value!=="custom";rebuild();});
+$("#custom").addEventListener("input",e=>{S.custom=e.target.value;rebuild();});
+$("#fourier").addEventListener("change",e=>{S.fourier=e.target.checked;$("#fourier-wrap").hidden=!e.target.checked;rebuild();});
+$("#showcircles").addEventListener("change",e=>{S.showcircles=e.target.checked;});
+$("#elbow").addEventListener("change",e=>{S.elbow=e.target.checked;rebuild();});
+$("#showwork").addEventListener("change",e=>{S.showwork=e.target.checked;draw();});
+function rebuild(){build();trace=[];anim.on=false;$("#run").hidden=false;$("#pause").hidden=true;draw();}
+$("#run").addEventListener("click",startDraw);
+$("#pause").addEventListener("click",()=>{anim.on=!anim.on;$("#pause").textContent=anim.on?"Pause":"Resume";if(anim.on){anim.last=performance.now();requestAnimationFrame(tick);}});
+$("#erase").addEventListener("click",startErase);
+$("#reset").addEventListener("click",rebuild);
+$("#copy").addEventListener("click",async()=>{const txt=streamJSON();try{await navigator.clipboard.writeText(txt);$("#copy").textContent="Copied ✓";}catch(e){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");$("#copy").textContent="Copied ✓";}catch(_){$("#copy").textContent="Copy failed";}ta.remove();}setTimeout(()=>$("#copy").textContent="Copy angle stream",1400);});
+
+// show the finished clock at rest, then let them press Draw
+build();
+// seed the trace with the full drawing so the first frame is complete
+for(let i=1;i<seq.length;i++)if(seq[i].pen===1)trace.push({x:seq[i].x,y:seq[i].y,x0:seq[i-1].x,y0:seq[i-1].y,pen:1});
+new ResizeObserver(fit).observe(cv);
+fit();
+</script>
