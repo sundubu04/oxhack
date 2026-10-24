@@ -91,7 +91,7 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
 <main class="page">
   <header>
     <h1>OxHack idea board</h1>
-    <p class="lede">What to build this weekend. The strongest ideas share one shape — a phone-vision game that collects a time-stamped dataset and turns it into a prediction — which lines up the main theme and the best sponsor prizes at once.</p>
+    <p class="lede">What to build this weekend. Most of the strong ideas share one shape — a phone-vision game that collects a time-stamped dataset and turns it into a prediction — which lines up the main theme and the best sponsor prizes at once. One route is different: a hardware clock that draws and erases itself.</p>
     <p class="meta"><span>24 Oct 2026</span><span>Theme: Time</span><span>Science-fair demo, 4–5 min</span></p>
   </header>
 
@@ -122,6 +122,10 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
         <div class="top"><span class="id">G4</span><h3>Calm Catch</h3><span class="route">biometric · Presage</span></div>
         <p>The biggest instant wow at a table: a creature you catch only by <b>lowering your own heart rate</b>, read from your face by Presage. Judges play it with their pulse. Thinner dataset and a slower 20-second reading, but unforgettable.</p>
       </div>
+      <div class="pick">
+        <div class="top"><span class="id">H9 / H3</span><h3>Camera drawing clock</h3><span class="route">hardware · plotter / Fourier arm · Gemini</span></div>
+        <p>The hardware route, with a camera. A machine that draws and erases like Maarten Baas's <em>Real Time</em> clock, but it <b>draws what the camera sees</b> — a portrait of whoever's there, a new face each minute, the erased faces building a mural of the event. Or it plots a live forecast (H3), and the camera watches the surface to correct its own lines. A natural Best Handmade + Hardware Lab entry, plus Gemini.</p>
+      </div>
     </div>
   </section>
 
@@ -129,7 +133,7 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
     <h2 id="h-matrix">Which prizes each stacks</h2>
     <div class="matrix">
       <table>
-        <caption class="muted small" style="text-align:left;margin-bottom:10px">● strong fit · <span class="half">·</span> partial. Main (Time) and HRT are the big two; the rest are sponsor prizes.</caption>
+        <caption class="muted small" style="text-align:left;margin-bottom:10px">● strong fit · <span class="half">·</span> partial. Main (Time) and HRT are the big two; the rest are sponsor prizes. The hardware clocks also target Best Handmade (Citadel) and the Hardware Lab, not shown here.</caption>
         <thead>
           <tr><th class="row">Idea</th><th>Time</th><th>HRT</th><th>Gemini</th><th>Presage</th><th>Data store</th><th>Eleven&shy;Labs</th><th>Delta</th></tr>
         </thead>
@@ -139,6 +143,8 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
           <tr><td class="row"><b>G1 SpawnCast</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td></tr>
           <tr><td class="row"><b>N2 Time Capsule</b></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td></td><td><span class="half">·</span></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td></tr>
           <tr><td class="row"><b>G4 Calm Catch</b></td><td><span class="half">·</span></td><td><span class="half">·</span></td><td></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="half">·</span></td><td><span class="half">·</span></td></tr>
+          <tr><td class="row"><b>H9 Camera clock</b></td><td><span class="dot">●</span></td><td></td><td><span class="dot">●</span></td><td></td><td><span class="half">·</span></td><td></td><td><span class="half">·</span></td></tr>
+          <tr><td class="row"><b>H3 Forecast plotter</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td></td><td></td><td><span class="dot">●</span></td><td></td><td><span class="half">·</span></td></tr>
           <tr><td class="row"><b>PHP Time to Safe</b></td><td><span class="dot">●</span></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td></td><td><span class="dot">●</span></td><td><span class="half">·</span></td><td><span class="dot">●</span></td></tr>
         </tbody>
       </table>
@@ -185,6 +191,25 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
     </div>
   </section>
 
+  <section aria-labelledby="h-hw">
+    <h2 id="h-hw">Route D — hardware: a drawing clock, with a camera</h2>
+    <p class="note">A machine that draws, erases and redraws — a robotic homage to Maarten Baas's <em>Real Time</em> clock, via a plotter, a polargraph, or a Fourier/epicycle arm. The camera is the fun part: it can draw <b>what it sees</b> (a portrait, the room), read a real clock and restyle it, track your finger in the air, or watch its own surface to correct the line. Targets Best Handmade (Citadel) and the Hardware Lab; the camera adds Gemini (or Presage), and the data spin adds Time + HRT.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>#</th><th>Idea</th><th>Hook</th><th class="n">/25</th></tr></thead>
+        <tbody>
+          <tr data-lead><td class="id">H9</td><td><b>Portrait clock</b></td><td>Camera + Gemini: draws whoever it sees; erased faces build a mural of the event</td><td class="n">21</td></tr>
+          <tr data-lead><td class="id">H3</td><td><b>Forecast plotter</b></td><td>Draws a live series and its prediction, wiping and redrawing each tick</td><td class="n">22</td></tr>
+          <tr><td class="id">H4</td><td>Sand-table clock</td><td>A ball redraws a pattern in sand endlessly — no eraser to fail</td><td class="n">20</td></tr>
+          <tr><td class="id">H1</td><td>Real Time plotter</td><td>Redraws the minute hand every minute, Baas-style</td><td class="n">19</td></tr>
+          <tr><td class="id">H11</td><td>Air-draw</td><td>The camera tracks your finger; the arm redraws your gesture</td><td class="n">17</td></tr>
+          <tr><td class="id">H2</td><td>Fourier clock</td><td>Rotating arms trace the time; a screen shows the epicycle maths</td><td class="n">18</td></tr>
+        </tbody>
+      </table>
+      <p class="small muted">The hard part is erasing: a sand table avoids it; otherwise keep the drawing small with a sponge eraser on a second servo. Fourier is easier in software (follow an epicycle path) than as a linkage. Spike first: draw one clean hand and erase it.</p>
+    </div>
+  </section>
+
   <section aria-labelledby="h-php">
     <h2 id="h-php">Route C — PHP2Shell tool (the serious one, weaker for now)</h2>
     <p class="note">Timely and real, and it fits Time + HRT, but it is less fun to demo and the obvious version is a crowded space. Keep it as the fallback, not the lead.</p>
@@ -204,7 +229,7 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; }
   <section aria-labelledby="h-decide">
     <h2 id="h-decide">Decide early</h2>
     <div class="decide">
-      <div class="q"><b>Pick a lane: eggs (A) or catch-game (B).</b><span class="note">They share the same engine (vision → spatiotemporal data → forecast), so the choice is mostly flavour. Eggs feel more novel and more Time-native; the catch game is more familiar and the data story is crisper. PHP (C) is the fallback.</span></div>
+      <div class="q"><b>Pick a lane: eggs (A), catch-game (B), or the hardware clock (D).</b><span class="note">A and B share one engine (vision → spatiotemporal data → forecast), so that choice is mostly flavour. D is a different bet — a physical build with its own risk (erasing) and its own prizes (Handmade, Hardware Lab), and a camera keeps it in the vision family. PHP (C) is the fallback.</span></div>
       <div class="q"><b>Gemini or Presage.</b><span class="note">Gemini (web app, catch the world) is more buildable and the data is richer. Presage (native SDK, read the body) is the biggest table wow but slower and more friction. Hybrids exist but cost build time.</span></div>
       <div class="q"><b>Build in Delta?</b><span class="note">It's a stackable prize and rewards snappy UX, but check it coexists with the repo's Claude Code setup before committing the night to it.</span></div>
       <div class="q"><b>Confirm the clock.</b><span class="note">The event times in the repo are estimates from "25 hours, demos Sunday" — get the real submission and judging times from Discord.</span></div>

@@ -110,6 +110,37 @@ Classic geocaching uses GPS coordinates. The twist: **the vision model is the lo
 
 **Table demo.** Hide an egg on an object in the room with a 2-minute unlock. A judge points their phone, the vision model confirms the anchor, the countdown ends, the egg opens live — then show the map, the growing archive and the "where/when to look next" forecast. Novel, personal, and it fits the 4–5 minutes.
 
+## Route D: hardware — a drawing clock (Fourier arm / Real Time)
+
+A physical machine that **draws, erases and redraws** — a robotic homage to Maarten Baas's *Real Time* (the Schiphol clock where a figure wipes and repaints the minute hand each minute). The drawing is done by a plotter arm, a polargraph, or a chain of rotating arms (a Fourier / epicycle machine, since any shape is a sum of rotating circles). It's a natural **Best Handmade Project** (Citadel) and **MLH Hardware Lab** entry, and the theme is literally in the object.
+
+**The spin that fits the theme harder: draw live data over time.** Instead of only clock hands, the arm physically plots a **time-series and its forecast**, erasing and redrawing as each new reading arrives — you watch the prediction and reality race, drawn by hand. That ties the hardware to the same thread as every other idea here (data → prediction → time) and brings in **HRT** (and a trading firm's judges love a machine drawing a price and its forecast in real time).
+
+| # | Idea | The hook | Fun | Data | Prize | Build | Table | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| H3 | **Forecast plotter** — the arm draws a live time-series and its prediction, wiping and redrawing each tick | Hand-drawn prediction vs reality, racing over time — Time + HRT + Handmade in one object | 4 | 5 | 5 | 3 | 5 | 22 |
+| H9 | **Portrait clock** (camera + Gemini) — the camera sees whoever's there, Gemini vectorises them, the arm plots a portrait and a new face each minute; the erased faces build a mural of the event | Camera as input + a mural that grows over time; judges watch their own portrait drawn and wiped | 5 | 3 | 5 | 3 | 5 | 21 |
+| H4 | **Sand-table clock** — a ball in sand redraws a time pattern endlessly (Sisyphus-style); drawing over *is* erasing | Mesmerising, low-mess, no eraser mechanism to fail — the safe, beautiful build | 5 | 3 | 4 | 3 | 5 | 20 |
+| H1 | **Real Time plotter** — a pen+eraser robot redraws the minute hand every minute, Baas-style | The purest Time homage; the wow is watching it erase and redraw | 5 | 2 | 4 | 3 | 5 | 19 |
+| H2 | **Fourier clock** — nested rotating arms trace the time as handwriting; a screen shows the epicycle maths | "Time drawn in the frequency domain" — mesmerising and educational | 5 | 2 | 4 | 2 | 5 | 18 |
+| H5 | **Biometric clock** (Presage) — the arm draws the room's live heart-rate/mood as an evolving clock face | Hardware + Presage; the clock's style changes with the crowd over the event | 4 | 3 | 4 | 2 | 4 | 17 |
+| H6 | **Copy-cat arm** (Gemini) — show it a drawing or an analog clock; it vectorises what it sees and redraws it | Vision + hardware; it can "read" a clock and redraw it in a new style | 4 | 2 | 4 | 2 | 4 | 16 |
+| H11 | **Air-draw** (camera) — the camera tracks your finger in the air; the arm redraws your gesture | The camera as the input device; immediate and playful | 4 | 2 | 4 | 3 | 4 | 17 |
+| H10 | **Closed-loop plotter** (camera) — a camera watches the surface, confirms the erase worked and corrects the line | A technical-excellence flourish (good for HRT's bar and Delta) more than a standalone idea | 3 | 2 | 4 | 2 | 4 | 15 |
+| H8 | **Every minute, a new time** — each minute it draws time a different way (analog, binary, word, sundial, a data chart) | A playful showcase of what "time" can look like | 4 | 2 | 3 | 2 | 5 | 16 |
+| H7 | **Self-erasing message** — it writes a note and slowly erases it over a set time | The physical version of the time-capsule egg (N2) | 4 | 1 | 3 | 3 | 4 | 15 |
+
+**Camera (Eun's ask): H9 Portrait clock** is the camera-forward lead — the arm draws what the camera sees, which adds **Gemini** and the biggest crowd delight (your portrait, drawn and wiped). The camera can also close the loop (H10): watch the surface, confirm the erase, correct the line — a technical flourish for HRT and Delta. Presage (H5) is the other camera route (draw at the pace of your pulse).
+
+**Lead on prizes: H3 Forecast plotter** — spins the clock to fit both Time and the data/HRT thread, stacking **Time + HRT + Best Handmade (Citadel) + Hardware Lab** (plus Snowflake/Tiger Data, and a *price* forecast for the HRT pitch). **H4 Sand table** is the safest, most beautiful build; **H1 Real Time** is the purest-Time crowd-pleaser. The best single build may **combine H9 + H3**: a camera drawing clock that draws faces *and* a live forecast, so it carries camera, data and Time at once.
+
+**The hard part is erasing — plan for it.**
+- **Avoid it:** a **sand table** (H4) draws over itself, so there's no pen or eraser to fail — the most reliable build, and it still does epicycle/Fourier paths.
+- **Or keep it small:** a polargraph (two steppers + belt + pen on a small whiteboard) or a 2-servo SCARA arm, with a **sponge eraser on a second servo** that wipes one small region before each redraw. Keep the drawing area to a single hand so the erase is quick and clean.
+- **Fourier is easier in software than in metal:** a 2-DOF plotter that *follows* an epicycle-computed path gives the Fourier look without a reconfigurable mechanical linkage; show the rotating-circles animation on a screen beside it.
+
+**Buildability (~20 h, Hardware Lab parts).** Arduino/RPi + two steppers or servos is a classic weekend drawing robot; the risk is the erase and reliability, not the drawing. The spike (first few hours): get it to draw one clean hand and erase it. Hardware demos are ideal for a science-fair table — the machine sits there and works in front of the judge.
+
 ## Long list
 
 Captured above (1–22). More raw seeds, not yet scored: a QR code on a "we're patching" holding page that links to the explainer; a uptime-style "is it down because of PHP2Shell?" checker; a diff tool that shows what a site's headers looked like before/after; a "trust receipt" a patched site can display; a Thunderbird/Outlook add-in that flags links to likely-unpatched domains.
