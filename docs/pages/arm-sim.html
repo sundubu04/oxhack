@@ -4,506 +4,373 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
 <style>
-/* A 2-link (base + elbow) arm simulator and the software spec for the drawing clock. Pink house look. */
-:root {
-  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
-  --wash: #f4f0f2; --line: #e6e0e3; --accent: #b23a6e; --accent-wash: #fbe6ee;
-  --board: #ffffff; --arm: #2a2327; --arm2: #8a8186; --ink-line: #b23a6e;
-  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318;
-  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+/* Five-bar drawing arm (both motors at base) for a 35x35 cm whiteboard, plus the spec and feasibility. */
+:root{
+  --bg:#fcfbfb;--ink:#1f1a1d;--ink-2:#5f575b;--ink-3:#8a8186;
+  --wash:#f4f0f2;--line:#e6e0e3;--accent:#b23a6e;--accent-wash:#fbe6ee;
+  --board-line:#cfc7cc;--arm:#2a2327;--arm2:#8a8186;
+  --ok:#2e7a4f;--warn:#9a5a06;--stop:#b42318;
+  --display:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
-  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
-  --board: #211c1f; --arm: #e8e2e5; --arm2: #8c8388; --ink-line: #ec8fb6;
-  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
-} }
-:root[data-theme="dark"] {
-  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
-  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
-  --board: #211c1f; --arm: #e8e2e5; --arm2: #8c8388; --ink-line: #ec8fb6;
-  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; color-scheme: dark;
-}
-* { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--body); }
-.page { max-width: 60rem; margin: 0 auto; padding-block: 36px 72px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: grid; gap: 40px; }
-header { display: grid; gap: 10px; }
-h1 { font: 600 1.9rem/1.1 var(--display); margin: 0; text-wrap: balance; }
-h2 { font: 600 1.25rem/1.3 var(--display); margin: 0; text-wrap: balance; }
-h3 { font: 600 1rem/1.35 var(--display); margin: 0; }
-p { margin: 0; max-width: 68ch; }
-.lede { font-size: 1.0625rem; color: var(--ink); }
-.meta { color: var(--ink-3); font-size: .85rem; display: flex; flex-wrap: wrap; gap: 4px 14px; }
-section { display: grid; gap: 16px; min-width: 0; }
-a { color: var(--accent); }
-code { font: .85em var(--mono); }
-.muted { color: var(--ink-2); }
-.small { font-size: .875rem; }
-
-/* Simulator */
-.sim { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 720px) { .sim { grid-template-columns: 1fr; } }
-.stage { display: grid; gap: 10px; min-width: 0; }
-.canvas-wrap { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--board);
-  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.badge { position: absolute; top: 10px; left: 10px; font: 600 .8rem/1 var(--display); padding: 5px 9px;
-  border-radius: 999px; background: var(--accent-wash); color: var(--accent); display: inline-flex; gap: 6px; align-items: center; }
-.badge[data-tone="warn"] { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
-.transport { display: flex; flex-wrap: wrap; gap: 8px; }
-button { font: 600 .9rem/1 var(--display); color: var(--ink); background: var(--wash); border: 1px solid var(--line);
-  border-radius: 8px; padding: 9px 13px; cursor: pointer; }
-button:hover { background: var(--line); }
-button.primary { background: var(--accent); color: #fff; border-color: transparent; }
-button.primary:hover { filter: brightness(1.05); }
-button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.controls { display: grid; gap: 14px; align-content: start; }
-.ctl { display: grid; gap: 5px; }
-.ctl label { font: 600 .8rem/1.2 var(--display); color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
-.ctl label .v { color: var(--accent); font-variant-numeric: tabular-nums; }
-select, textarea { font: inherit; color: var(--ink); background: var(--board); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 100%; }
-textarea { font: .8rem/1.4 var(--mono); resize: vertical; min-height: 64px; }
-input[type=range] { width: 100%; accent-color: var(--accent); }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.toggle { display: flex; align-items: center; gap: 8px; font: 600 .8rem/1.2 var(--display); color: var(--ink-2); }
-.toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
-
-.readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; padding: 12px; background: var(--wash); border-radius: 10px; }
-.readout .k { font: 600 .72rem/1.2 var(--display); color: var(--ink-3); text-transform: none; }
-.readout .val { font: 600 1.25rem/1 var(--display); font-variant-numeric: tabular-nums; margin-top: 3px; }
-.readout .val small { font: 400 .7rem var(--body); color: var(--ink-3); }
-
-/* spec bits */
-.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 8px; font: 600 .9rem/1.3 var(--display); }
-.flow span { background: var(--wash); border-radius: 999px; padding: 6px 12px; }
-.flow .hot { background: var(--accent-wash); color: var(--accent); }
-.flow .arrow { background: none; color: var(--accent); padding: 0 2px; }
-.ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: s; }
-.ladder li { position: relative; padding-left: 2.5rem; min-height: 1.7rem; }
-.ladder li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 0;
-  font: 600 .9rem/1.7rem var(--display); color: var(--accent);
-  background: var(--accent-wash); border-radius: 7px; width: 1.7rem; height: 1.7rem; text-align: center; }
-.ladder b { font-weight: 600; }
-pre { margin: 0; overflow-x: auto; background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
-pre code { font-size: .82rem; line-height: 1.5; color: var(--ink); }
-.rows table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-.rows { overflow-x: auto; }
-.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 14px 7px 0; white-space: nowrap; }
-.rows td { padding: 7px 14px 7px 0; vertical-align: top; }
-.rows td:last-child, .rows th:last-child { padding-right: 0; }
-details { color: var(--ink-2); font-size: .875rem; }
-summary { cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161214;--ink:#f2edf0;--ink-2:#b4abb0;--ink-3:#8c8388;
+  --wash:#241e21;--line:#352d31;--accent:#ec8fb6;--accent-wash:#3b1f2c;
+  --board-line:#4a4044;--arm:#e8e2e5;--arm2:#8c8388;
+  --ok:#72c79a;--warn:#e3a95a;--stop:#f08b80;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#161214;--ink:#f2edf0;--ink-2:#b4abb0;--ink-3:#8c8388;
+  --wash:#241e21;--line:#352d31;--accent:#ec8fb6;--accent-wash:#3b1f2c;
+  --board-line:#4a4044;--arm:#e8e2e5;--arm2:#8c8388;
+  --ok:#72c79a;--warn:#e3a95a;--stop:#f08b80;color-scheme:dark;}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);}
+.page{max-width:60rem;margin:0 auto;padding-block:36px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px;}
+header{display:grid;gap:10px;}
+h1{font:600 1.9rem/1.1 var(--display);margin:0;text-wrap:balance;}
+h2{font:600 1.25rem/1.3 var(--display);margin:0;text-wrap:balance;}
+p{margin:0;max-width:68ch;}
+.lede{font-size:1.0625rem;}
+.meta{color:var(--ink-3);font-size:.85rem;display:flex;flex-wrap:wrap;gap:4px 14px;}
+section{display:grid;gap:16px;min-width:0;}
+a{color:var(--accent);}
+code{font:.85em var(--mono);}
+.muted{color:var(--ink-2);}
+.small{font-size:.875rem;}
+.sim{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:20px;align-items:start;}
+@media (max-width:720px){.sim{grid-template-columns:1fr;}}
+.stage{display:grid;gap:10px;min-width:0;}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.badge{position:absolute;top:10px;left:10px;font:600 .8rem/1 var(--display);padding:5px 9px;border-radius:999px;background:var(--accent-wash);color:var(--accent);display:inline-flex;gap:6px;align-items:center;}
+.badge[data-tone="warn"]{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);}
+.badge[data-tone="ok"]{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);}
+.transport{display:flex;flex-wrap:wrap;gap:8px;}
+button{font:600 .9rem/1 var(--display);color:var(--ink);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer;}
+button:hover{background:var(--line);}
+button.primary{background:var(--accent);color:#fff;border-color:transparent;}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.controls{display:grid;gap:13px;align-content:start;}
+.ctl{display:grid;gap:5px;}
+.ctl label{font:600 .8rem/1.2 var(--display);color:var(--ink-2);display:flex;justify-content:space-between;gap:8px;}
+.ctl label .v{color:var(--accent);font-variant-numeric:tabular-nums;}
+select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%;}
+textarea{font:.8rem/1.4 var(--mono);resize:vertical;min-height:60px;}
+input[type=range]{width:100%;accent-color:var(--accent);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.toggle{display:flex;align-items:center;gap:8px;font:600 .8rem/1.2 var(--display);color:var(--ink-2);}
+.toggle input{accent-color:var(--accent);width:16px;height:16px;}
+.readout{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px;padding:12px;background:var(--wash);border-radius:10px;}
+.readout .k{font:600 .72rem/1.2 var(--display);color:var(--ink-3);}
+.readout .val{font:600 1.2rem/1 var(--display);font-variant-numeric:tabular-nums;margin-top:3px;}
+.readout .val small{font:400 .7rem var(--body);color:var(--ink-3);}
+.readout .val[data-tone="ok"]{color:var(--ok);}.readout .val[data-tone="warn"]{color:var(--warn);}.readout .val[data-tone="stop"]{color:var(--stop);}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font:600 .9rem/1.3 var(--display);}
+.flow span{background:var(--wash);border-radius:999px;padding:6px 12px;}
+.flow .hot{background:var(--accent-wash);color:var(--accent);}
+.flow .arrow{background:none;color:var(--accent);padding:0 2px;}
+pre{margin:0;overflow-x:auto;background:var(--wash);border:1px solid var(--line);border-radius:10px;padding:14px;}
+pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
+.rows{overflow-x:auto;}
+.rows table{border-collapse:collapse;width:100%;font-size:.9rem;}
+.rows th{text-align:left;font-weight:600;color:var(--ink-2);padding:0 14px 7px 0;white-space:nowrap;}
+.rows td{padding:7px 14px 7px 0;vertical-align:top;}
+.rows td:last-child,.rows th:last-child{padding-right:0;}
+.rows tr[data-pick] td{background:var(--accent-wash);}
+.rows tr[data-pick] td:first-child{border-radius:6px 0 0 6px;padding-left:8px;}
+.rows tr[data-pick] td:last-child{border-radius:0 6px 6px 0;}
+.rows .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.verdict{display:grid;gap:6px;border-left:3px solid var(--accent);padding:2px 0 2px 18px;}
+.verdict b{color:var(--accent);font:600 1rem/1.4 var(--display);}
+details{color:var(--ink-2);font-size:.875rem;}
+summary{cursor:pointer;}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
 
 <main class="page">
   <header>
     <h1>Clock arm simulator</h1>
-    <p class="lede">A 2-link arm — a <b>base</b> angle and an <b>elbow</b> angle — that draws, erases and redraws a clock. This page is the software spec and a live simulation: pick a drawing, tune the link lengths until it fits the arm's reach, and read out the exact <b>joint-angle stream</b> the Raspberry Pi needs. The sim is driven by the same angles the hardware gets, so what you see here is what the arm does.</p>
-    <p class="meta"><span>OxHack · hardware clock</span><span>2R planar arm</span><span>Output: base° , elbow° , pen</span></p>
+    <p class="lede">A <b>five-bar drawing arm</b> — two motors at the base, a light linkage reaching to the pen, and a bottom motor that lifts the pen and sets pressure — drawing on your <b>35 × 35 cm whiteboard</b>. Both motors stay at the base, so there's no fragile elbow motor. Tune the links, watch the reachable area cover the board, read the dexterity, and check whether the accuracy is good enough at this size.</p>
+    <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Five-bar / Line-us style</span><span>Output: motor A°, motor B°, lift, pressure</span></p>
   </header>
 
   <section aria-label="Simulator">
     <div class="sim">
       <div class="stage">
-        <div class="canvas-wrap">
-          <canvas id="cv" aria-label="Whiteboard: the two-link arm drawing the selected shape"></canvas>
-          <span class="badge" id="reach">reach: ok</span>
-        </div>
+        <div class="canvas-wrap"><canvas id="cv" aria-label="Five-bar arm drawing on a 35 by 35 cm whiteboard, reachable area shaded by dexterity"></canvas>
+          <span class="badge" id="reach">coverage</span></div>
         <div class="transport">
           <button class="primary" id="run">Draw</button>
           <button id="pause" hidden>Pause</button>
-          <button id="erase">Erase</button>
+          <button id="erase">Flip &amp; erase</button>
           <button id="reset">Reset</button>
           <button id="copy">Copy angle stream</button>
         </div>
         <div class="readout" aria-live="polite">
-          <div><div class="k">Base angle θ₁</div><div class="val"><span id="r-b">—</span><small>°</small></div></div>
-          <div><div class="k">Elbow angle θ₂</div><div class="val"><span id="r-e">—</span><small>°</small></div></div>
-          <div><div class="k">Pen</div><div class="val" id="r-p">up</div></div>
-          <div><div class="k">Pen X,Y</div><div class="val small" id="r-xy">—</div></div>
-          <div><div class="k">Waypoints</div><div class="val" id="r-n">—</div></div>
-          <div><div class="k">Out of reach</div><div class="val" id="r-u">0</div></div>
+          <div><div class="k">Motor A (left)</div><div class="val"><span id="r-a">—</span><small>°</small></div></div>
+          <div><div class="k">Motor B (right)</div><div class="val"><span id="r-bb">—</span><small>°</small></div></div>
+          <div><div class="k">Pen / lift</div><div class="val" id="r-p">up</div></div>
+          <div><div class="k">Worst dexterity</div><div class="val" id="r-d">—</div></div>
+          <div><div class="k">Drawing covered</div><div class="val" id="r-c">—</div></div>
+          <div><div class="k">Tip error (est.)</div><div class="val" id="r-err">—</div></div>
         </div>
       </div>
-
       <div class="controls">
-        <div class="ctl">
-          <label for="preset">Drawing (pretrained)</label>
-          <select id="preset">
-            <option value="clock">Clock (now)</option>
-            <option value="star">Star</option>
-            <option value="spiral">Spiral</option>
-            <option value="flower">Flower (continuous)</option>
-            <option value="custom">Paste a path (SVG d or JSON)</option>
-          </select>
-        </div>
-        <div class="ctl" id="custom-wrap" hidden>
-          <label for="custom">Vectors in — what "ask Claude" returns</label>
-          <textarea id="custom" placeholder='SVG path, e.g. M10 10 L90 10 L50 90 Z
-or JSON points: [[[10,10],[90,10],[50,90]]]'></textarea>
-        </div>
-        <div class="row2">
-          <div class="ctl"><label for="l1">Link 1 (base)<span class="v" id="l1v">150</span></label><input type="range" id="l1" min="60" max="260" value="150"></div>
-          <div class="ctl"><label for="l2">Link 2 (elbow)<span class="v" id="l2v">120</span></label><input type="range" id="l2" min="60" max="260" value="120"></div>
-        </div>
-        <div class="row2">
-          <div class="ctl"><label for="size">Drawing size<span class="v" id="sizev">120</span></label><input type="range" id="size" min="40" max="200" value="120"></div>
-          <div class="ctl"><label for="cy">Height from base<span class="v" id="cyv">170</span></label><input type="range" id="cy" min="80" max="260" value="170"></div>
-        </div>
-        <div class="ctl"><label for="speed">Draw speed (mm/s)<span class="v" id="speedv">140</span></label><input type="range" id="speed" min="20" max="400" value="140"></div>
+        <div class="ctl"><label for="preset">Drawing</label>
+          <select id="preset"><option value="clock">Clock (now)</option><option value="star">Star</option><option value="spiral">Spiral</option><option value="flower">Flower (continuous)</option><option value="custom">Paste a path</option></select></div>
+        <div class="ctl" id="custom-wrap" hidden><label for="custom">Vectors in — what "ask Claude" returns</label>
+          <textarea id="custom" placeholder='M10 10 L90 10 L50 90 Z   or   [[[10,10],[90,10],[50,90]]]'></textarea></div>
+        <div class="ctl"><label for="link">Link length La = Lb mm<span class="v" id="linkv">240</span></label><input type="range" id="link" min="150" max="340" value="240"></div>
+        <div class="ctl"><label for="base">Base width (motor spacing) mm<span class="v" id="basev">120</span></label><input type="range" id="base" min="40" max="220" value="120"></div>
+        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">90</span></label><input type="range" id="standoff" min="20" max="220" value="90"></div>
+        <button id="optimise" style="justify-self:start">Optimise links for this drawing</button>
+        <div class="ctl"><label for="fill">Drawing fills board<span class="v" id="fillv">82</span></label><input type="range" id="fill" min="30" max="98" value="82"></div>
+        <div class="ctl"><label for="pressure">Pen pressure (bottom motor)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
+        <div class="ctl"><label for="res">Actuator (sets tip error)</label>
+          <select id="res"><option value="1">Hobby servo (~1°)</option><option value="0.3">Digital metal-gear (~0.3°)</option><option value="0.1">Servo + 3:1 reduction (~0.1°)</option><option value="0.045">Stepper + microstep + belt (~0.05°)</option></select></div>
+        <div class="ctl"><label for="speed">Draw speed mm/s<span class="v" id="speedv">160</span></label><input type="range" id="speed" min="20" max="500" value="160"></div>
         <label class="toggle"><input type="checkbox" id="fourier"> Fourier mode (epicycles)</label>
-        <div class="ctl" id="fourier-wrap" hidden>
-          <label for="terms">Fourier terms<span class="v" id="termsv">40</span></label><input type="range" id="terms" min="2" max="120" value="40">
-          <label class="toggle" style="margin-top:6px"><input type="checkbox" id="showcircles" checked> Show rotating circles</label>
-        </div>
-        <label class="toggle"><input type="checkbox" id="elbow" checked> Elbow up</label>
-        <label class="toggle"><input type="checkbox" id="showwork" checked> Show reach area</label>
+        <div class="ctl" id="fourier-wrap" hidden><label for="terms">Fourier terms<span class="v" id="termsv">40</span></label><input type="range" id="terms" min="2" max="120" value="40">
+          <label class="toggle" style="margin-top:6px"><input type="checkbox" id="showcircles" checked> Show rotating circles</label></div>
+        <label class="toggle"><input type="checkbox" id="showdex" checked> Shade reach by dexterity</label>
+        <label class="toggle"><input type="checkbox" id="showerr"> Show tip-error wobble</label>
       </div>
     </div>
-    <p class="small muted">All lengths in mm; angles in degrees, CCW from the +x axis (elbow measured from link 1). Everything renders at rest so you can read the pose; press <b>Draw</b> to animate. Units are a convention — set them to your real link lengths and the reach area tells you if the clock fits.</p>
+    <p class="small muted">Dexterity is the transmission angle between the two linkage arms at the pen (1 = best, 0 = the five-bar's singularity where they line up). Keep the drawing in the green zone. <b>Show tip-error wobble</b> jitters the drawn line by the actuator's error so you can see what that size board really looks like.</p>
   </section>
 
-  <section aria-labelledby="h-pipe">
-    <h2 id="h-pipe">The pipeline: from "ask Claude" to joint angles</h2>
-    <div class="flow" aria-label="prompt to Claude, to vector paths, to a toolpath, to inverse kinematics, to a joint-angle stream, to the Pi">
-      <span class="hot">ask Claude "draw a clock"</span><span class="arrow">→</span><span>SVG / polylines</span><span class="arrow">→</span><span>toolpath (x, y, pen)</span><span class="arrow">→</span><span class="hot">inverse kinematics</span><span class="arrow">→</span><span>base°, elbow°, pen</span><span class="arrow">→</span><span>Pi → servos</span>
-    </div>
-    <p>Work in <b>vectors</b>, not pixels. A raster image means edge-detection and contour-tracing (OpenCV / potrace) — slow and fiddly, and the output is still a set of polylines. Claude already speaks vectors: ask it for an SVG path or a JSON list of strokes and you skip the whole computer-vision step. Paste exactly that into the <em>Paste a path</em> box above to see it drawn. So:</p>
+  <section aria-labelledby="h-feas">
+    <h2 id="h-feas">Is it feasible on a 35 cm board?</h2>
+    <div class="verdict"><b>Short answer: yes for a loose, hand-drawn look; borderline for a crisp clock with bare hobby servos.</b>
+      <p>A five-bar needs ~24 cm links to cover a 35 cm board, so the pen sits up to ~30 cm from a motor. Tip error is <code>lever × servo step</code>, so a small angle error becomes millimetres at the pen:</p></div>
     <div class="rows">
       <table>
-        <thead><tr><th>Input</th><th>How it becomes position coordinates</th><th>Use it?</th></tr></thead>
+        <thead><tr><th>Actuator</th><th>Angle step</th><th>Tip error @ 300 mm lever</th><th>Good for</th></tr></thead>
         <tbody>
-          <tr><td><b>Preset</b> (clock)</td><td>Parametric: the circle, ticks and hands are maths, sampled to points</td><td>Start here — snappy and exact</td></tr>
-          <tr><td><b>Ask Claude</b></td><td>Prompt → SVG <code>d</code> or JSON polylines → parse → resample</td><td>The AI route; vectors straight out, no image step</td></tr>
-          <tr><td><b>Photo / online image</b></td><td>Threshold → <code>findContours</code> → simplify to polylines</td><td>Only if you must draw a real photo; most error</td></tr>
+          <tr><td>Hobby servo (SG90)</td><td class="n">~1°</td><td class="n">~5.2 mm</td><td>loose line art only</td></tr>
+          <tr><td>Digital metal-gear (MG996R)</td><td class="n">~0.3°</td><td class="n">~1.6 mm</td><td>chunky clock, wobbly detail</td></tr>
+          <tr data-pick><td>Servo + 3:1 belt/gear reduction</td><td class="n">~0.1°</td><td class="n">~0.5 mm</td><td>a clean, readable clock</td></tr>
+          <tr><td>Stepper + microstep + belt</td><td class="n">~0.05°</td><td class="n">~0.2 mm</td><td>crisp, best repeatability</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="small muted">Snappy comes from caching: ask Claude once per drawing, store the toolpath, and replay the angle stream. The arm never waits on the model mid-draw.</p>
+    <p>So the board size is fine — the limit is the <b>actuator</b>, not the reach. For a Maarten-Baas clock, use <b>belt/gear reduction or steppers</b>. Shrinking the links helps too: optimise for the clock disk, not the whole square, so the lever is shorter and the error smaller. Near a singularity (worst dexterity ≈ 0.4) both error and joint speed amplify ~2.5×, so keep the drawing in the dexterous band. Extra mitigations: draw <b>flat on a table</b> (gravity only adds droop, not sag, and lets the bottom motor set pressure cleanly) rather than vertical, and add a <b>camera closed-loop</b> correction if you want crisp lines from cheap servos. Prior art agrees: Plotclock uses tiny 35/55 mm links for exactly this reason, and a Cornell rebuild got unreadable digits from servo error at larger scale.</p>
+    <p class="small muted">We optimise manipulability (<code>|sin|</code> of the transmission angle). Optimising isotropy instead (equal precision in all directions) favours slightly unequal links (La/Lb ≈ 1/√2); we keep equal links because it maximises the worst-case transmission and simplifies the build.</p>
+  </section>
+
+  <section aria-labelledby="h-mech">
+    <h2 id="h-mech">Why the five-bar (not two serial arms)</h2>
+    <p>A serial 2-link arm puts a motor at the elbow — heavy, wobbly, and it fights gravity at the end of a long arm. The five-bar keeps <b>both motors bolted to the base</b> and reaches with a light linkage (the Line-us / Plotclock design), so it's far stiffer at this size. The <b>bottom motor</b> lifts the whole pen for pen-up and presses it for pressure — a clean third axis. The trade: a five-bar has its own singularity (when the two linkage arms line up) and a lens-shaped workspace, both shown live on the left.</p>
   </section>
 
   <section aria-labelledby="h-contract">
     <h2 id="h-contract">What software hands the hardware</h2>
-    <p>Software owns the maths (point → angles). The Pi owns angle → servo, with your own calibration — that's the part you said you've got. The contract is a list of waypoints plus a header:</p>
+    <p>Software owns point → the two motor angles; the Pi owns angle → servo. <b>Lift/pressure</b> is the bottom motor (map 0–100 % to its travel). <b>Erase</b> flips the marker 180° to its eraser end, then sweeps. We write our own IK (Plotclock is CC-BY, Makelangelo GPL-2.0, GRBL GPL-3.0 — read, don't copy; check the event's licence rule).</p>
     <pre><code>{
-  "frame":  "base at origin; x right, y up; angles degrees, CCW from +x; elbow relative to link 1",
-  "links_mm": { "L1": 150, "L2": 120 },
-  "home":   { "base": 90, "elbow": 0 },      // calibration / park pose
-  "pen":    { "up": 0, "down": 1 },           // third actuator (servo or solenoid)
-  "feed_mm_s": 140,                            // pen speed; the Pi interpolates between waypoints
+  "mechanism": "five-bar: motors A(-d/2,0) B(+d/2,0), links La,Lb to pen",
+  "board_mm": { "w": 350, "h": 350 },
+  "geom_mm": { "base_width": 120, "La": 240, "Lb": 240, "standoff": 90 },
+  "frame": "origin at base midpoint; x right, y up; motor angles degrees CCW from +x",
+  "lift": { "up": 0, "down": 1 }, "flip_deg": 180, "feed_mm_s": 160,
   "path": [
-    { "base": 46.5, "elbow": 102.8, "pen": 0 },   // travel to the start, pen up
-    { "base": 48.1, "elbow": 99.4,  "pen": 1 },   // pen down, drawing
-    { "base": 50.0, "elbow": 96.1,  "pen": 1 }
-    // ... one entry per waypoint, in order
-  ]
+    { "a": 118.3, "b": 61.7, "lift": 0, "pressure": 0 },   // travel, pen up
+    { "a": 115.1, "b": 63.9, "lift": 1, "pressure": 60 },  // drawing
+    { "a": 112.0, "b": 66.2, "lift": 1, "pressure": 60 }
+  ],
+  "erase": [ { "flip": 180 }, { "a": 100.2, "b": 150.0, "lift": 1, "pressure": 85, "tool": "eraser" } ]
 }</code></pre>
-    <p class="small muted">Use <b>Copy angle stream</b> above to grab this for the current drawing. The Pi reads <code>base</code>, <code>elbow</code>, <code>pen</code> in order and moves at <code>feed_mm_s</code>; it never does kinematics. Keep angular velocity under the servo's limit (slow near full extension, where small moves swing the pen a long way).</p>
+    <p class="small muted"><b>Copy angle stream</b> grabs this for the current drawing. Time the path in joint space, not Cartesian — joint speed blows up near the singularity.</p>
   </section>
 
   <section aria-labelledby="h-ik">
     <h2 id="h-ik">The maths (verified)</h2>
-    <p>Forward (angles → pen) and inverse (target → angles) for a 2-link planar arm. Reachable only when <code>|L1−L2| ≤ r ≤ L1+L2</code>; the reach area on the whiteboard is that annulus. There are two elbow solutions (up / down) — pick one and keep it, and watch the fully-extended singularity.</p>
-    <pre><code>// inverse kinematics: target (x,y) -> base θ₁, elbow θ₂
-r2 = x*x + y*y;  r = sqrt(r2);
-if (r &gt; L1+L2 || r &lt; |L1-L2|) return OUT_OF_REACH;
-c2 = (r2 - L1² - L2²) / (2·L1·L2);
-θ₂ = atan2( ±sqrt(1-c2²), c2 );                 // + elbow-up, − elbow-down
-θ₁ = atan2(y, x) - atan2(L2·sin θ₂, L1 + L2·cos θ₂);</code></pre>
-    <p class="small muted">Checked: forward∘inverse round-trips to ~1e-13 mm over a full clock; out-of-range points return cleanly. Fourier mode runs a DFT on the path and redraws it from the N largest epicycles (N≈40 is plenty for a clock).</p>
-  </section>
-
-  <section aria-labelledby="h-ladder">
-    <h2 id="h-ladder">Build it in steps</h2>
-    <ol class="ladder">
-      <li><b>Follow a line.</b> Send the arm two angles and watch it hold a point; then a straight segment between two points. Proves the servo + angle contract end to end.</li>
-      <li><b>Pi-turtle a polyline.</b> Convert a list of points to angles and draw an open path (a triangle, your initials). This is the <code>toolpath → IK → angles</code> core, no image needed.</li>
-      <li><b>Draw the clock.</b> The parametric preset: circle, ticks, two hands at the current time. Add pen up/down between strokes.</li>
-      <li><b>Erase and redraw.</b> Wipe the face and draw the next minute. See the erase options below.</li>
-      <li><b>Fourier arm.</b> Redraw a continuous contour from its epicycles — the "Fourier series" look, and smoother motion.</li>
-      <li><b>Ask Claude.</b> Prompt → SVG → toolpath → angles, cached so it stays snappy. Draw anything on request.</li>
-    </ol>
-  </section>
-
-  <section aria-labelledby="h-erase">
-    <h2 id="h-erase">Erasing — pick one early, it's the real risk</h2>
-    <div class="rows">
-      <table>
-        <thead><tr><th>Approach</th><th>How</th><th>Verdict</th></tr></thead>
-        <tbody>
-          <tr><td><b>Sand table</b></td><td>A ball in sand; drawing a new path covers the old one</td><td>No eraser to fail — the safe build, if the aesthetic suits</td></tr>
-          <tr><td><b>Sponge on a 3rd servo</b></td><td>Pen lifts, sponge drops, the arm sweeps the drawing's bounding box in rows</td><td>Keep the drawing small so the wipe is quick; most faithful to Maarten Baas</td></tr>
-          <tr><td><b>Dual-tool head</b></td><td>Pen and eraser side by side; offset the toolpath by the tool gap</td><td>Tidy, but mind the offset in the maths</td></tr>
-          <tr><td><b>Dry-wipe / magnetic board</b></td><td>A slider or the arm clears a magnetic drawing board</td><td>Clean, but a different surface</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="small muted">In software, <b>erase is just another toolpath</b>: a back-and-forth (boustrophedon) fill over the last drawing's bounding box, with the pen flag set to the eraser tool. Same angle-stream format. The <b>Erase</b> button above animates it.</p>
+    <pre><code>// five-bar IK: pen (x,y) -> motor angles a (left), b (right). Each side is a 2R solve.
+for each base O in { A=(-d/2,0) sign -1,  B=(+d/2,0) sign +1 }:
+  dx=x-O.x; dy=y-O.y; r=hypot(dx,dy);
+  if (r &gt; La+Lb || r &lt; |La-Lb|) return OUT_OF_REACH;
+  c = (r² + La² - Lb²) / (2·La·r);
+  angle = atan2(dy,dx) + sign·acos(c);        // the motor angle
+  elbow = O + La·(cos angle, sin angle);
+dexterity = |sin(angle between (elbowA-pen) and (elbowB-pen))|;  // transmission</code></pre>
+    <p class="small muted">Each elbow sits exactly La from its motor and Lb from the pen by construction; checked over the drawing disk. Tip error from one motor ≈ (La+Lb)·Δθ in the worst case.</p>
   </section>
 
   <section aria-labelledby="h-front">
     <h2 id="h-front">This page is the frontend sim</h2>
-    <p>It already does what you asked the frontend to do: select a pretrained drawing, control the arm (link lengths, drawing size and height, speed, elbow, Fourier), show the reach area so you can size the links, animate the draw, and <b>erase</b>. Crucially, it runs the pen through the same <code>IK → base°, elbow°</code> that the Pi will, so a drawing that completes here with "out of reach: 0" is one the real arm can make. Export the stream with <b>Copy angle stream</b> and send it down.</p>
-    <details>
-      <summary>Notes &amp; next</summary>
-      <p style="margin-top:8px">Single file, no libraries, Canvas 2D. The SVG parser handles M/L/H/V/C/Q/Z (absolute and relative); arcs (A) are skipped — ask Claude for line/curve paths. Next: wire a live "Ask Claude" box (an artifact can ask Claude for the SVG itself), add joint-speed limiting and acceleration smoothing to the exported stream, and a serial sender from the Pi. Say the word and I'll add them.</p>
-    </details>
+    <p>Pick a drawing, size the linkage against the reach, choose the actuator to see its real wobble, set the pressure, and watch the draw and the flip-and-erase — all from the same two motor angles the Pi runs. See the companion <a href="https://claude.ai/artifact/DE7tSVJYnyefa7GkchoWmH">drawing-arm research</a> (prior art, the Fourier pipeline, the clock benchmark) from the other session.</p>
+    <details><summary>Notes &amp; next</summary><p style="margin-top:8px">Single file, Canvas 2D, no libraries, own IK. SVG parser: M/L/H/V/C/Q/Z. Next on request: joint-space time-optimal path (toppra-style), a live "Ask Claude" box, and a Pi serial-sender.</p></details>
   </section>
 </main>
 
 <script>
 "use strict";
-const D2R = Math.PI/180, R2D = 180/Math.PI;
-const $ = s => document.querySelector(s);
-const cv = $("#cv"), ctx = cv.getContext("2d");
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const R2D=180/Math.PI,BOARD=350,H=175;
+const $=s=>document.querySelector(s);
+const cv=$("#cv"),ctx=cv.getContext("2d");
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-// ---- arm maths ----
-function fk(t1,t2,L1,L2){const ex=L1*Math.cos(t1),ey=L1*Math.sin(t1);return{ex,ey,px:ex+L2*Math.cos(t1+t2),py:ey+L2*Math.sin(t1+t2)};}
-function ik(x,y,L1,L2,up){const r2=x*x+y*y,r=Math.sqrt(r2);
-  if(r>L1+L2+1e-6||r<Math.abs(L1-L2)-1e-6)return null;
-  let c2=(r2-L1*L1-L2*L2)/(2*L1*L2);c2=Math.min(1,Math.max(-1,c2));
-  const s2=Math.sqrt(1-c2*c2)*(up?1:-1),t2=Math.atan2(s2,c2);
-  const t1=Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2);return{t1,t2};}
+const S={link:240,base:120,standoff:90,fill:82,pressure:60,res:1,speed:160,preset:"clock",
+  fourier:false,terms:40,showcircles:true,showdex:true,showerr:false,custom:""};
+let seq=[],angles=[],worstDex=0,covered=true;
+let anim={on:false,i:0,mode:"draw",last:0,acc:0,flip:0};
+let eraseList=[],eraseAng=[],trace=[];
+let scale=1,ox=0,oy=0;
+function boardCY(){return S.standoff+H;}
+function drawR(){return S.fill/100*H;}
 
-// ---- state ----
-const S={L1:150,L2:120,size:120,cy:170,speed:140,preset:"clock",fourier:false,terms:40,
-  showcircles:true,elbow:true,showwork:true,custom:""};
-let seq=[];           // {x,y,pen} waypoints in mm (base at origin)
-let angles=[];        // {t1,t2,ok} per waypoint
-let unreach=0;
-let anim={on:false,i:0,mode:"draw",last:0,acc:0};
-let eraseSeq=null;
+// five-bar IK: pen -> motor angles + elbows + transmission dexterity
+function ik(px,py){const La=S.link,Lb=S.link,d=S.base;
+  const sideAngle=(Ox,sign)=>{const dx=px-Ox,dy=py-0,r=Math.hypot(dx,dy);
+    if(r>La+Lb||r<Math.abs(La-Lb))return null;let c=(r*r+La*La-Lb*Lb)/(2*La*r);c=Math.min(1,Math.max(-1,c));
+    const a=Math.atan2(dy,dx)+sign*Math.acos(c);return{a,ex:Ox+La*Math.cos(a),ey:La*Math.sin(a)};};
+  const A=sideAngle(-d/2,1),B=sideAngle(d/2,-1);if(!A||!B)return null;
+  const uax=A.ex-px,uay=A.ey-py,ubx=B.ex-px,uby=B.ey-py;
+  let cg=(uax*ubx+uay*uby)/(Math.hypot(uax,uay)*Math.hypot(ubx,uby));cg=Math.min(1,Math.max(-1,cg));
+  return{alpha:A.a,beta:B.a,A,B,dex:Math.sqrt(1-cg*cg),ok:true};}
 
-// ---- presets: return array of strokes, each {x,y}[] in a ~[-60,60] box ----
 function presetStrokes(name){
-  if(name==="clock"){
-    const R=58,st=[];
-    const ring=[];for(let i=0;i<=120;i++){const a=i/120*2*Math.PI;ring.push({x:R*Math.cos(a),y:R*Math.sin(a)});}st.push(ring);
-    for(let h=0;h<12;h++){const a=h/12*2*Math.PI;const r0=h%3===0?R*0.8:R*0.9;
-      st.push([{x:r0*Math.cos(a),y:r0*Math.sin(a)},{x:R*0.98*Math.cos(a),y:R*0.98*Math.sin(a)}]);}
-    const now=new Date();const hr=(now.getHours()%12)+now.getMinutes()/60, mn=now.getMinutes();
-    const ah=hr/12*2*Math.PI-Math.PI/2, am=mn/60*2*Math.PI-Math.PI/2;
-    st.push([{x:0,y:0},{x:R*0.5*Math.cos(ah),y:-R*0.5*Math.sin(ah)}]);
-    st.push([{x:0,y:0},{x:R*0.8*Math.cos(am),y:-R*0.8*Math.sin(am)}]);
-    return st;
-  }
+  if(name==="clock"){const R=58,st=[];const ring=[];for(let i=0;i<=120;i++){const a=i/120*2*Math.PI;ring.push({x:R*Math.cos(a),y:R*Math.sin(a)});}st.push(ring);
+    for(let h=0;h<12;h++){const a=h/12*2*Math.PI,r0=h%3===0?R*0.8:R*0.9;st.push([{x:r0*Math.cos(a),y:r0*Math.sin(a)},{x:R*0.98*Math.cos(a),y:R*0.98*Math.sin(a)}]);}
+    const now=new Date(),hr=(now.getHours()%12)+now.getMinutes()/60,mn=now.getMinutes();
+    const ah=hr/12*2*Math.PI-Math.PI/2,am=mn/60*2*Math.PI-Math.PI/2;
+    st.push([{x:0,y:0},{x:R*0.5*Math.cos(ah),y:-R*0.5*Math.sin(ah)}]);st.push([{x:0,y:0},{x:R*0.8*Math.cos(am),y:-R*0.8*Math.sin(am)}]);return st;}
   if(name==="star"){const o=[];for(let i=0;i<=10;i++){const a=i/10*2*Math.PI-Math.PI/2,r=i%2?26:60;o.push({x:r*Math.cos(a),y:r*Math.sin(a)});}return[o];}
   if(name==="spiral"){const o=[];for(let i=0;i<=360;i++){const a=i/360*6*Math.PI,r=6+i/360*54;o.push({x:r*Math.cos(a),y:r*Math.sin(a)});}return[o];}
   if(name==="flower"){const o=[];for(let i=0;i<=600;i++){const t=i/600*2*Math.PI,r=58*Math.cos(5*t);o.push({x:r*Math.cos(t),y:r*Math.sin(t)});}return[o];}
-  if(name==="custom")return parsePath(S.custom);
-  return [];
-}
-
-// ---- minimal SVG path / JSON parser -> strokes ----
-function parsePath(src){
-  src=(src||"").trim();if(!src)return[];
-  if(src[0]==="["){try{let j=JSON.parse(src);if(Array.isArray(j[0][0]))return j.map(s=>s.map(p=>({x:p[0],y:p[1]})));return [j.map(p=>({x:p[0],y:p[1]}))];}catch(e){return[];}}
-  const strokes=[];let cur=[];let x=0,y=0,sx=0,sy=0;
-  const toks=src.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)||[];let i=0,cmd="";
-  const num=()=>parseFloat(toks[i++]);
-  const push=()=>{if(cur.length>1)strokes.push(cur);};
-  const bez=(p0,p1,p2,p3)=>{for(let t=1;t<=16;t++){const u=t/16,m=1-u;
-    cur.push({x:m*m*m*p0.x+3*m*m*u*p1.x+3*m*u*u*p2.x+u*u*u*p3.x,y:m*m*m*p0.y+3*m*m*u*p1.y+3*m*u*u*p2.y+u*u*u*p3.y});}};
-  const quad=(p0,p1,p2)=>{for(let t=1;t<=12;t++){const u=t/12,m=1-u;
-    cur.push({x:m*m*p0.x+2*m*u*p1.x+u*u*p2.x,y:m*m*p0.y+2*m*u*p1.y+u*u*p2.y});}};
-  while(i<toks.length){
-    let t=toks[i];
-    if(/[a-zA-Z]/.test(t)){cmd=t;i++;}
-    const rel=cmd===cmd.toLowerCase(),C=cmd.toUpperCase();
+  if(name==="custom")return parsePath(S.custom);return[];}
+function parsePath(src){src=(src||"").trim();if(!src)return[];
+  if(src[0]==="["){try{let j=JSON.parse(src);if(Array.isArray(j[0][0]))return j.map(s=>s.map(p=>({x:p[0],y:p[1]})));return[j.map(p=>({x:p[0],y:p[1]}))];}catch(e){return[];}}
+  const strokes=[];let cur=[],x=0,y=0,sx=0,sy=0;const toks=src.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)||[];let i=0,cmd="";
+  const num=()=>parseFloat(toks[i++]),push=()=>{if(cur.length>1)strokes.push(cur);};
+  const bez=(p0,p1,p2,p3)=>{for(let t=1;t<=16;t++){const u=t/16,m=1-u;cur.push({x:m*m*m*p0.x+3*m*m*u*p1.x+3*m*u*u*p2.x+u*u*u*p3.x,y:m*m*m*p0.y+3*m*m*u*p1.y+3*m*u*u*p2.y+u*u*u*p3.y});}};
+  const quad=(p0,p1,p2)=>{for(let t=1;t<=12;t++){const u=t/12,m=1-u;cur.push({x:m*m*p0.x+2*m*u*p1.x+u*u*p2.x,y:m*m*p0.y+2*m*u*p1.y+u*u*p2.y});}};
+  while(i<toks.length){let t=toks[i];if(/[a-zA-Z]/.test(t)){cmd=t;i++;}const rel=cmd===cmd.toLowerCase(),C=cmd.toUpperCase();
     if(C==="M"){push();cur=[];let nx=num(),ny=num();if(rel){nx+=x;ny+=y;}x=nx;y=ny;sx=x;sy=y;cur.push({x,y});cmd=rel?"l":"L";}
     else if(C==="L"){let nx=num(),ny=num();if(rel){nx+=x;ny+=y;}x=nx;y=ny;cur.push({x,y});}
     else if(C==="H"){let nx=num();if(rel)nx+=x;x=nx;cur.push({x,y});}
     else if(C==="V"){let ny=num();if(rel)ny+=y;y=ny;cur.push({x,y});}
-    else if(C==="C"){let p1={x:num(),y:num()},p2={x:num(),y:num()},p3={x:num(),y:num()};
-      if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;p3.x+=x;p3.y+=y;}bez({x,y},p1,p2,p3);x=p3.x;y=p3.y;}
-    else if(C==="Q"){let p1={x:num(),y:num()},p2={x:num(),y:num()};
-      if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;}quad({x,y},p1,p2);x=p2.x;y=p2.y;}
-    else if(C==="Z"){cur.push({x:sx,y:sy});x=sx;y=sy;push();cur=[];}
-    else {i++;}
-  }
-  push();
-  return strokes;
-}
-
-// fit strokes into a box of half-size `half`, centred, y flipped (SVG y-down -> up), then offset to (0, cy)
-function fitStrokes(strokes,half,cy){
-  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
-  for(const s of strokes)for(const p of s){minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y);}
-  if(!isFinite(minx))return[];
-  const w=maxx-minx||1,h=maxy-miny||1,sc=(2*half)/Math.max(w,h),cx=(minx+maxx)/2,cyy=(miny+maxy)/2;
-  return strokes.map(s=>s.map(p=>({x:(p.x-cx)*sc,y:-(p.y-cyy)*sc+cy})));
-}
-
-function resample(stroke,step){
-  if(stroke.length<2)return stroke.slice();
-  const out=[stroke[0]];let acc=0;
-  for(let i=1;i<stroke.length;i++){let a=stroke[i-1],b=stroke[i];let d=Math.hypot(b.x-a.x,b.y-a.y);
-    while(acc+d>=step){const t=(step-acc)/d;a={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};out.push(a);d=Math.hypot(b.x-a.x,b.y-a.y);acc=0;}
-    acc+=d;}
-  out.push(stroke[stroke.length-1]);return out;
-}
-
-// Fourier: one continuous closed path from all strokes -> DFT -> reconstruct with N epicycles
+    else if(C==="C"){let p1={x:num(),y:num()},p2={x:num(),y:num()},p3={x:num(),y:num()};if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;p3.x+=x;p3.y+=y;}bez({x,y},p1,p2,p3);x=p3.x;y=p3.y;}
+    else if(C==="Q"){let p1={x:num(),y:num()},p2={x:num(),y:num()};if(rel){p1.x+=x;p1.y+=y;p2.x+=x;p2.y+=y;}quad({x,y},p1,p2);x=p2.x;y=p2.y;}
+    else if(C==="Z"){cur.push({x:sx,y:sy});x=sx;y=sy;push();cur=[];}else{i++;}}
+  push();return strokes;}
+function fitStrokes(strokes,half,cy){let a=1e9,b=1e9,c=-1e9,d=-1e9;for(const s of strokes)for(const p of s){a=Math.min(a,p.x);b=Math.min(b,p.y);c=Math.max(c,p.x);d=Math.max(d,p.y);}
+  if(!isFinite(a))return[];const w=c-a||1,h=d-b||1,sc=(2*half)/Math.max(w,h),cx=(a+c)/2,cyy=(b+d)/2;
+  return strokes.map(s=>s.map(p=>({x:(p.x-cx)*sc,y:-(p.y-cyy)*sc+cy})));}
+function resample(stroke,step){if(stroke.length<2)return stroke.slice();const out=[stroke[0]];let acc=0;
+  for(let i=1;i<stroke.length;i++){let a=stroke[i-1],b=stroke[i],d=Math.hypot(b.x-a.x,b.y-a.y);
+    while(acc+d>=step){const t=(step-acc)/d;a={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};out.push(a);d=Math.hypot(b.x-a.x,b.y-a.y);acc=0;}acc+=d;}out.push(stroke[stroke.length-1]);return out;}
 let fourierC=null;
-function buildFourier(strokes){
-  const pts=[];for(const s of strokes)for(const p of s)pts.push(p);
-  const N=Math.min(512,Math.max(64,pts.length));const z=[];
+function buildFourier(strokes){const pts=[];for(const s of strokes)for(const p of s)pts.push(p);const N=Math.min(512,Math.max(64,pts.length)),z=[];
   for(let k=0;k<N;k++){const p=pts[Math.floor(k/N*pts.length)];z.push({re:p.x,im:p.y});}
   const C=[];for(let k=0;k<N;k++){let re=0,im=0;for(let n=0;n<N;n++){const a=-2*Math.PI*k*n/N,c=Math.cos(a),s=Math.sin(a);re+=z[n].re*c-z[n].im*s;im+=z[n].re*s+z[n].im*c;}C.push({re:re/N,im:im/N,freq:k<=N/2?k:k-N});}
-  C.sort((a,b)=>Math.hypot(b.re,b.im)-Math.hypot(a.re,a.im));return C;
-}
-function fourierPoint(C,M,t){let re=0,im=0;const circ=[];let px=0,py=0;
-  for(let j=0;j<M&&j<C.length;j++){const c=C[j],a=2*Math.PI*c.freq*t;const nx=px+c.re*Math.cos(a)-c.im*Math.sin(a),ny=py+c.re*Math.sin(a)+c.im*Math.cos(a);
-    circ.push({x0:px,y0:py,x1:nx,y1:ny,r:Math.hypot(c.re,c.im)});px=nx;py=ny;}
-  return{x:px,y:py,circ};}
+  C.sort((a,b)=>Math.hypot(b.re,b.im)-Math.hypot(a.re,a.im));return C;}
+function fourierPoint(C,M,t){let px=0,py=0;const circ=[];for(let j=0;j<M&&j<C.length;j++){const c=C[j],a=2*Math.PI*c.freq*t;const nx=px+c.re*Math.cos(a)-c.im*Math.sin(a),ny=py+c.re*Math.sin(a)+c.im*Math.cos(a);circ.push({x0:px,y0:py,x1:nx,y1:ny,r:Math.hypot(c.re,c.im)});px=nx;py=ny;}return{x:px,y:py,circ};}
 
-// ---- build the toolpath + angles ----
+function tipErr(){return (S.link*2)*(S.res/R2D);} // mm, worst-case lever = La+Lb
+
 function build(){
-  let strokes=fitStrokes(presetStrokes(S.preset),S.size/2,S.cy);
+  const strokes=fitStrokes(presetStrokes(S.preset),drawR(),boardCY());
   seq=[];
-  if(S.fourier){
-    fourierC=buildFourier(strokes);
-    const M=S.terms,steps=720;let first=true;
-    for(let i=0;i<=steps;i++){const p=fourierPoint(fourierC,M,i/steps);seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}
-  } else {
-    fourierC=null;
-    for(const s of strokes){const rs=resample(s,2.0);let first=true;
-      for(const p of rs){seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}
-  }
-  angles=[];unreach=0;
-  for(const p of seq){const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);if(s)angles.push({t1:s.t1,t2:s.t2,ok:true});else{angles.push({t1:0,t2:0,ok:false});unreach++;}}
-  eraseSeq=null;
-  $("#r-n").textContent=seq.length;
-  $("#r-u").textContent=unreach;
-  const warn=unreach>0;
-  const rb=$("#reach");rb.textContent=warn?("out of reach: "+unreach):"reach: ok";rb.dataset.tone=warn?"warn":"";
-}
+  if(S.fourier){fourierC=buildFourier(strokes);let first=true;for(let i=0;i<=720;i++){const p=fourierPoint(fourierC,S.terms,i/720);seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}
+  else{fourierC=null;for(const s of strokes){const rs=resample(s,2.0);let first=true;for(const p of rs){seq.push({x:p.x,y:p.y,pen:first?0:1});first=false;}}}
+  angles=seq.map(p=>{const s=ik(p.x,p.y);return s?{a:s.alpha,b:s.beta,A:s.A,B:s.B,ok:true}:{ok:false};});
+  // dexterity + coverage over the drawing region
+  let mn=1,cov=true;for(const p of seq){const s=ik(p.x,p.y);if(!s){cov=false;mn=0;}else mn=Math.min(mn,s.dex);}
+  worstDex=mn;covered=cov;
+  const rb=$("#reach");rb.textContent=covered?"drawing reachable":"out of reach";rb.dataset.tone=covered?"ok":"warn";
+  const rd=$("#r-d");rd.textContent=worstDex.toFixed(2);rd.dataset.tone=worstDex>0.5?"ok":(worstDex>0.3?"warn":"stop");
+  const rc=$("#r-c");rc.textContent=covered?"yes":"no";rc.dataset.tone=covered?"ok":"stop";
+  const re=$("#r-err");const e=tipErr();re.textContent=e.toFixed(1)+" mm";re.dataset.tone=e<1?"ok":(e<2.5?"warn":"stop");}
+function buildErase(){let a=1e9,b=1e9,c=-1e9,d=-1e9;for(const p of seq){a=Math.min(a,p.x);b=Math.min(b,p.y);c=Math.max(c,p.x);d=Math.max(d,p.y);}
+  const pad=12,step=16,out=[];let y=d+pad,dir=1,first=true;while(y>=b-pad){const xs=dir>0?[a-pad,c+pad]:[c+pad,a-pad];out.push({x:xs[0],y,pen:first?0:1});out.push({x:xs[1],y,pen:1});first=false;dir*=-1;y-=step;}return out;}
 
-// erase toolpath: boustrophedon over the drawing bbox, pen flag 2 (eraser)
-function buildErase(){
-  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
-  for(const p of seq){minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y);}
-  const pad=10,step=12,out=[];let y=maxy+pad,dir=1,first=true;
-  while(y>=miny-pad){const xs=dir>0?[minx-pad,maxx+pad]:[maxx+pad,minx-pad];
-    out.push({x:xs[0],y,pen:first?0:2});out.push({x:xs[1],y,pen:2});first=false;dir*=-1;y-=step;}
-  return out;
-}
-
-// ---- rendering ----
-let scale=1,ox=0,oy=0,trace=[];
-function fit(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
-  cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-  const reach=S.L1+S.L2;scale=Math.min(r.width/(2.3*reach),r.height/(1.25*reach));
-  ox=r.width/2;oy=r.height*0.9;draw();}
+function fit(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  const topY=S.standoff+BOARD+40,halfX=H+70;scale=Math.min(r.width/(2*halfX),r.height/topY);ox=r.width/2;oy=r.height-16;draw();}
 function P(x,y){return[ox+x*scale,oy-y*scale];}
-
-function draw(){
-  const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);
-  // reach area (annulus)
-  if(S.showwork){const rin=Math.abs(S.L1-S.L2),rout=S.L1+S.L2;
-    ctx.fillStyle=css("--accent-wash");ctx.globalAlpha=.5;ctx.beginPath();
-    ctx.arc(ox,oy,rout*scale,0,2*Math.PI);ctx.arc(ox,oy,rin*scale,0,2*Math.PI,true);ctx.fill();ctx.globalAlpha=1;}
-  // trace drawn so far
-  ctx.lineWidth=2.2;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle=css("--ink-line");
-  ctx.beginPath();let penDown=false;
-  for(const s of trace){if(s.pen===1){const a=P(s.x0,s.y0),b=P(s.x,s.y);if(!penDown){ctx.moveTo(a[0],a[1]);penDown=true;}ctx.lineTo(b[0],b[1]);}else penDown=false;}
-  ctx.stroke();
-  // current pose
-  let pose=null;
-  if(anim.on){const cur=anim.mode==="erase"?eraseCur:angles[anim.i];pose=anim.mode==="erase"?eraseCur:angles[anim.i];}
-  else pose=angles.length?angles[angles.length-1]:null;
-  let penPt=null,t1=0,t2=0,penState=0;
-  if(anim.on&&anim.mode==="erase"&&eraseCur){t1=eraseCur.t1;t2=eraseCur.t2;penState=2;}
-  else if(pose&&pose.ok){t1=pose.t1;t2=pose.t2;penState=(anim.on?seq[anim.i].pen:(seq.length?seq[seq.length-1].pen:0));}
+let jitter=[];
+function draw(){const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);
+  // dexterity shading + reach (lens)
+  if(S.showdex){const n=24;for(let i=0;i<n;i++)for(let j=0;j<n;j++){const x=-H-20+(2*H+40)*(i+0.5)/n,y=S.standoff-20+(BOARD+40)*(j+0.5)/n;const s=ik(x,y);const p=P(x,y);const w=(2*H+40)/n*scale*0.95;
+    if(s){const hue=120*s.dex;ctx.fillStyle=`hsla(${hue},65%,50%,.26)`;ctx.fillRect(p[0]-w/2,p[1]-w/2,w,w);}}}
+  // board
+  const bl=P(-H,S.standoff),tr=P(H,S.standoff+BOARD);ctx.strokeStyle=css("--board-line");ctx.lineWidth=2;ctx.strokeRect(bl[0],tr[1],tr[0]-bl[0],bl[1]-tr[1]);
+  ctx.fillStyle=css("--ink-3");ctx.font="11px "+css("--display");ctx.fillText("35 cm",bl[0]+6,bl[1]-6);
+  // trace
+  ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle=css("--accent");
+  for(const s of trace){if(s.pen!==1)continue;ctx.lineWidth=1.2+s.pr/100*2.6;ctx.beginPath();const a=P(s.x0,s.y0),b=P(s.x,s.y);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
+  // pose
+  let pose=null,penState=0,tool=0;
+  if(anim.on&&anim.mode==="erase"){pose=eraseAng[Math.min(anim.i,eraseAng.length-1)];penState=eraseList[Math.min(anim.i,eraseList.length-1)].pen;tool=1;}
+  else{pose=anim.on?angles[anim.i]:(angles.length?angles[angles.length-1]:null);penState=anim.on&&pose&&pose.ok?seq[anim.i].pen:(seq.length?seq[seq.length-1].pen:0);}
   // epicycles
-  if(S.fourier&&S.showcircles&&fourierC&&anim.on){const tt=anim.i/(seq.length-1||1);const fp=fourierPoint(fourierC,S.terms,tt);
-    ctx.strokeStyle=css("--arm2");ctx.globalAlpha=.5;ctx.lineWidth=1;
-    for(const c of fp.circ){if(c.r*scale<1.5)continue;const a=P(c.x0,c.y0);ctx.beginPath();ctx.arc(a[0],a[1],c.r*scale,0,2*Math.PI);ctx.stroke();
-      const b=P(c.x1,c.y1);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}
-    ctx.globalAlpha=1;}
-  // the arm
-  const f=fk(t1,t2,S.L1,S.L2);
-  const base=P(0,0),elb=P(f.ex,f.ey),pen=P(f.px,f.py);
-  ctx.strokeStyle=css("--arm");ctx.lineWidth=7;ctx.lineCap="round";
-  ctx.beginPath();ctx.moveTo(base[0],base[1]);ctx.lineTo(elb[0],elb[1]);ctx.stroke();
-  ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(elb[0],elb[1]);ctx.lineTo(pen[0],pen[1]);ctx.stroke();
-  for(const[pt,rr]of[[base,7],[elb,5]]){ctx.fillStyle=css("--board");ctx.strokeStyle=css("--arm");ctx.lineWidth=3;
-    ctx.beginPath();ctx.arc(pt[0],pt[1],rr,0,2*Math.PI);ctx.fill();ctx.stroke();}
-  ctx.fillStyle=penState===1?css("--accent"):(penState===2?css("--warn"):css("--arm2"));
-  ctx.beginPath();ctx.arc(pen[0],pen[1],penState===1?5:4,0,2*Math.PI);ctx.fill();
-  // readout
-  $("#r-b").textContent=(((t1*R2D)%360+360)%360).toFixed(1);
-  $("#r-e").textContent=(t2*R2D).toFixed(1);
-  $("#r-p").textContent=penState===2?"erase":(penState===1?"down":"up");
-  $("#r-xy").textContent=Math.round(f.px)+", "+Math.round(f.py);
-}
+  if(S.fourier&&S.showcircles&&fourierC&&anim.on&&anim.mode==="draw"){const fp=fourierPoint(fourierC,S.terms,anim.i/(seq.length-1||1));ctx.strokeStyle=css("--arm2");ctx.globalAlpha=.5;ctx.lineWidth=1;for(const c of fp.circ){if(c.r*scale<1.5)continue;const a=P(c.x0,c.y0);ctx.beginPath();ctx.arc(a[0],a[1],c.r*scale,0,2*Math.PI);ctx.stroke();const b=P(c.x1,c.y1);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();}ctx.globalAlpha=1;}
+  // five-bar linkage
+  const d=S.base,Ax=-d/2,Bx=d/2;
+  if(pose&&pose.ok){const La=S.link;const ea=pose.A||{ex:Ax+La*Math.cos(pose.a),ey:La*Math.sin(pose.a)},eb=pose.B||{ex:Bx+La*Math.cos(pose.b),ey:La*Math.sin(pose.b)};
+    const f=fk5(pose);const base1=P(Ax,0),base2=P(Bx,0),elA=P(ea.ex,ea.ey),elB=P(eb.ex,eb.ey),pen=P(f.x,f.y);
+    ctx.strokeStyle=css("--arm");ctx.lineCap="round";ctx.lineWidth=6;
+    ctx.beginPath();ctx.moveTo(base1[0],base1[1]);ctx.lineTo(elA[0],elA[1]);ctx.lineTo(pen[0],pen[1]);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(base2[0],base2[1]);ctx.lineTo(elB[0],elB[1]);ctx.lineTo(pen[0],pen[1]);ctx.stroke();
+    // motor boxes at base
+    for(const bp of [base1,base2]){ctx.fillStyle=css("--arm2");ctx.fillRect(bp[0]-9,bp[1]-6,18,16);}
+    for(const[pt,rr]of[[elA,4],[elB,4]]){ctx.fillStyle=css("--bg");ctx.strokeStyle=css("--arm");ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(pt[0],pt[1],rr,0,2*Math.PI);ctx.fill();ctx.stroke();}
+    // pen marker + flip
+    const flip=anim.mode==="erase"?1:anim.flip,down=penState===1;
+    ctx.fillStyle=tool===1?css("--warn"):(down?css("--accent"):css("--arm2"));ctx.beginPath();ctx.arc(pen[0],pen[1],down?5:3.6,0,2*Math.PI);ctx.fill();
+    if(flip>0){ctx.strokeStyle=css("--warn");ctx.lineWidth=2;ctx.beginPath();ctx.arc(pen[0],pen[1],9,0,Math.PI*2*flip);ctx.stroke();}
+    $("#r-a").textContent=(((pose.a*R2D)%360+360)%360).toFixed(1);
+    $("#r-bb").textContent=(((pose.b*R2D)%360+360)%360).toFixed(1);
+    $("#r-p").textContent=anim.mode==="erase"?"eraser (flipped)":(down?("pen down "+S.pressure+"%"):"pen up");
+  }}
+// pen point from the two elbows (intersection of distal circles, upper branch)
+function fk5(pose){const d=S.base,La=S.link,Lb=S.link;const ea=pose.A,eb=pose.B;if(ea&&eb){return penFromElbows(ea.ex,ea.ey,eb.ex,eb.ey,Lb);}return{x:0,y:boardCY()};}
+function penFromElbows(ax,ay,bx,by,Lb){const dx=bx-ax,dy=by-ay,D=Math.hypot(dx,dy);if(D<1e-9||D>2*Lb)return{x:(ax+bx)/2,y:(ay+by)/2};
+  const a=D/2,h=Math.sqrt(Math.max(0,Lb*Lb-a*a)),mx=(ax+bx)/2,my=(ay+by)/2;
+  // choose the solution with larger y (pen above the base)
+  const s1={x:mx-h*dy/D,y:my+h*dx/D},s2={x:mx+h*dy/D,y:my-h*dx/D};return s1.y>=s2.y?s1:s2;}
 
-// ---- animation ----
-let eraseCur=null,eraseList=null;
-function tick(ts){
-  if(!anim.on){return;}
-  const dt=Math.min(0.05,(ts-anim.last)/1000||0);anim.last=ts;
-  const list=anim.mode==="erase"?eraseList:seq;
-  const ang=anim.mode==="erase"?eraseAng:angles;
-  // advance by distance
-  anim.acc+=S.speed*dt;
-  while(anim.acc>0&&anim.i<list.length-1){
-    const a=list[anim.i],b=list[anim.i+1],d=Math.hypot(b.x-a.x,b.y-a.y)||0.001;
+function tick(ts){if(!anim.on)return;const dt=Math.min(0.05,(ts-anim.last)/1000||0);anim.last=ts;
+  if(anim.mode==="erase"&&anim.flip<1){anim.flip=Math.min(1,anim.flip+dt/0.5);draw();requestAnimationFrame(tick);return;}
+  const list=anim.mode==="erase"?eraseList:seq;anim.acc+=S.speed*dt;
+  while(anim.acc>0&&anim.i<list.length-1){const a=list[anim.i],b=list[anim.i+1],d=Math.hypot(b.x-a.x,b.y-a.y)||0.001;
     if(anim.acc>=d){anim.acc-=d;anim.i++;
-      if(anim.mode==="draw"){const s=angles[anim.i];if(seq[anim.i].pen===1&&seq[anim.i-1]&&seq[anim.i-1].pen!==0){}
-        trace.push({x:seq[anim.i].x,y:seq[anim.i].y,x0:seq[anim.i-1].x,y0:seq[anim.i-1].y,pen:seq[anim.i].pen});}
-      else {eraseCur=eraseAng[anim.i];
-        // erase: remove trace near the eraser row
-        const ey=eraseList[anim.i].y;trace=trace.filter(s=>s.y>ey+8||s.y0>ey+8);}
-    } else break;
-  }
-  if(anim.mode==="erase")eraseCur=eraseAng[Math.min(anim.i,eraseAng.length-1)];
+      if(anim.mode==="draw"){if(seq[anim.i].pen===1){const j=S.showerr?tipErr()*0.5:0;trace.push({x:seq[anim.i].x+(Math.random()-0.5)*j,y:seq[anim.i].y+(Math.random()-0.5)*j,x0:seq[anim.i-1].x,y0:seq[anim.i-1].y,pen:1,pr:S.pressure});}}
+      else{const ey=eraseList[anim.i].y;trace=trace.filter(s=>s.y>ey+10||s.y0>ey+10);}
+    }else break;}
   draw();
-  if(anim.i>=list.length-1){anim.on=false;$("#run").hidden=false;$("#pause").hidden=true;
-    if(anim.mode==="erase"){trace=[];draw();}return;}
-  requestAnimationFrame(tick);
-}
-let eraseAng=[];
-function startDraw(){build();trace=[];anim={on:true,i:0,mode:"draw",last:performance.now(),acc:0};
-  $("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
-function startErase(){if(!seq.length)return;eraseList=buildErase();eraseAng=eraseList.map(p=>{const s=ik(p.x,p.y,S.L1,S.L2,S.elbow);return s?{t1:s.t1,t2:s.t2,ok:true}:{t1:0,t2:0,ok:false};});
-  anim={on:true,i:0,mode:"erase",last:performance.now(),acc:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
+  if(anim.i>=list.length-1){anim.on=false;$("#run").hidden=false;$("#pause").hidden=true;if(anim.mode==="erase"){trace=[];draw();}return;}
+  requestAnimationFrame(tick);}
+function startDraw(){build();trace=[];anim={on:true,i:0,mode:"draw",last:performance.now(),acc:0,flip:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
+function startErase(){if(!seq.length)return;eraseList=buildErase();eraseAng=eraseList.map(p=>{const s=ik(p.x,p.y);return s?{a:s.alpha,b:s.beta,A:s.A,B:s.B,ok:true}:{ok:false};});
+  anim={on:true,i:0,mode:"erase",last:performance.now(),acc:0,flip:0};$("#run").hidden=true;$("#pause").hidden=false;requestAnimationFrame(tick);}
+function streamJSON(){const path=seq.map((p,i)=>angles[i].ok?{a:+(((angles[i].a*R2D)%360+360)%360).toFixed(2),b:+(((angles[i].b*R2D)%360+360)%360).toFixed(2),lift:p.pen,pressure:p.pen?S.pressure:0}:{out_of_reach:true});
+  return JSON.stringify({mechanism:"five-bar",geom_mm:{base_width:S.base,La:S.link,Lb:S.link,standoff:S.standoff},board_mm:{w:BOARD,h:BOARD},
+    frame:"origin at base midpoint; x right, y up; motor angles degrees CCW from +x",lift:{up:0,down:1},flip_deg:180,feed_mm_s:S.speed,pressure_pct:S.pressure,
+    actuator_deg:S.res,est_tip_error_mm:+tipErr().toFixed(2),worst_dexterity:+worstDex.toFixed(3),reachable:covered,path},null,2);}
 
-// ---- angle stream export ----
-function streamJSON(){
-  const path=seq.map((p,i)=>({base:+(((angles[i].t1*R2D)%360+360)%360).toFixed(2),elbow:+(angles[i].t2*R2D).toFixed(2),pen:p.pen}));
-  return JSON.stringify({frame:"base at origin; x right, y up; degrees CCW from +x; elbow relative to link 1",
-    links_mm:{L1:S.L1,L2:S.L2},home:{base:90,elbow:0},pen:{up:0,down:1},feed_mm_s:S.speed,path},null,2);
-}
-
-// ---- wire up ----
-function bindRange(id,key,fmt){const el=$("#"+id),v=$("#"+id+"v");
-  el.addEventListener("input",()=>{S[key]=+el.value;if(v)v.textContent=fmt?fmt(+el.value):el.value;build();if(!anim.on){trace=[];draw();}});}
-bindRange("l1","L1");bindRange("l2","L2");bindRange("size","size");bindRange("cy","cy");bindRange("speed","speed");bindRange("terms","terms");
+function rebuild(){build();trace=[];anim.on=false;anim.flip=0;$("#run").hidden=false;$("#pause").hidden=true;draw();}
+function bindRange(id,key){const el=$("#"+id),v=$("#"+id+"v");el.addEventListener("input",()=>{S[key]=+el.value;if(v)v.textContent=el.value;rebuild();});}
+["link:link","base:base","standoff:standoff","fill:fill","pressure:pressure","speed:speed","terms:terms"].forEach(s=>{const[a,b]=s.split(":");bindRange(a,b);});
 $("#preset").addEventListener("change",e=>{S.preset=e.target.value;$("#custom-wrap").hidden=e.target.value!=="custom";rebuild();});
 $("#custom").addEventListener("input",e=>{S.custom=e.target.value;rebuild();});
+$("#res").addEventListener("change",e=>{S.res=+e.target.value;build();draw();});
 $("#fourier").addEventListener("change",e=>{S.fourier=e.target.checked;$("#fourier-wrap").hidden=!e.target.checked;rebuild();});
 $("#showcircles").addEventListener("change",e=>{S.showcircles=e.target.checked;});
-$("#elbow").addEventListener("change",e=>{S.elbow=e.target.checked;rebuild();});
-$("#showwork").addEventListener("change",e=>{S.showwork=e.target.checked;draw();});
-function rebuild(){build();trace=[];anim.on=false;$("#run").hidden=false;$("#pause").hidden=true;draw();}
+$("#showdex").addEventListener("change",e=>{S.showdex=e.target.checked;draw();});
+$("#showerr").addEventListener("change",e=>{S.showerr=e.target.checked;});
+$("#optimise").addEventListener("click",()=>{// small search: equal links covering the drawing with best worst-dexterity
+  build();let best={d:-1,L:S.link};for(let L=160;L<=340;L+=5){S.link=L;let mn=1,ok=true;for(const p of seq){const s=ik(p.x,p.y);if(!s){ok=false;break;}mn=Math.min(mn,s.dex);}if(ok&&mn>best.d)best={d:mn,L};}
+  S.link=best.d>0?best.L:240;$("#link").value=S.link;$("#linkv").textContent=S.link;rebuild();});
 $("#run").addEventListener("click",startDraw);
 $("#pause").addEventListener("click",()=>{anim.on=!anim.on;$("#pause").textContent=anim.on?"Pause":"Resume";if(anim.on){anim.last=performance.now();requestAnimationFrame(tick);}});
 $("#erase").addEventListener("click",startErase);
 $("#reset").addEventListener("click",rebuild);
 $("#copy").addEventListener("click",async()=>{const txt=streamJSON();try{await navigator.clipboard.writeText(txt);$("#copy").textContent="Copied ✓";}catch(e){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");$("#copy").textContent="Copied ✓";}catch(_){$("#copy").textContent="Copy failed";}ta.remove();}setTimeout(()=>$("#copy").textContent="Copy angle stream",1400);});
 
-// show the finished clock at rest, then let them press Draw
 build();
-// seed the trace with the full drawing so the first frame is complete
-for(let i=1;i<seq.length;i++)if(seq[i].pen===1)trace.push({x:seq[i].x,y:seq[i].y,x0:seq[i-1].x,y0:seq[i-1].y,pen:1});
+for(let i=1;i<seq.length;i++)if(seq[i].pen===1&&angles[i].ok)trace.push({x:seq[i].x,y:seq[i].y,x0:seq[i-1].x,y0:seq[i-1].y,pen:1,pr:S.pressure});
 new ResizeObserver(fit).observe(cv);
 fit();
 </script>
