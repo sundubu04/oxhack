@@ -61,20 +61,20 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
 <main class="page">
   <header>
     <h1>Drawing arm — build spec</h1>
-    <p class="sub">Serial two-link arm that draws a 20 cm clock centred on a 35 × 35 cm whiteboard, with a rolling-ball tip and a tilt marker. Sized for small motors. For 3D printing with motor slots.</p>
-    <p class="meta"><span>OxHack · hardware clock</span><span>v1 · check motor model before cutting slots</span><span><a href="https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k">live simulator</a></span></p>
+    <p class="sub">Serial two-link arm that draws a 20 cm clock centred on a 35 × 35 cm whiteboard, with a rolling-ball tip and a tilt marker. PLA links, 3× TowerPro SG92R servos. For 3D printing with motor slots.</p>
+    <p class="meta"><span>OxHack · hardware clock</span><span>v2 · PLA links, SG92R servos</span><span><a href="https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k">live simulator</a></span></p>
   </header>
 
   <div class="hero">
     <span class="small muted">The two numbers to print to</span>
-    <b>L1 = L2 = 200 mm</b>
-    <span class="small">axis-to-axis (shoulder→elbow and elbow→pen). Base pivot centred 90 mm below the board. 200 mm clock, centred on the board with ~7.5 cm of margin all round.</span>
+    <b>L1 = L2 = 180 mm</b>
+    <span class="small">axis-to-axis (shoulder→elbow and elbow→pen). Base pivot centred 40 mm below the board (a compact bracket). 200 mm clock, centred on the board with ~7.5 cm of margin all round.</span>
   </div>
 
   <section aria-label="Diagram">
     <h2>Dimensioned layout (front view, looking at the board)</h2>
     <div class="diagram">
-      <svg viewBox="0 0 520 560" role="img" aria-label="Front view: the two-link arm reaching a 200mm clock centred on a 350mm board, with link lengths 200mm each and a 90mm standoff">
+      <svg viewBox="0 0 520 560" role="img" aria-label="Front view: the two-link arm reaching a 200mm clock centred on a 350mm board, with link lengths 180mm each and a 40mm standoff">
         <!-- board -->
         <rect x="85" y="60" width="350" height="350" rx="4" fill="none" stroke="var(--line)" stroke-width="2"/>
         <text x="92" y="402" font-size="12" fill="var(--ink-3)" font-family="var(--display)">350 mm whiteboard — clock centred, margin all round</text>
@@ -83,29 +83,29 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
         <g stroke="var(--accent)" stroke-width="2"><line x1="260" y1="147" x2="260" y2="157"/><line x1="348" y1="235" x2="338" y2="235"/><line x1="260" y1="323" x2="260" y2="313"/><line x1="172" y1="235" x2="182" y2="235"/></g>
         <line x1="260" y1="235" x2="226" y2="187" stroke="var(--accent)" stroke-width="2.5"/>
         <line x1="260" y1="235" x2="316" y2="255" stroke="var(--accent)" stroke-width="2.5"/>
-        <!-- arm: base (260,500) -> elbow (330,312) -> pen (200,160) -->
-        <line x1="260" y1="500" x2="330" y2="312" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>
-        <line x1="330" y1="312" x2="200" y2="160" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>
-        <rect x="246" y="494" width="28" height="22" rx="3" fill="var(--ink-2)"/>
-        <circle cx="330" cy="312" r="6" fill="var(--bg)" stroke="var(--ink)" stroke-width="3"/>
+        <!-- arm: base (260,450) -> elbow (330,284) -> pen (200,160) -->
+        <line x1="260" y1="450" x2="330" y2="284" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>
+        <line x1="330" y1="284" x2="200" y2="160" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>
+        <rect x="246" y="444" width="28" height="22" rx="3" fill="var(--ink-2)"/>
+        <circle cx="330" cy="284" r="6" fill="var(--bg)" stroke="var(--ink)" stroke-width="3"/>
         <circle cx="200" cy="160" r="6" fill="var(--bg)" stroke="var(--ink-2)" stroke-width="2.5"/>
         <circle cx="200" cy="160" r="3.5" fill="var(--accent)"/>
         <!-- labels -->
-        <text x="252" y="524" font-size="12" fill="var(--ink-2)" text-anchor="end" font-family="var(--display)">base motor</text>
-        <text x="340" y="316" font-size="12" fill="var(--ink-2)" font-family="var(--display)">elbow</text>
+        <text x="252" y="474" font-size="12" fill="var(--ink-2)" text-anchor="end" font-family="var(--display)">base motor</text>
+        <text x="340" y="288" font-size="12" fill="var(--ink-2)" font-family="var(--display)">elbow</text>
         <text x="186" y="152" font-size="12" fill="var(--ink-2)" text-anchor="end" font-family="var(--display)">pen + ball</text>
         <!-- dims -->
         <g stroke="var(--dim)" stroke-width="1" fill="var(--dim)" font-family="var(--display)" font-size="12">
-          <line x1="248" y1="512" x2="312" y2="324" stroke-dasharray="3 3"/>
-          <text x="214" y="430" fill="var(--accent)" font-weight="600">L1 = 200</text>
-          <line x1="352" y1="300" x2="222" y2="148" stroke-dasharray="3 3"/>
-          <text x="244" y="216" fill="var(--accent)" font-weight="600">L2 = 200</text>
-          <!-- standoff 90 (board bottom 410 to base 500) -->
-          <line x1="410" y1="410" x2="410" y2="500"/>
-          <line x1="404" y1="410" x2="416" y2="410"/><line x1="404" y1="500" x2="416" y2="500"/>
-          <text x="420" y="458" fill="var(--ink-2)">90 mm</text>
+          <line x1="248" y1="462" x2="312" y2="296" stroke-dasharray="3 3"/>
+          <text x="214" y="392" fill="var(--accent)" font-weight="600">L1 = 180</text>
+          <line x1="352" y1="272" x2="222" y2="148" stroke-dasharray="3 3"/>
+          <text x="244" y="206" fill="var(--accent)" font-weight="600">L2 = 180</text>
+          <!-- standoff 40 (board bottom 410 to base 450) -->
+          <line x1="410" y1="410" x2="410" y2="450"/>
+          <line x1="404" y1="410" x2="416" y2="410"/><line x1="404" y1="450" x2="416" y2="450"/>
+          <text x="420" y="434" fill="var(--ink-2)">40 mm</text>
           <line x1="435" y1="410" x2="410" y2="410" stroke-dasharray="2 3"/>
-          <line x1="260" y1="500" x2="410" y2="500" stroke-dasharray="2 3"/>
+          <line x1="260" y1="450" x2="410" y2="450" stroke-dasharray="2 3"/>
           <!-- clock dia -->
           <line x1="160" y1="355" x2="360" y2="355"/>
           <line x1="160" y1="349" x2="160" y2="361"/><line x1="360" y1="349" x2="360" y2="361"/>
@@ -113,22 +113,23 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
         </g>
       </svg>
     </div>
-    <p class="small muted">Both links are the same length. The arm bends with the elbow near 90° across the clock (dexterity ≥ 0.43), well clear of the folded and stretched singularities. Reach is 400 mm; the clock needs ~365 mm of it, leaving margin.</p>
+    <p class="small muted">Both links are the same length. The arm bends with the elbow near 90° across the clock (dexterity ≥ 0.43), well clear of the folded and stretched singularities. Reach is 360 mm; the clock needs ~315 mm of it, leaving margin.</p>
   </section>
 
   <div class="two">
     <section>
       <h2>Key dimensions</h2>
       <div class="rows"><table>
-        <tr><td>Link 1 (shoulder→elbow)</td><td class="n">200 mm axis-to-axis</td></tr>
-        <tr><td>Link 2 (elbow→pen)</td><td class="n">200 mm axis-to-axis</td></tr>
-        <tr><td>Base pivot below board</td><td class="n">90 mm</td></tr>
+        <tr><td>Link 1 (shoulder→elbow)</td><td class="n">180 mm axis-to-axis</td></tr>
+        <tr><td>Link 2 (elbow→pen)</td><td class="n">180 mm axis-to-axis</td></tr>
+        <tr><td>Base pivot below board</td><td class="n">40 mm</td></tr>
         <tr><td>Clock drawn</td><td class="n">Ø 200 mm</td></tr>
-        <tr><td>Total reach (L1+L2)</td><td class="n">400 mm</td></tr>
-        <tr><td>Elbow angle range</td><td class="n">~48°–131°</td></tr>
-        <tr><td>Worst dexterity on clock</td><td class="n">0.75</td></tr>
-        <tr><td>Tip error (servo + 3:1)</td><td class="n">~0.7 mm</td></tr>
-        <tr><td>Link cross-section</td><td class="n">≥ 4 mm wall + rib</td></tr>
+        <tr><td>Total reach (L1+L2)</td><td class="n">360 mm</td></tr>
+        <tr><td>Elbow angle range</td><td class="n">~58°–143°</td></tr>
+        <tr><td>Worst dexterity on clock</td><td class="n">0.60</td></tr>
+        <tr><td>Tip error (SG92R bare)</td><td class="n">~6–7 mm (hand-drawn)</td></tr>
+        <tr><td>Link cross-section</td><td class="n">≥ 4 mm wall + box rib (PLA)</td></tr>
+        <tr><td>Motors</td><td class="n">3 × TowerPro SG92R</td></tr>
         <tr><td>Elbow bearing</td><td class="n">608 (8 × 22 × 7)</td></tr>
       </table></div>
     </section>
@@ -154,34 +155,37 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
     <h2>Parts to print / buy</h2>
     <div class="rows"><table>
       <tr><th>Part</th><th>Qty</th><th>Notes</th></tr>
-      <tr><td>Base block</td><td class="n">1</td><td>Holds the shoulder motor (and the elbow motor if base-driven). Bolt-down or clamp to the desk/board frame, centred, pivot 90 mm below the board</td></tr>
-      <tr><td>Link 1</td><td class="n">1</td><td>200 mm between axes; 4 mm wall + box rib; shoulder-end couples to the motor, elbow-end takes the 608 bearing</td></tr>
-      <tr><td>Link 2</td><td class="n">1</td><td>200 mm; elbow-end on the shared axis, tip-end carries the ball caster + tilt servo bracket</td></tr>
+      <tr><td>Base block</td><td class="n">1</td><td>Holds the shoulder motor (and the elbow motor if base-driven). Bolt-down or clamp to the desk/board frame, centred, pivot 40 mm below the board</td></tr>
+      <tr><td>Link 1</td><td class="n">1</td><td>180 mm between axes; 4 mm wall + box rib; shoulder-end couples to the motor, elbow-end takes the 608 bearing</td></tr>
+      <tr><td>Link 2</td><td class="n">1</td><td>180 mm; elbow-end on the shared axis, tip-end carries the ball caster + tilt servo bracket</td></tr>
       <tr><td>Elbow bearing + shaft</td><td class="n">1–2</td><td>608 (22 mm OD) press-fit bore; 8 mm shaft/bolt</td></tr>
       <tr><td>Ball transfer / caster</td><td class="n">1</td><td>10–14 mm ball; rides on the board, sets height</td></tr>
       <tr><td>Tilt servo + bracket</td><td class="n">1</td><td>SG90; swings the marker holder ±16°</td></tr>
       <tr><td>Marker holder (double-ended)</td><td class="n">1</td><td>Clamp for a whiteboard marker (~10–12 mm) with the eraser on the far end</td></tr>
-      <tr><td>Drive motors</td><td class="n">2</td><td>Shoulder + elbow. See the note below — slot size depends on the model</td></tr>
+      <tr><td>Drive servos (SG92R)</td><td class="n">2</td><td>Shoulder + elbow. Slot = 23 × 12.5 mm pocket, 27 mm deep; two M2 screws 32 mm apart through the mounting tabs; output spline on the joint axis</td></tr>
     </table></div>
   </section>
 
   <section>
-    <h2>Motor slots — confirm the model first</h2>
-    <div class="flag"><b>Cut the motor pockets to the actual motor you'll use.</b><span class="small">Tip error ≈ arm length × angular step, so for a clean clock use a geared stepper or a servo with reduction, not a bare SG90 on the joints. Here are the common footprints:</span></div>
+    <h2>SG92R motor slots &amp; torque</h2>
+    <p>Three TowerPro SG92R micro servos — shoulder, elbow and tilt. Same slot for all three.</p>
     <div class="rows"><table>
-      <tr><th>Motor</th><th>Body</th><th>Mount</th><th>Shaft / horn</th><th>For</th></tr>
-      <tr><td><b>NEMA17 stepper</b></td><td class="n">42.3 × 42.3 mm</td><td>31 mm bolt circle, 4× M3, 22 mm boss</td><td>5 mm D-shaft</td><td>Best accuracy (with GT2 belt reduction)</td></tr>
-      <tr><td><b>MG996R servo</b></td><td class="n">40.7 × 19.7 × 42.9 mm</td><td>tabs 49.5 mm span, 2× M3</td><td>25-tooth spline</td><td>Good with ~3:1 reduction</td></tr>
-      <tr><td><b>SG90 micro</b></td><td class="n">23 × 12.2 × 29 mm</td><td>tabs 32 mm span</td><td>~20-tooth spline</td><td>Tilt servo only (too coarse for the joints)</td></tr>
+      <tr><th>SG92R</th><th>Value</th></tr>
+      <tr><td>Body pocket</td><td class="n">23 × 12.2 × 27 mm (cut ~23.5 × 12.8 mm, 27 mm deep)</td></tr>
+      <tr><td>Mounting tabs</td><td class="n">span 32 mm; 2 × M2 holes (~2.2 mm)</td></tr>
+      <tr><td>Output shaft</td><td class="n">~4.8 mm spline, ~20T (takes SG90 horns)</td></tr>
+      <tr><td>Torque · speed · weight</td><td class="n">2.5 kg·cm @ 4.8 V · 0.1 s/60° · 9 g</td></tr>
     </table></div>
-    <p class="small muted">Recommended: two geared servos (or small steppers with a small belt reduction) at the shoulder and elbow, and one SG90 for the tilt. Minimum total = 3 motors.</p>
+    <p class="small">Orient each servo so its output shaft sits on the joint axis. Couple the link to the servo through a printed horn screwed to an SG90 arm — don't trust the spline friction alone. Leave a channel for the 3-wire lead.</p>
+    <div class="flag" style="border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)"><b style="color:var(--ok)">Torque is fine; accuracy is the limit.</b><span class="small">The ~60 g PLA arm needs ~0.9 kg·cm at the shoulder — 35% of the SG92R's 2.5 kg·cm stall on a vertical board, ~0.34 kg·cm at the elbow, trivial flat on a table. But bare SG92Rs give ~6–7 mm tip error, so the clock reads hand-drawn (fine for the Baas look). A 3:1 reduction later brings it to ~2 mm.</span></div>
   </section>
 
   <section>
     <h2>Print notes</h2>
     <ul>
       <li><b>Stiffness is accuracy.</b> Any flex in a link bends the whole lever, so give each link a box or I-beam rib, not a flat bar. PLA is fine; PETG if it'll sit in sun/heat.</li>
-      <li><b>Keep links light.</b> Low infill with a stiff shell lowers inertia and sag, which keeps the motor torque low — the whole point of the short arm.</li>
+      <li><b>Keep links light.</b> Low infill with a stiff shell lowers inertia and sag, which keeps the SG92R torque demand low (it's already only ~35% of stall). PLA flexes ~0.5 mm per link under load on a vertical board; the box rib cuts that.</li>
+      <li><b>Run flat on a table if you can.</b> Gravity then acts out of the drawing plane and the ball carries the tip, so the servos only fight friction — least sag, least drift, least torque.</li>
       <li><b>Joints:</b> press-fit the 608 at the elbow (bore ~21.8 mm, tune for your printer). Couple links to motor shafts with a printed horn to the spline (25T / 20T) or a clamp onto the 5 mm D-shaft — avoid relying on friction alone.</li>
       <li><b>Orientation:</b> print links flat so layers run along the length (resists bending); add chamfers at the joints to avoid layer splitting.</li>
       <li><b>Zero reference:</b> add a small hard stop or witness mark at each joint so the firmware can home to a known angle.</li>
@@ -191,12 +195,12 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
   <section>
     <h2>For the firmware</h2>
     <p class="small">The arm is controlled as a 2-link planar arm: base angle θ₁, elbow angle θ₂, plus the tilt. Origin at the base pivot, x right, y up, angles degrees CCW from +x, elbow relative to link 1.</p>
-    <pre><code>L1 = L2 = 200 mm
+    <pre><code>L1 = L2 = 180 mm
 // target pen (x,y) -> angles
-r = hypot(x,y);  if (r &gt; 400 || r &lt; 0) out_of_reach;
-c2 = (x*x + y*y - 200² - 200²) / (2*200*200);
+r = hypot(x,y);  if (r &gt; 360 || r &lt; 0) out_of_reach;
+c2 = (x*x + y*y - 180² - 180²) / (2*180*180);
 θ2 = atan2(+sqrt(1-c2²), c2);              // elbow up
-θ1 = atan2(y,x) - atan2(200*sin θ2, 200 + 200*cos θ2);
+θ1 = atan2(y,x) - atan2(180*sin θ2, 180 + 180*cos θ2);
 tilt_deg = { draw:-14, lift:-2, erase:+16 }</code></pre>
     <p class="small muted">The live <a href="https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k">simulator</a> exports the full angle stream for any drawing (Copy angle stream). Verified: forward∘inverse round-trips to ~1e-13 mm.</p>
   </section>

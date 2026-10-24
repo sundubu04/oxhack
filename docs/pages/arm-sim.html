@@ -95,7 +95,7 @@ summary{cursor:pointer;}
 <main class="page">
   <header>
     <h1>Clock arm simulator</h1>
-    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing a <b>20 cm clock centred</b> on your 35 × 35 cm whiteboard (the margin is deliberate). The pen tip rides on a <b>rolling ball</b> that holds a constant height, and the marker <b>tilts to lift, draw and erase</b> — no lift motor. With <b>200 mm links</b> and the base ~90 mm below the board, the clock sits right in the arm's sweet spot. Read the base and elbow angles, dexterity and tip error live.</p>
+    <p class="lede">A <b>two-link arm</b> — a <b>base</b> joint and an <b>elbow</b> joint, two arms in series — drawing a <b>20 cm clock centred</b> on your 35 × 35 cm whiteboard (the margin is deliberate). The pen tip rides on a <b>rolling ball</b> that holds a constant height, and the marker <b>tilts to lift, draw and erase</b> — no lift motor. With <b>180 mm links</b> and the base just <b>40 mm below the board</b> (a compact mount), the clock sits in a well-conditioned band — dexterity ~0.60. Read the base and elbow angles, dexterity and tip error live.</p>
     <p class="meta"><span>OxHack · hardware clock</span><span>Board 350 × 350 mm</span><span>Serial 2-link arm + rolling-ball tip</span><span>Output: base°, elbow°, tilt, pressure</span></p>
   </header>
 
@@ -127,15 +127,15 @@ summary{cursor:pointer;}
         <div class="ctl" id="custom-wrap" hidden><label for="custom">Vectors in — what "ask Claude" returns</label>
           <textarea id="custom" placeholder='M10 10 L90 10 L50 90 Z   or   [[[10,10],[90,10],[50,90]]]'></textarea></div>
         <div class="row2">
-          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">200</span></label><input type="range" id="l1" min="80" max="340" value="200"></div>
-          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">200</span></label><input type="range" id="l2" min="80" max="340" value="200"></div>
+          <div class="ctl"><label for="l1">Link 1 (base) mm<span class="v" id="l1v">180</span></label><input type="range" id="l1" min="80" max="340" value="180"></div>
+          <div class="ctl"><label for="l2">Link 2 (elbow) mm<span class="v" id="l2v">180</span></label><input type="range" id="l2" min="80" max="340" value="180"></div>
         </div>
-        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">90</span></label><input type="range" id="standoff" min="0" max="240" value="90"></div>
+        <div class="ctl"><label for="standoff">Base below board mm<span class="v" id="standoffv">40</span></label><input type="range" id="standoff" min="0" max="240" value="40"></div>
         <button id="optimise" style="justify-self:start">Optimise links for this clock</button>
         <div class="ctl"><label for="fill">Clock size on board<span class="v" id="fillv">57</span></label><input type="range" id="fill" min="30" max="98" value="57"></div>
         <div class="ctl"><label for="pressure">Pen pressure (tilt firmness)<span class="v" id="pressurev">60</span></label><input type="range" id="pressure" min="0" max="100" value="60"></div>
         <div class="ctl"><label for="res">Actuator (sets tip error)</label>
-          <select id="res"><option value="1">Hobby servo (~1°)</option><option value="0.3">Digital metal-gear (~0.3°)</option><option value="0.1">Servo + 3:1 reduction (~0.1°)</option><option value="0.045">Stepper + microstep + belt (~0.05°)</option></select></div>
+          <select id="res"><option value="1">Hobby servo (~1°)</option><option value="0.33">SG92R + 3:1 reduction (~0.33°)</option><option value="0.11">SG92R + 9:1 reduction (~0.11°)</option><option value="0.045">Stepper + microstep + belt (~0.05°)</option></select></div>
         <div class="ctl"><label for="speed">Draw speed mm/s<span class="v" id="speedv">160</span></label><input type="range" id="speed" min="20" max="500" value="160"></div>
         <label class="toggle"><input type="checkbox" id="fourier"> Fourier mode (epicycles)</label>
         <div class="ctl" id="fourier-wrap" hidden><label for="terms">Fourier terms<span class="v" id="termsv">40</span></label><input type="range" id="terms" min="2" max="120" value="40">
@@ -149,20 +149,20 @@ summary{cursor:pointer;}
   </section>
 
   <section aria-labelledby="h-opt">
-    <h2 id="h-opt">200 mm links — mount the base to match</h2>
-    <p>With 200 mm links drawing a centred 200 mm clock, the one thing to get right is <b>how far below the board the base sits</b>: too close and the clock's bottom edge folds the elbow near its singularity; too far and the top edge over-stretches it. There's a sweet spot where the whole clock sits in the arm's best-conditioned band:</p>
+    <h2 id="h-opt">Compact build: 180 mm links, base 40 mm below</h2>
+    <p>Keeping the links under 20 cm and the base close to the board (a small bracket, not a tall stand) means accepting a bit less dexterity — which is fine. With <b>180 mm links and the base 40 mm below the board</b>, the centred 200 mm clock draws at worst-case dexterity 0.60, elbow 58°–143°, reach 360 mm. How the standoff trades against dexterity for 180 mm links:</p>
     <div class="rows">
       <table>
-        <thead><tr><th>Base below board</th><th>Worst dexterity on clock</th><th>Elbow range</th><th>Note</th></tr></thead>
+        <thead><tr><th>Base below board</th><th>Worst dexterity</th><th>Elbow range</th><th>Note</th></tr></thead>
         <tbody>
-          <tr><td class="n">30 mm</td><td class="n">0.51</td><td>81°–150°</td><td>clock too near the base — folded</td></tr>
-          <tr><td class="n">60 mm</td><td class="n">0.64</td><td>63°–140°</td><td>good</td></tr>
-          <tr data-pick><td class="n">90 mm</td><td class="n">0.75</td><td>48°–131°</td><td>sweet spot — best conditioning</td></tr>
-          <tr><td class="n">120 mm</td><td class="n">0.31</td><td>35°–118°</td><td>far edge over-stretched</td></tr>
+          <tr><td class="n">20 mm</td><td class="n">0.51</td><td>64°–149°</td><td>base flush; near edge folds</td></tr>
+          <tr data-pick><td class="n">40 mm</td><td class="n">0.60</td><td>58°–143°</td><td>compact and well-conditioned</td></tr>
+          <tr><td class="n">60 mm</td><td class="n">0.69</td><td>43°–136°</td><td>best for 180 mm links, if you can drop 2 cm more</td></tr>
+          <tr><td class="n">80 mm</td><td class="n">0.33</td><td>—</td><td>far edge over-stretched</td></tr>
         </tbody>
       </table>
     </div>
-    <p><b>Recommendation: L1 = L2 = 200 mm, base 90 mm below the board, 200 mm clock centred.</b> That puts worst-case dexterity at 0.75 (elbow 48°–131°) — better-conditioned than a shorter arm, with 400 mm of reach to spare. The cost of the longer links is a bit more tip error (longer lever) and ~64% of a whole-board arm's torque, so still use geared servos or steppers. The spec sheet has the print dimensions.</p>
+    <p><b>Recommendation: L1 = L2 = 180 mm, base 40 mm below the board, 200 mm clock centred.</b> Compact (a 4 cm bracket), links under 20 cm, dexterity 0.60 — plenty for a hand-drawn clock. Equal links are optimal. If you can mount the base 6 cm below instead of 4, dexterity rises to 0.69 for free. The spec sheet has the print dimensions.</p>
   </section>
 
   <section aria-labelledby="h-mech">
@@ -212,21 +212,32 @@ dexterity = |sin θ₂|;  best at θ₂ = ±90°, zero at 0° and 180°.</code><
   </section>
 
   <section aria-labelledby="h-feas">
-    <h2 id="h-feas">Is it accurate enough on a 35 cm board?</h2>
-    <div class="verdict"><b>Yes for a loose, hand-drawn look; borderline for a crisp clock with bare hobby servos.</b>
-      <p>Tip error is <code>lever × servo step</code>, and a 250 mm arm has a long lever, so a small angle error becomes millimetres at the pen:</p></div>
+    <h2 id="h-feas">Your real hardware: 2 × SG92R + PLA</h2>
+    <div class="verdict"><b>It works — torque is fine, and it draws a hand-drawn clock (not a crisp one).</b>
+      <p>With bare TowerPro SG92R servos (2.5 kg·cm, ~1° effective resolution) and PLA links, the physics say: plenty of torque, a few millimetres of positional wobble.</p></div>
     <div class="rows">
       <table>
-        <thead><tr><th>Actuator</th><th>Angle step</th><th>Tip error @ 300 mm lever</th><th>Good for</th></tr></thead>
+        <thead><tr><th>Torque (SG92R stall 2.5 kg·cm)</th><th>Demand</th><th>Headroom</th></tr></thead>
         <tbody>
-          <tr><td>Hobby servo (SG90)</td><td class="n">~1°</td><td class="n">~5.2 mm</td><td>loose line art only</td></tr>
-          <tr><td>Digital metal-gear (MG996R)</td><td class="n">~0.3°</td><td class="n">~1.6 mm</td><td>chunky clock, wobbly detail</td></tr>
-          <tr data-pick><td>Servo + 3:1 belt/gear reduction</td><td class="n">~0.1°</td><td class="n">~0.5 mm</td><td>a clean, readable clock</td></tr>
-          <tr><td>Stepper + microstep + belt</td><td class="n">~0.05°</td><td class="n">~0.2 mm</td><td>crisp, best repeatability</td></tr>
+          <tr><td>Shoulder, vertical board, arm out</td><td class="n">0.9 kg·cm</td><td class="n">35% of stall ✓</td></tr>
+          <tr><td>Elbow</td><td class="n">0.34 kg·cm</td><td class="n">14% of stall ✓</td></tr>
+          <tr data-pick><td>Flat on a table</td><td class="n">friction only</td><td class="n">trivial ✓</td></tr>
         </tbody>
       </table>
     </div>
-    <p>The board size is fine — the limit is the <b>actuator</b>. For a Maarten-Baas clock use <b>belt/gear reduction or steppers</b>. The rolling ball only fixes the <b>height</b> (Z) — consistent contact, pressure and no skipping — it does <b>not</b> fix the X-Y error above, which comes from the joint angles. Other mitigations: draw <b>flat on a table</b> (gravity only adds droop, not sag), keep the drawing in the dexterous band (near the singularity both error and joint speed amplify ~2.5×), and add a <b>camera closed-loop</b> if you want crisp lines from cheap servos.</p>
+    <p class="small muted">Arm mass ~60 g of PLA + servos. On a vertical board the shoulder holds about a third of its stall torque — fine. Flat on a table, gravity is out of plane and the ball carries the tip, so the motors only fight friction.</p>
+    <div class="rows">
+      <table>
+        <thead><tr><th>Actuator on the joints</th><th>Resolution</th><th>Tip error (360 mm lever)</th><th>Look</th></tr></thead>
+        <tbody>
+          <tr data-pick><td><b>SG92R, bare (your parts)</b></td><td class="n">~1°</td><td class="n">~6–7 mm</td><td>loose, hand-drawn</td></tr>
+          <tr><td>SG92R + 3:1 reduction</td><td class="n">~0.33°</td><td class="n">~2 mm</td><td>chunky clock</td></tr>
+          <tr><td>SG92R + 9:1 reduction</td><td class="n">~0.11°</td><td class="n">~0.7 mm</td><td>clean, readable</td></tr>
+          <tr><td>Stepper + microstep + belt</td><td class="n">~0.05°</td><td class="n">~0.3 mm</td><td>crisp</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>So the SG92Rs give a <b>~6–7 mm hand-drawn wobble</b> — which looks right for a Maarten-Baas clock, so lean into it rather than fight it. Turn on <b>Show tip-error wobble</b> above to see it. PLA links flex ~0.5 mm each under load on a vertical board (rib them and it's less; negligible flat on a table). The rolling ball fixes the <b>height</b> only — it keeps pressure even and stops skipping, but doesn't touch the X-Y wobble. For crisp lines later, add a small <b>reduction</b> (even 3:1 halves the error), and <b>run flat on a table</b> to drop torque, sag and any gravity drift.</p>
   </section>
 
   <section aria-labelledby="h-front">
@@ -250,7 +261,7 @@ function ik(x,y,L1,L2,up){const r2=x*x+y*y,r=Math.sqrt(r2);
   const s2=Math.sqrt(1-c2*c2)*(up?1:-1),t2=Math.atan2(s2,c2);
   return{t1:Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2),t2,dex:Math.sqrt(1-c2*c2)};}
 
-const S={L1:200,L2:200,standoff:90,fill:57,pressure:60,res:0.1,speed:160,preset:"clock",
+const S={L1:180,L2:180,standoff:40,fill:57,pressure:60,res:1,speed:160,preset:"clock",
   fourier:false,terms:40,showcircles:true,elbow:true,showdex:true,showerr:false,custom:""};
 let seq=[],angles=[],worstDex=0,covered=true;
 let anim={on:false,i:0,mode:"draw",last:0,acc:0,flip:0};
