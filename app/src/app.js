@@ -1,4 +1,4 @@
-// Clockwork: talk to a drawing arm. Each simulation is a whiteboard you change by chatting: ask for a drawing, an
+// Clockedin: talk to a drawing arm. Each simulation is a whiteboard you change by chatting: ask for a drawing, an
 // edit, or a game. Every change is planned as the difference from what is already on the board (optimize.js):
 // only what changed is wiped and drawn, in the order the sim times as fastest. The sim plays it to scale through
 // the servos' limits, and the real arm gets the same commands.
@@ -45,7 +45,7 @@ const hhmm = (t) => `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinu
 let cfg = withDefaults({}), g = geomFrom(cfg);
 let board, sim, setupBoard, setupSim, v3 = null, inkDirty = true;
 let services = { gemini: { ready: false, model: "" }, voice: { provider: "browser" } };
-const S = load("clockwork.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
+const S = load("clockedin.prefs", { narrate: false, physics: true, reach: true, voice: "", follow: true });
 let sims = [], doc = null;           // the saved simulations, and the open one
 let scene = emptyScene();            // what should be on the board
 let boardStrokes = [];               // what is on it once the current job finishes (board mm)
@@ -111,7 +111,7 @@ async function enter(s) {
   sim.reset();
   renderTitle(); renderThread(); renderPicture(); renderAngles(); renderPlanEmpty();
   $("#empty").hidden = !!(scene.items.length || scene.game);
-  syncTransport(); syncLive(true); draw(); try { localStorage.setItem("clockwork.open", doc.id); } catch (e) {}
+  syncTransport(); syncLive(true); draw(); try { localStorage.setItem("clockedin.open", doc.id); } catch (e) {}
 }
 // before leaving a simulation, finish what is drawing and keep the board as it ends
 async function leaveSim() { if (!doc) return; finishJob(); clearTimeout(saveTimer); await saveNow(); }
@@ -449,7 +449,7 @@ function syncSend() {
   b.classList.toggle("dl-btn--primary", next); b.classList.toggle("dl-btn--secondary", !next);
 }
 async function connectArm() {
-  try { await arm.connect(); setArm(true); toast(arm.version() >= 2 ? "Arm connected" : "Arm connected, but it didn't answer as Clockwork firmware"); arm.jog(homePose(g), g); }
+  try { await arm.connect(); setArm(true); toast(arm.version() >= 2 ? "Arm connected" : "Arm connected, but it didn't answer as Clockedin firmware"); arm.jog(homePose(g), g); }
   catch (e) { if (e.name !== "NotFoundError") toast(e.message, "circle-alert"); }
 }
 // the arm runs exactly the job the sim is running
@@ -629,11 +629,11 @@ function movePalette(d) {
 function runPalette(i = palIndex) { const c = palItems[i]; if (!c) return; $("#palette").close(); c.run(); }
 
 // ---------- toggles ----------
-function togglePhysics() { S.physics = !S.physics; store("clockwork.prefs", S); sim.physics = S.physics; $("#sw-physics").setAttribute("aria-checked", String(S.physics)); if (active) seek(sim.t); }
-function toggleReach() { S.reach = !S.reach; store("clockwork.prefs", S); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); draw(); }
-function toggleFollow() { S.follow = !S.follow; store("clockwork.prefs", S); $("#sw-follow").setAttribute("aria-checked", String(S.follow)); }
+function togglePhysics() { S.physics = !S.physics; store("clockedin.prefs", S); sim.physics = S.physics; $("#sw-physics").setAttribute("aria-checked", String(S.physics)); if (active) seek(sim.t); }
+function toggleReach() { S.reach = !S.reach; store("clockedin.prefs", S); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); draw(); }
+function toggleFollow() { S.follow = !S.follow; store("clockedin.prefs", S); $("#sw-follow").setAttribute("aria-checked", String(S.follow)); }
 function toggleNarrate() {
-  S.narrate = !S.narrate; store("clockwork.prefs", S);
+  S.narrate = !S.narrate; store("clockedin.prefs", S);
   const b = $("#narrate"); b.setAttribute("aria-pressed", String(S.narrate)); setIcon(b, S.narrate ? "volume-2" : "volume-x");
   b.title = b.ariaLabel = S.narrate ? "Arm speaks: on" : "Arm speaks: off";
   if (S.narrate) voice.say("I'll talk you through each change.", { voice: S.voice || undefined });
@@ -688,7 +688,7 @@ function wire() {
   $("#sw-follow").addEventListener("click", toggleFollow);
   $("#narrate").addEventListener("click", toggleNarrate);
   $("#send").addEventListener("click", () => { if (sending) { sending.abort(); pause(); return; } arm.connected() ? sendToArm() : connectArm(); });
-  $("#download").addEventListener("click", () => arm.download(stream(), `clockwork-${(doc?.title || "change").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.json`));
+  $("#download").addEventListener("click", () => arm.download(stream(), `clockedin-${(doc?.title || "change").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.json`));
   $("#copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(JSON.stringify(stream(), null, 2)); toast("Angles copied"); } catch (e) { toast("The browser would not copy. Use the download instead.", "circle-alert"); }
   });
@@ -708,8 +708,8 @@ function wire() {
   $("#nav-open").addEventListener("click", () => $("#app").toggleAttribute("data-nav-open"));
   $(".dl-scrim").addEventListener("click", () => $("#app").removeAttribute("data-nav-open"));
   addEventListener("hashchange", () => showPage(location.hash.slice(1)));
-  document.addEventListener("change", (e) => { if (e.target.id === "voice-id") { S.voice = e.target.value.trim(); store("clockwork.prefs", S); } });
-  document.addEventListener("click", (e) => { if (e.target.closest("#voice-test")) voice.say("Hello. I'm the Clockwork arm, and this is how I sound.", { voice: ($("#voice-id").value || "").trim() || undefined }); });
+  document.addEventListener("change", (e) => { if (e.target.id === "voice-id") { S.voice = e.target.value.trim(); store("clockedin.prefs", S); } });
+  document.addEventListener("click", (e) => { if (e.target.closest("#voice-test")) voice.say("Hello. I'm the Clockedin arm, and this is how I sound.", { voice: ($("#voice-id").value || "").trim() || undefined }); });
   document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); } });
   $("#palette-input").addEventListener("input", renderPalette);
   $("#palette-input").addEventListener("keydown", (e) => {
@@ -752,7 +752,7 @@ async function start() {
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
   wire(); renderServices(); refreshStatus(); setInterval(refreshStatus, 60000);
   await listSims();
-  let want = params.get("sim"); try { want ||= localStorage.getItem("clockwork.open"); } catch (e) {}
+  let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];
   if (pick && !params.has("fresh")) await openSim(pick.id); else await newSim({ focus: false });
   showPage(location.hash.slice(1));

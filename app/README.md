@@ -1,4 +1,4 @@
-# Clockwork
+# Clockedin
 
 Control app for the OxHack drawing arm. Each **simulation** is a whiteboard you change by chatting: ask for a
 drawing, change it ("make the cat grumpy"), clear it, or play noughts and crosses. Every change is planned as the
@@ -69,7 +69,7 @@ or by hand. The numbers in it now are the design ones (`"measured": false`); sav
 
 ## The arm over USB
 
-An Arduino Uno or Nano runs `firmware/clockwork` and drives the servos; the app streams timed keyframes and the
+An Arduino Uno or Nano runs `firmware/clockedin` and drives the servos; the app streams timed keyframes and the
 board moves between them on its own 20 ms servo frame. **Connect arm** finds it, dragging the pen on the board moves
 the real arm, **Send to arm** draws the plan while the sim plays alongside, and the same button stops it. Wiring,
 the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](../docs/hardware-link.md).
@@ -92,7 +92,7 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `src/pathplan.js` | fit, order, resample; the eraser's zigzag |
 | `src/svg.js`, `src/vectorize.js` | SVG to polylines; raster to polylines |
 | `src/voice.js`, `src/arm.js` | speech in and out; Web Serial, keyframes and flow control (protocol 2) |
-| `../firmware/clockwork` | the Arduino sketch (Uno or Nano) |
+| `../firmware/clockedin` | the Arduino sketch (Uno or Nano) |
 | `server.mjs`, `lib/gemini.mjs` | dev server holding the keys; Gemini drawing, image and voice calls |
 | `test.mjs` | `node test.mjs`: IK, parsing, planning and the sim |
 | `tools/compare-servos.mjs` | the clock under each servo model, side by side |

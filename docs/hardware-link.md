@@ -1,14 +1,14 @@
 # Connecting the arm: Arduino, and where a Pi fits
 
-**Recommendation:** an Arduino Uno or Nano drives the three servos, plugged by USB into the laptop running Clockwork.
+**Recommendation:** an Arduino Uno or Nano drives the three servos, plugged by USB into the laptop running Clockedin.
 The app plans everything and streams timed keyframes; the Arduino does only the real-time part, moving the servos
 between keyframes on its own 20 ms clock. Add a Raspberry Pi only if the arm must run without a laptop.
 
 ```
-Laptop (Chrome, Clockwork, node server.mjs)
+Laptop (Chrome, Clockedin, node server.mjs)
    │  USB serial, 115200 baud, protocol 2: timed keyframes, flow-controlled
    ▼
-Arduino Uno / Nano (firmware/clockwork)   ── D9 base · D10 elbow · D11 tilt ──▶  3 × SG92R
+Arduino Uno / Nano (firmware/clockedin)   ── D9 base · D10 elbow · D11 tilt ──▶  3 × SG92R
    ▲                                                                              ▲
    └── powered by USB                                   5 V servo supply ─────────┘  (shared ground)
 ```
@@ -38,13 +38,13 @@ latency each way; the buffer stayed full, never overflowed and never ran dry. Th
 - A large electrolytic capacitor across the servo supply, close to the servos, smooths the current spikes when they start moving.
 - Plug the servo supply in after the Arduino is running: at start the firmware sends every servo to the park pose.
 
-## Protocol 2 (firmware/clockwork/clockwork.ino)
+## Protocol 2 (firmware/clockedin/clockedin.ino)
 
 One line each way, angles in centi-degrees of servo travel (0 to 18000), times in ms from the start.
 
 | App sends | Board answers | Meaning |
 |---|---|---|
-| `?` | `CLOCKWORK 2 48` | handshake: protocol and buffer size |
+| `?` | `CLOCKEDIN 2 48` | handshake: protocol and buffer size |
 | `K <t> <base> <elbow> <tilt>` | `F <free>` | one keyframe; the reply says how many slots are free |
 | `G` | `RUN` | start the clock (the app sends it once 12 keyframes are buffered) |
 | `E` | `DONE` when finished | no more keyframes |
@@ -62,14 +62,14 @@ A board that doesn't answer `?` gets protocol 1: plain `base,elbow,tilt,pressure
 ## Bring-up
 
 ```
-arduino-cli compile --fqbn arduino:avr:uno firmware/clockwork        # arduino:avr:nano for a Nano
+arduino-cli compile --fqbn arduino:avr:uno firmware/clockedin        # arduino:avr:nano for a Nano
 arduino-cli board list                                                # find the port, e.g. /dev/cu.usbmodem1101
-arduino-cli upload -p /dev/cu.usbmodem1101 --fqbn arduino:avr:uno firmware/clockwork
+arduino-cli upload -p /dev/cu.usbmodem1101 --fqbn arduino:avr:uno firmware/clockedin
 ```
 
-1. Open the Serial Monitor at 115200, type `?`: it should answer `CLOCKWORK 2 48`.
+1. Open the Serial Monitor at 115200, type `?`: it should answer `CLOCKEDIN 2 48`.
 2. `J 9000 9000 9000` puts every servo at the middle of its travel. Note where each link points.
-3. In Clockwork's Arm setup, set each servo's zero offset and direction so the sim's pose matches the real one; set the real link lengths and board position. Save.
+3. In Clockedin's Arm setup, set each servo's zero offset and direction so the sim's pose matches the real one; set the real link lengths and board position. Save.
 4. If a servo doesn't reach its ends, change its `US_MIN` / `US_MAX` pulse widths at the top of the sketch (the defaults are the Servo library's, 544 to 2400 µs).
 5. In Studio, Connect arm, then drag the pen on the board: the real arm should follow. Then draw a sample and Send to arm.
 
@@ -106,7 +106,7 @@ What to do with the motors, in order:
 
 ## On a Raspberry Pi (the team's choice)
 
-The Pi runs Clockwork itself (`node server.mjs`), and anyone on the same Wi-Fi opens the app from a laptop or
+The Pi runs Clockedin itself (`node server.mjs`), and anyone on the same Wi-Fi opens the app from a laptop or
 phone. The servos need pulses with exact widths; Linux can't time those from ordinary GPIO code, so something
 has to make them in hardware. A handwritten look is fine, so any of these is good enough:
 

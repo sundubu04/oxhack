@@ -1,4 +1,4 @@
-// Talk to the arm over USB (Web Serial, Chrome on localhost). The Arduino firmware in firmware/clockwork speaks
+// Talk to the arm over USB (Web Serial, Chrome on localhost). The Arduino firmware in firmware/clockedin speaks
 // protocol 2: the app streams timed keyframes ahead of time and the board moves the servos between them on its
 // own 20 ms frame, so browser timing never reaches the line. A board that doesn't answer the handshake gets
 // protocol 1: one "base,elbow,tilt,pressure" line per waypoint, paced by the app.
@@ -44,7 +44,7 @@ export async function connect(baud = 115200) {
   // an Uno resets when the port opens; give it time to boot before the handshake
   await new Promise((r) => setTimeout(r, 1800));
   await write("?");
-  const hello = await expect((l) => l.startsWith("CLOCKWORK"), 1500);
+  const hello = await expect((l) => l.startsWith("CLOCKEDIN"), 1500);
   protocol = hello ? Number(hello.split(" ")[1]) || 2 : 1;
   slots = hello ? Number(hello.split(" ")[2]) || 48 : 0;
   return protocol;
@@ -125,7 +125,7 @@ export function jog(j, g) {
   write(`J ${cd("base", j.base)} ${cd("elbow", j.elbow)} ${cd("tilt", j.tilt)}`);
 }
 
-export function download(streamObj, name = "clockwork-angles.json") {
+export function download(streamObj, name = "clockedin-angles.json") {
   const blob = new Blob([JSON.stringify(streamObj, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();

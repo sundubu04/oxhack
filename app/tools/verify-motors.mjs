@@ -1,5 +1,5 @@
 // Is the sim what the motors get? Builds real jobs, turns them into the keyframes the Arduino receives, replays
-// those through the firmware's own 50 Hz interpolation (a line-for-line copy of frame() in clockwork.ino), and
+// those through the firmware's own 50 Hz interpolation (a line-for-line copy of frame() in clockedin.ino), and
 // compares every servo command with what the sim commands at the same moment. node tools/verify-motors.mjs
 import { readFileSync } from "node:fs";
 import { geomFrom, withDefaults, servoAngle } from "../src/config.js";

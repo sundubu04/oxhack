@@ -1,4 +1,4 @@
-<title>Clockwork results</title>
+<title>Clockedin results</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,9 +87,9 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 
 <main class="page">
   <header>
-    <h1>Clockwork results</h1>
+    <h1>Clockedin results</h1>
     <p class="answer">Changing what's on the board now takes 55% to 95% less time than wiping it and drawing everything again, and the board always ends up right. What the simulation plays is what the motors get, to within 0.15°. Better drawings need Gemini's stronger models, which today's free quota doesn't cover.</p>
-    <p class="meta"><span>OxHack · Clockwork</span><span>24 Oct 2026</span><span>Measured in the sim; the arm isn't built yet</span></p>
+    <p class="meta"><span>OxHack · Clockedin</span><span>24 Oct 2026</span><span>Measured in the sim; the arm isn't built yet</span></p>
   </header>
 
   <section aria-labelledby="h-fig">
@@ -181,7 +181,7 @@ details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
     <summary>How these were measured</summary>
     <ul>
       <li><code>node app/tools/optimize-test.mjs</code>: stroke order against Held–Karp on random strokes; every change planned four ways, timed with <code>makeJob</code>, played through the SG92R sim (600°/s, 1° dead band) onto a 0.5 mm ink raster and compared with the target.</li>
-      <li><code>node app/tools/verify-motors.mjs</code>: keyframes from <code>arm.keyframes()</code> replayed through a copy of <code>frame()</code> in <code>firmware/clockwork/clockwork.ino</code>, compared every 20 ms within the 1 ms rounding of keyframe times.</li>
+      <li><code>node app/tools/verify-motors.mjs</code>: keyframes from <code>arm.keyframes()</code> replayed through a copy of <code>frame()</code> in <code>firmware/clockedin/clockedin.ino</code>, compared every 20 ms within the 1 ms rounding of keyframe times.</li>
       <li>Gemini: the same prompt to each model on 24 Oct 2026, timed end to end; quota limits read from the API's own 429 responses.</li>
       <li>Noughts and crosses: every sequence of human moves played against the computer.</li>
       <li>Times are for the design dimensions (180 mm links, 165 mm pen at 56°); the arm isn't measured yet.</li>

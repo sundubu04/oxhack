@@ -1,8 +1,8 @@
-// Clockwork arm firmware, for an Arduino Uno or Nano driving three hobby servos (base, elbow, tilt).
-// The Clockwork app streams timed keyframes over USB; this board buffers them and moves the servos between
+// Clockedin arm firmware, for an Arduino Uno or Nano driving three hobby servos (base, elbow, tilt).
+// The Clockedin app streams timed keyframes over USB; this board buffers them and moves the servos between
 // them on its own clock, once per servo frame (20 ms), so the laptop's timing never shows in the line.
 // Protocol (115200 baud, one line each, angles in centi-degrees of servo travel, 0 to 18000):
-//   ?                      -> CLOCKWORK 2 <slots>
+//   ?                      -> CLOCKEDIN 2 <slots>
 //   K <t_ms> <b> <e> <w>   keyframe at t ms after G      -> F <free slots> (one reply per K, in order)
 //   G                      start the clock               -> RUN
 //   E                      no more keyframes; finish     -> DONE when the last one is reached
@@ -60,7 +60,7 @@ void handle(char *s) {
   char *p = s + 1;
   for (uint8_t i = 0; i < 4 && *p; i++) v[i] = strtol(p, &p, 10);
   switch (cmd) {
-    case '?': Serial.print(F("CLOCKWORK 2 ")); Serial.println(SLOTS); break;
+    case '?': Serial.print(F("CLOCKEDIN 2 ")); Serial.println(SLOTS); break;
     case 'K':
       if (count < SLOTS) {
         Key &k = buf[(head + count) % SLOTS];

@@ -1,4 +1,4 @@
-# Brief: arm control (Clockwork studio)
+# Brief: arm control (Clockedin studio)
 
 - Skeleton: Linear's three columns. Rail 232 px (workspace, find, two pages, samples, recent, service status at the foot); work area; inspector 340 px with a hairline, its own scroll.
 - Density: Linear rows 28–32 px, 13 px interface text, one 21 px title; properties as label and value pairs, 8 to 12 per screen.

@@ -1,4 +1,4 @@
-// Dev server for Clockwork. Serves this folder, holds the API keys (from .env, never sent to the browser) and
+// Dev server for Clockedin. Serves this folder, holds the API keys (from .env, never sent to the browser) and
 // answers the app's few calls: /api/status, /api/draw, /api/speak and /api/config. `node server.mjs`, then open the URL.
 import { createServer } from "node:http";
 import { readFile, writeFile, readdir, mkdir, unlink } from "node:fs/promises";
@@ -128,6 +128,6 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, "127.0.0.1", () => {
   const k = keys();
-  console.log(`Clockwork → http://localhost:${PORT}`);
+  console.log(`Clockedin → http://localhost:${PORT}`);
   console.log(`  Gemini ${k.gemini ? "ready" : "no key (add GEMINI_API_KEY to app/.env)"} · voice ${k.eleven ? "ElevenLabs" : k.gemini ? "Gemini TTS" : "browser"}`);
 });

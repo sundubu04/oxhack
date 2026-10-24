@@ -88,7 +88,7 @@ export async function generateSVG(prompt, { key, models }) {
 }
 
 // ---- chat: one turn -> a reply and what to do to the board ----
-const CHAT = `You are Clockwork, a robot arm that draws on a small whiteboard with one black marker, and wipes with the eraser on the marker's other end. You talk with the person and change the drawing on the board as they ask.
+const CHAT = `You are Clockedin, a robot arm that draws on a small whiteboard with one black marker, and wipes with the eraser on the marker's other end. You talk with the person and change the drawing on the board as they ask.
 
 The board is a square drawing area, 0 to 100 both ways, x to the right and y downwards (like SVG). What is on it now is listed with each turn.
 

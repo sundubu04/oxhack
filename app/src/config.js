@@ -4,7 +4,7 @@ import { penGeometry } from "./pen.js";
 // edits that file through the dev server; everything else reads the flat geometry that geomFrom() makes.
 // Lengths in mm, angles in degrees, speeds in mm/s (pen) and deg/s (servo).
 export const DEFAULT_CONFIG = {
-  name: "Clockwork arm",
+  name: "Clockedin arm",
   measured: false,
   links: { L1: 180, L2: 180 },
   board: { width: 350, height: 350, standoff: 40 },

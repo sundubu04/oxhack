@@ -1,4 +1,4 @@
-<title>Clockwork motion planning</title>
+<title>Clockedin motion planning</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,7 +97,7 @@ details ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 
 <main class="page">
   <header>
-    <h1>Clockwork motion planning</h1>
+    <h1>Clockedin motion planning</h1>
     <p class="answer">Only the picture comes from a model. Fixed code does the rest: it fits and orders the strokes, solves two joint angles for every point 2 mm apart, and times each move so no servo is asked for more than it can do. The servos are not what limits the speed. Drawing needs at most 83°/s from a servo rated 600°/s; the clock's 10 seconds go on the pen speed we set and on lifting the pen.</p>
     <p class="meta"><span>24 Oct 2026, 18:20</span><span>Eun's session</span><span>From the code at 31366be, in the sim; the real arm is not measured yet</span></p>
   </header>
@@ -141,7 +141,7 @@ flowchart LR
           <tr data-current><td class="step">8</td><td>Timing<span class="file"><code>makeJob()</code> in <code>sim.js</code></span></td><td>Each move gets the longer of the pen's time and the slowest joint's time, with a 20% margin on the servo. When the tilt changes, the arm holds still until the pen has landed or lifted.</td></tr>
           <tr><td class="step">9</td><td>Compensation<span class="file"><code>compensate()</code></span></td><td>Each base and elbow command is pushed ahead by half the servo's dead band (1°) plus half its gear play (0 until measured), in the direction the joint is turning.</td></tr>
           <tr><td class="step">10</td><td>Keyframes<span class="file"><code>arm.js</code></span></td><td>Angles go out in each servo's own frame (zero offset, direction, gear ratio) as hundredths of a degree with a time stamp, into a 48-slot buffer on the board that the app never overfills.</td></tr>
-          <tr><td class="step">11</td><td>Arduino<span class="file"><code>firmware/clockwork</code></span></td><td>Moves the servos between keyframes on its own 20 ms servo frame, so the laptop's timing never shows in the line.</td></tr>
+          <tr><td class="step">11</td><td>Arduino<span class="file"><code>firmware/clockedin</code></span></td><td>Moves the servos between keyframes on its own 20 ms servo frame, so the laptop's timing never shows in the line.</td></tr>
         </tbody>
       </table>
     </div>
@@ -237,7 +237,7 @@ tilt wait = tilt turn ÷ servo speed + 50 ms, with the arm still</div>
   <details>
     <summary>Sources</summary>
     <ol>
-      <li>The code at commit 31366be: <code>app/src/pathplan.js</code>, <code>ik.js</code>, <code>sim.js</code>, <code>arm.js</code>, <code>svg.js</code>, <code>vectorize.js</code>, <code>pen.js</code>, <code>app/lib/gemini.mjs</code>, <code>firmware/clockwork/clockwork.ino</code>.</li>
+      <li>The code at commit 31366be: <code>app/src/pathplan.js</code>, <code>ik.js</code>, <code>sim.js</code>, <code>arm.js</code>, <code>svg.js</code>, <code>vectorize.js</code>, <code>pen.js</code>, <code>app/lib/gemini.mjs</code>, <code>firmware/clockedin/clockedin.ino</code>.</li>
       <li>Clock time, its split, joint speeds, the servo and pen speed sweeps, slower-servo errors, stroke order, lead-in cost and planning time: <code>node app/tools/time-budget.mjs</code>, run 24 Oct 2026 on this Mac (planning time 0.17 ms per clock).</li>
       <li>Line error by servo model: <code>node app/tools/compare-servos.mjs</code>, run 24 Oct 2026; the method is in <code>docs/hardware-link.md</code>, "Smoothing the line".</li>
       <li>Erase pass out of range: <code>node app/test.mjs</code>, run 24 Oct 2026.</li>
