@@ -87,6 +87,29 @@ Scored out of 25: **Fun** (demo delight), **Data** (is the dataset genuinely use
 
 **Demo-at-a-table plan (either route).** Pre-seed a handful of "spawns" — printed cards or objects on the table (G1), product tags (G2), or the judges' own faces (G4). The judge catches two or three, the dex fills, and the prediction/map visibly updates. That is the whole 4–5 minutes.
 
+## Neo-geocache: real-life Easter eggs (vision + time)
+
+Classic geocaching uses GPS coordinates. The twist: **the vision model is the lock.** You hide an "egg" (a message, photo, voice note, AR gift, dare, coupon) pinned to a real-world *view* — an object, a mural, a plaque, a storefront — and the camera recognising that view is what unlocks it. GPS can get you close; **vision confirms you're at the exact thing**, so hides can be precise and playful indoors where GPS is useless (and so it demos on a tabletop).
+
+**Where data and time come in.** Every hide and find is time- and place-stamped, so the log is a spatiotemporal time-series — the native shape for **Snowflake / Tiger Data**, **HRT** (predict where/when eggs are findable, and decide where to hide), and **Time** (eggs that unlock on a schedule, expire, or capsule into the future). The game you play builds the forecast you play by.
+
+| # | Idea | The hook | Fun | Data | Prize | Build | Table | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1 | **Chronocache** — vision-locked eggs with a *time rule*: unlock now, at a future date (capsule), only in a window (ephemeral), or on a schedule. Finds + hides train a "where/when to look next" forecast | Vision is the lock, time is the gate, and the map predicts the next finds — all four prize angles in one loop | 5 | 5 | 5 | 3 | 4 | 22 |
+| N2 | **Time Capsule** — hide a message/photo/voice pinned to a real spot; it stays locked until a future time; finders open it only after it matures | "Leave something for whoever stands here in 6 months" — pure Time, genuinely moving | 5 | 4 | 4 | 4 | 4 | 21 |
+| N3 | **Vision dead-drop** — no coordinates at all; the clue *is* a photo, and you find it by matching the view. Eggs can self-destruct after one read or after a time | The cleverest mechanic: scene-matching replaces GPS; spycraft vibe | 4 | 4 | 4 | 3 | 4 | 19 |
+| N4 | **Data-bounty eggs** — an egg rewards you for capturing a specific real-world datum nearby (snap the thing next to it); the aggregate is a directed, productive dataset | Geocache meets citizen science — the game *is* the data collection | 4 | 5 | 5 | 3 | 3 | 20 |
+| N5 | **Then & Now** — pin old photos/stories to places; point your camera to see the past layered on the present, and add your own over time | Local history that grows; then-vs-now is the Time axis | 4 | 4 | 4 | 3 | 3 | 18 |
+| N6 | **Venue hunt** — a time-boxed egg trail around the OxHack venue (or freshers' week): eggs teach you the place and expire when the event ends | Most demoable of all — hide eggs around *this* room and have judges find them | 5 | 3 | 3 | 4 | 5 | 20 |
+| N7 | **Predictive hiding** — the app suggests good hiding spots from foot-traffic and find data, and forecasts a cache's "findability" over the day | Data → a decision (where to hide); the clean HRT story | 3 | 5 | 5 | 3 | 3 | 19 |
+| N8 | **Echo eggs** (ElevenLabs) — the egg is a voice note tied to a place; point your camera to hear it. A crowd-built audio ghost tour | Sensory and shareable; narration on a schedule (Time) | 4 | 3 | 4 | 3 | 4 | 18 |
+
+**Lead: N1 Chronocache**, with **N2 Time Capsule** as the warmer, simpler cut and **N4 Data-bounty** as the most HRT-productive cut. N1 stacks **Main (Time)** — time-gating is the core mechanic, **HRT** — the find/hide forecast, **Gemini** — the vision lock, **Snowflake / Tiger Data** — the spatiotemporal log, plus **ElevenLabs** (voice eggs), **Delta**, **Vultr**.
+
+**How the vision lock works (buildable in the time).** GPS as a coarse filter, then a scene match to confirm the exact anchor: Gemini ("is this the same object/view?") for the quick version, or CLIP-style image embeddings with a similarity threshold for something more robust. A simple density/kNN model over the time-stamped log is enough to show the prediction flywheel.
+
+**Table demo.** Hide an egg on an object in the room with a 2-minute unlock. A judge points their phone, the vision model confirms the anchor, the countdown ends, the egg opens live — then show the map, the growing archive and the "where/when to look next" forecast. Novel, personal, and it fits the 4–5 minutes.
+
 ## Long list
 
 Captured above (1–22). More raw seeds, not yet scored: a QR code on a "we're patching" holding page that links to the explainer; a uptime-style "is it down because of PHP2Shell?" checker; a diff tool that shows what a site's headers looked like before/after; a "trust receipt" a patched site can display; a Thunderbird/Outlook add-in that flags links to likely-unpatched domains.
