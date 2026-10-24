@@ -104,11 +104,29 @@ What to do with the motors, in order:
 5. **If it still wobbles, add a 2:1 reduction** (GT2 belt or printed gears) to base and elbow; it halves dead band and play at the link. The drawing square needs 89° of base travel and 83° of elbow, so 2:1 uses 178° and 166° of a 180° servo: it fits, with the zero offsets set carefully. 3:1 does not fit. Set the ratio in the servo table.
 6. **Steppers** are the step after that: in the sim, 1/16 microstepping is within 0.3 mm with no compensation. They need drivers and are much heavier; mount both at the base and drive the elbow with a belt.
 
-## Where a Raspberry Pi fits
+## On a Raspberry Pi (the team's choice)
 
-| Setup | When | Notes |
-|---|---|---|
-| Laptop + Arduino | the demo | what is built and tested above |
-| Pi + Arduino | the arm runs on its own, e.g. keeping time on a wall | the Pi runs `node server.mjs` and Chromium in kiosk mode on the arm's page; Chromium on Pi OS has Web Serial, so nothing else changes |
-| Pi alone + a PCA9685 servo board (I2C) | fewer parts | the PCA9685 makes the pulses in hardware, but the keyframe timing would have to move into a Pi process; more work than it saves |
-| Pi GPIO pins straight to the servos | not recommended | software pulses on Linux jitter, which shows as a shaky line |
+The Pi runs Clockwork itself (`node server.mjs`), and anyone on the same Wi-Fi opens the app from a laptop or
+phone. The servos need pulses with exact widths; Linux can't time those from ordinary GPIO code, so something
+has to make them in hardware. A handwritten look is fine, so any of these is good enough:
+
+| Setup | Works on | Extra parts | What makes the pulses |
+|---|---|---|---|
+| **Pi + PCA9685 servo board** (recommended) | every Pi, including the Pi 5 | a PCA9685 board, 4 wires (I2C) | the board, 16 channels in hardware |
+| Pi + pigpio | Pi 4, 3, Zero 2 W (pigpio doesn't support the Pi 5) | none | pigpio's DMA timing, on any GPIO pin |
+| Pi + Arduino over USB | every Pi | the Arduino (firmware is ready, compiled) | the Arduino |
+
+In the first two, the server plays the same keyframes itself, 50 times a second, instead of streaming them to an
+Arduino. A few milliseconds of Linux jitter in when each update goes out doesn't show in a handwritten line;
+the pulse widths themselves stay exact because hardware makes them.
+
+**PCA9685 wiring:** Pi pin 1 (3.3 V) to VCC, pin 6 to GND, pin 3 (SDA) to SDA, pin 5 (SCL) to SCL. The servos plug
+into channels 0 (base), 1 (elbow), 2 (tilt). The servos' 5 V supply goes to the board's V+ terminal, never the
+Pi's 5 V pin. Turn on I2C with `sudo raspi-config` → Interface Options → I2C.
+
+**pigpio wiring:** base GPIO 12, elbow GPIO 13, tilt GPIO 18; the servos on their own 5 V supply with its ground
+joined to the Pi's. Run `sudo pigpiod`.
+
+**Keys on the Pi:** copy `app/.env` across by hand (never through git). To reach the app from other machines the
+server has to listen beyond the Pi itself; on a shared hackathon Wi-Fi that also lets others use the Gemini key,
+so keep it on a hotspot of your own.

@@ -12,3 +12,4 @@ Every page we publish with the Artifact tool. Republish the same source file to 
 | Clock arm simulator + spec (five-bar) | https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k | `docs/pages/arm-sim.html` | Eun | Private |
 | Rolling clock bot (views + hardware compare) | https://claude.ai/artifact/Y2X7H4zhxooCwYvn3jPxh2 | `docs/pages/rolling-bot.html` | Eun | Private |
 | Drawing arm build spec (3D print) | https://claude.ai/artifact/2gFJhEhu9WXtdMQibEL5ua | `docs/pages/arm-spec.html` | Eun | Private |
+| Pen mount study (tilt spec, live side view) | https://claude.ai/artifact/NujPPg4U78MYye7YAooZEo | `docs/pages/pen-mount.html` | Eun | Private |

@@ -1,6 +1,6 @@
 // Draws the whiteboard, the planned path, the ink the simulated arm has left and the arm itself, to scale.
 // World units are mm in the arm frame: base axis at the origin, x right, y up, the board above the base.
-import { fk } from "./ik.js";
+import { fk, toolPoint } from "./ik.js";
 
 const PXMM = 3;      // resolution of the ink layer, px per mm
 const MARKER = 2;    // width of the marker line, mm
@@ -106,11 +106,15 @@ export function createBoard(canvas, { pad = 12 } = {}) {
 
     // the arm: mount, two links, joints, and the tip
     const j = state.joints; if (!j) return;
-    const f = fk(j.base * D2R, j.elbow * D2R, g.L1, g.L2), base = P(0, 0), elb = P(f.ex, f.ey), tip = P(f.px, f.py);
+    const f = fk(j.base * D2R, j.elbow * D2R, g.L1, g.L2), base = P(0, 0), elb = P(f.ex, f.ey), end = P(f.px, f.py);
+    const n = toolPoint(j.base * D2R, j.elbow * D2R, g, "draw"), e = toolPoint(j.base * D2R, j.elbow * D2R, g, "erase");
+    const nib = P(n.x, n.y), felt = P(e.x, e.y), tip = state.mode === "erase" ? felt : nib;
     ctx.fillStyle = col.mount; const mw = 36 * s, mh = 14 * s; ctx.beginPath(); ctx.roundRect(base[0] - mw / 2, base[1] - mh / 2, mw, mh, 3); ctx.fill();
     // lighter than the ink, so the drawing stays the darkest thing on the board
     ctx.globalAlpha = 0.55; ctx.strokeStyle = col.mount; ctx.lineCap = "round"; ctx.lineWidth = Math.max(4, 8 * s);
-    ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(elb[0], elb[1]); ctx.lineTo(tip[0], tip[1]); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(elb[0], elb[1]); ctx.lineTo(end[0], end[1]); ctx.stroke();
+    // the pen, seen from the front: it lies across the forearm's tip, nib to one side and eraser to the other
+    ctx.lineWidth = Math.max(4, 9 * s); ctx.beginPath(); ctx.moveTo(felt[0], felt[1]); ctx.lineTo(nib[0], nib[1]); ctx.stroke(); ctx.globalAlpha = 1;
     for (const p of [base, elb]) { ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(3, 4 * s), 0, Math.PI * 2); ctx.fillStyle = col.joint; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = col.mount; ctx.stroke(); }
     if (state.mode === "erase") {
       ctx.beginPath(); ctx.arc(tip[0], tip[1], (g.eraserWidth / 2) * s, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = col.info; ctx.stroke();

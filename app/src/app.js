@@ -470,7 +470,7 @@ function showPage(page) {
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["board.standoff", "Base below board", "mm"], ["drawing.size", "Drawing size", "mm"]]],
-  ["Pen", [["pen.drawTilt", "Draw tilt", "°"], ["pen.liftTilt", "Lift tilt", "°"], ["pen.eraseTilt", "Erase tilt", "°"], ["pen.eraserWidth", "Eraser width", "mm"]]],
+  ["Pen", [["pen.drawTilt", "Draw tilt", "°"], ["pen.liftTilt", "Lift tilt", "°"], ["pen.eraseTilt", "Erase tilt", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["pen.nibSide", "Nib, across the tip", "mm"], ["pen.eraserSide", "Eraser, across the tip", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];

@@ -135,17 +135,19 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
     </section>
     <section>
       <h2>End effector</h2>
-      <p class="small">At the tip of link 2: a <b>ball transfer / caster</b> (10–14 mm ball) rides on the board and sets a constant height. A <b>micro tilt servo</b> swings a double-ended marker holder through three positions — draw (−14°), lift (−2°), erase (+16°). No lift motor.</p>
+      <p class="small"><b>Changed 24 Oct:</b> the earlier ±16° rocker can't work with one marker whose eraser is on its far end, because the barrel hits the board first. Use the <b>60° mount</b> from the <a href="https://claude.ai/artifact/NujPPg4U78MYye7YAooZEo">pen mount study</a>. The tilt servo sits at the tip of link 2 with its <b>shaft along the link, about 61 mm above the board</b>, and clamps the marker at its balance point. It turns the pen to <b>draw −62°, lift −55°, erase +62°</b> from lying flat (28°, 35°, 152° on the servo). A ball caster on a 61 mm post keeps that height. Numbers are for a 140 mm marker: re-run the study with yours.</p>
       <div class="diagram" style="padding:8px">
-        <svg viewBox="0 0 260 120" role="img" aria-label="End effector side view: ball on the board, tilt servo swings the marker to draw, lift or erase">
-          <line x1="20" y1="92" x2="240" y2="92" stroke="var(--line)" stroke-width="3"/>
-          <circle cx="96" cy="80" r="12" fill="var(--wash)" stroke="var(--ink-3)" stroke-width="2"/>
-          <rect x="108" y="30" width="64" height="26" rx="5" fill="var(--wash)" stroke="var(--ink)" stroke-width="2"/>
-          <line x1="150" y1="56" x2="138" y2="92" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>
-          <line x1="140" y1="86" x2="138" y2="92" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
-          <line x1="168" y1="56" x2="182" y2="92" stroke="var(--ink-3)" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 3"/>
-          <text x="20" y="22" font-size="11" fill="var(--ink-2)" font-family="var(--display)">tilt: draw / lift / erase</text>
-          <text x="70" y="112" font-size="10" fill="var(--ink-3)" font-family="var(--display)">rolling ball</text>
+        <svg viewBox="0 0 260 150" role="img" aria-label="End effector side view: the marker clamped at its middle on the tilt shaft 61 mm above the board, meeting it at 60 degrees">
+          <line x1="20" y1="130" x2="240" y2="130" stroke="var(--line)" stroke-width="3"/>
+          <line x1="130" y1="70" x2="130" y2="124" stroke="var(--line)" stroke-width="4"/>
+          <circle cx="130" cy="124" r="6" fill="var(--wash)" stroke="var(--ink-3)" stroke-width="1.5"/>
+          <line x1="95" y1="130" x2="165" y2="10" stroke="var(--ink)" stroke-width="9" stroke-linecap="round"/>
+          <line x1="95" y1="130" x2="101" y2="120" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>
+          <line x1="160" y1="19" x2="165" y2="10" stroke="var(--ink-3)" stroke-width="9" stroke-linecap="round"/>
+          <circle cx="130" cy="70" r="7" fill="var(--wash)" stroke="var(--ink)" stroke-width="2"/>
+          <text x="142" y="74" font-size="10" fill="var(--ink-2)" font-family="var(--display)">tilt shaft, 61 mm up</text>
+          <text x="40" y="146" font-size="10" fill="var(--ink-3)" font-family="var(--display)">nib meets the board at 60°</text>
+          <text x="172" y="16" font-size="10" fill="var(--ink-3)" font-family="var(--display)">eraser</text>
         </svg>
       </div>
     </section>
@@ -159,9 +161,9 @@ pre code{font-size:.82rem;line-height:1.5;color:var(--ink);}
       <tr><td>Link 1</td><td class="n">1</td><td>180 mm between axes; 4 mm wall + box rib; shoulder-end couples to the motor, elbow-end takes the 608 bearing</td></tr>
       <tr><td>Link 2</td><td class="n">1</td><td>180 mm; elbow-end on the shared axis, tip-end carries the ball caster + tilt servo bracket</td></tr>
       <tr><td>Elbow bearing + shaft</td><td class="n">1–2</td><td>608 (22 mm OD) press-fit bore; 8 mm shaft/bolt</td></tr>
-      <tr><td>Ball transfer / caster</td><td class="n">1</td><td>10–14 mm ball; rides on the board, sets height</td></tr>
-      <tr><td>Tilt servo + bracket</td><td class="n">1</td><td>SG90; swings the marker holder ±16°</td></tr>
-      <tr><td>Marker holder (double-ended)</td><td class="n">1</td><td>Clamp for a whiteboard marker (~10–12 mm) with the eraser on the far end</td></tr>
+      <tr><td>Ball transfer / caster</td><td class="n">1</td><td>10–14 mm ball on a post, so the tilt shaft sits about 61 mm above the board</td></tr>
+      <tr><td>Tilt servo + bracket</td><td class="n">1</td><td>SG92R at the tip of link 2, shaft along the link; turns the pen 124° between draw and erase</td></tr>
+      <tr><td>Marker clamp</td><td class="n">1</td><td>Collar with a screw at the marker's balance point, fixed to the servo's own horn. Trim the eraser felt to 60°</td></tr>
       <tr><td>Drive servos (SG92R)</td><td class="n">2</td><td>Shoulder + elbow. Slot = 23 × 12.5 mm pocket, 27 mm deep; two M2 screws 32 mm apart through the mounting tabs; output spline on the joint axis</td></tr>
     </table></div>
   </section>
@@ -201,7 +203,9 @@ r = hypot(x,y);  if (r &gt; 360 || r &lt; 0) out_of_reach;
 c2 = (x*x + y*y - 180² - 180²) / (2*180*180);
 θ2 = atan2(+sqrt(1-c2²), c2);              // elbow up
 θ1 = atan2(y,x) - atan2(180*sin θ2, 180 + 180*cos θ2);
-tilt_deg = { draw:-14, lift:-2, erase:+16 }</code></pre>
+tilt_deg = { draw:-62, lift:-55, erase:+62 }   // from the pen lying flat; servo 28, 35, 152
+// the nib touches 35 mm to one side of the link's tip, the eraser 35 mm to the other:
+// aim with L2' = hypot(180, 35) and subtract atan2(±35, 180) from θ2</code></pre>
     <p class="small muted">The live <a href="https://claude.ai/artifact/WteAH3aBzGQUeEUBF86p4k">simulator</a> exports the full angle stream for any drawing (Copy angle stream). Verified: forward∘inverse round-trips to ~1e-13 mm.</p>
   </section>
 </main>

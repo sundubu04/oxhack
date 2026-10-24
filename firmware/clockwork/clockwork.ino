@@ -16,7 +16,7 @@
 const uint8_t PIN[3] = {9, 10, 11};             // base, elbow, tilt signal pins
 const int US_MIN[3] = {544, 544, 544};           // pulse at 0 deg: the Servo library's default; calibrate per servo
 const int US_MAX[3] = {2400, 2400, 2400};        // pulse at 180 deg
-const int16_t PARK[3] = {2830, 7570, 8800};      // centi-degrees: the app's park pose for the design numbers, pen lifted
+const int16_t PARK[3] = {2830, 7570, 3500};      // centi-degrees: roughly the app's park pose, pen lifted (tilt -55 deg from flat)
 const uint8_t SLOTS = 48;                        // keyframes held (10 bytes each)
 const uint16_t FRAME_MS = 20;                    // a hobby servo reads one pulse every 20 ms
 

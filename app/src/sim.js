@@ -1,6 +1,6 @@
 // Live simulation of the arm: the angle stream played through the servos' limits (top speed and resolution),
 // so the line on screen is the one the real arm would leave, wobble and lag included. Pure: no DOM.
-import { fk, ik, R2D } from "./ik.js";
+import { fk, ik, ikTool, toolPoint, R2D } from "./ik.js";
 
 const D2R = Math.PI / 180;
 const NEAR = 1.5;   // deg: how close the tilt servo must be to a pose for the marker or eraser to touch
@@ -54,11 +54,11 @@ export function compensate(path, g) {
 // The pose the arm parks in: pen up, beside the drawing on the elbow's side, so neither link crosses it.
 export function homePose(g) {
   const x = (g.elbowUp ? 1 : -1) * Math.min(g.half + 25, g.boardW / 2 - 10), y = g.standoff + g.board / 2 + g.half / 2;
-  const s = ik(x, y, g.L1, g.L2, g.elbowUp) || ik(0, g.standoff + g.board / 2, g.L1, g.L2, g.elbowUp) || { t1: Math.PI / 2, t2: 0 };
+  const s = ikTool(x, y, g) || ikTool(0, g.standoff + g.board / 2, g) || { t1: Math.PI / 2, t2: 0 };
   return { base: s.t1 * R2D, elbow: s.t2 * R2D, tilt: g.tilt.lift };
 }
 
-function homeTip(g) { const h = homePose(g), f = fk(h.base * D2R, h.elbow * D2R, g.L1, g.L2); return { x: f.px, y: f.py }; }
+function homeTip(g) { const h = homePose(g); return toolPoint(h.base * D2R, h.elbow * D2R, g); }
 
 // How a servo turns a command into a position (physics on):
 //   deadband  it only moves when the command is more than half its dead band away, and stops at the edge of it,
@@ -82,7 +82,8 @@ export class Sim {
 
   get done() { return !this.job || this.t >= this.job.total; }
 
-  tip() { const f = fk(this.j.base * D2R, this.j.elbow * D2R, this.g.L1, this.g.L2); return { x: f.px, y: f.py, ex: f.ex, ey: f.ey }; }
+  // where an end of the pen is now: the nib, or the eraser's felt
+  tip(tool = "draw") { return toolPoint(this.j.base * D2R, this.j.elbow * D2R, this.g, tool); }
 
   // What touches the board: the marker near its draw pose, the eraser near its erase pose, or nothing.
   mode() {
@@ -94,7 +95,7 @@ export class Sim {
 
   // Jog: send the pen to a point by hand (pen up). Returns false when the point is out of reach.
   jog(x, y) {
-    const s = ik(x, y, this.g.L1, this.g.L2, this.g.elbowUp); if (!s) return false;
+    const s = ikTool(x, y, this.g); if (!s) return false;
     this.manual = { base: s.t1 * R2D, elbow: s.t2 * R2D, tilt: this.g.tilt.lift }; return true;
   }
 
@@ -147,7 +148,7 @@ export class Sim {
       if (play > 0) { if (this.m[k] - this.j[k] > play / 2) this.j[k] = this.m[k] - play / 2; else if (this.j[k] - this.m[k] > play / 2) this.j[k] = this.m[k] + play / 2; }
       else this.j[k] = this.m[k];
     }
-    const tip = this.tip(), mode = this.mode();
+    const mode = this.mode(), tip = this.tip(mode === "erase" ? "erase" : "draw");
     if (mode && mode === this.prevMode && onInk) onInk(this.prevTip, tip, mode);
     if (mode === "draw" && job && !this.manual && this.i > 0) this.measure(tip);
     this.prevTip = tip; this.prevMode = mode;

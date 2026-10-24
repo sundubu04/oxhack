@@ -18,6 +18,24 @@ export function ik(x, y, L1, L2, up = true) {
   return { t1, t2, dex: Math.sqrt(1 - c2 * c2) };
 }
 
+// The pen lies across the forearm's tip (docs/pages/pen-mount.html): the nib touches `nibSide` mm to one side
+// of the tip and the eraser `eraserSide` mm to the other (+ is the counter-clockwise side). Seen as a link, the
+// forearm out to either end is a little longer and turned by gamma.
+export function toolLink(g, tool) {
+  const side = tool === "erase" ? +(g.eraserSide || 0) : +(g.nibSide || 0);
+  return { L: Math.hypot(g.L2, side), gamma: Math.atan2(side, g.L2) };
+}
+// Joint angles that put this end of the pen on (x, y), or null when it is out of reach.
+export function ikTool(x, y, g, tool = "draw") {
+  const { L, gamma } = toolLink(g, tool), s = ik(x, y, g.L1, L, g.elbowUp);
+  return s && { t1: s.t1, t2: s.t2 - gamma, dex: s.dex };
+}
+// Where this end of the pen is for given joint angles (radians).
+export function toolPoint(t1, t2, g, tool = "draw") {
+  const { L, gamma } = toolLink(g, tool), f = fk(t1, t2 + gamma, g.L1, L);
+  return { x: f.px, y: f.py };
+}
+
 // Default geometry — the chosen build (180 mm links, base 40 mm below a 350 mm board, clock centred).
 export const GEOM = {
   L1: 180, L2: 180, standoff: 40, board: 350, elbowUp: true, pressure: 60,
@@ -32,11 +50,15 @@ export function drawCentre(g = GEOM) { return { cx: 0, cy: g.standoff + g.board 
 export function toAngles(toolpath, g = GEOM) {
   let unreachable = 0, worstDex = 1, outOfRange = 0;
   const lim = (j, a) => { const s = g.servo?.[j]; if (!s) return true; const v = +s.offset + +s.dir * (+s.ratio || 1) * a; return v >= +s.min - 1e-6 && v <= +s.max + 1e-6; };
-  const path = toolpath.map((p) => {
-    const s = ik(p.x, p.y, g.L1, g.L2, g.elbowUp);
+  const tools = toolpath.map((p) => p.tool || (p.pen ? "draw" : "lift"));
+  // a lifted move aims the end that touches down next (the nib before a stroke, the felt before a wipe)
+  const hand = tools.slice(); let next = "draw";
+  for (let i = hand.length - 1; i >= 0; i--) { if (hand[i] === "lift") hand[i] = next; else next = hand[i]; }
+  const path = toolpath.map((p, i) => {
+    const s = ikTool(p.x, p.y, g, hand[i]);
     if (!s) { unreachable++; return { out_of_reach: true }; }
     worstDex = Math.min(worstDex, s.dex);
-    const tool = p.tool || (p.pen ? "draw" : "lift");
+    const tool = tools[i];
     const base = +((((s.t1 * R2D + 180) % 360) + 360) % 360 - 180).toFixed(2), elbow = +(s.t2 * R2D).toFixed(2);
     if (!lim("base", base) || !lim("elbow", elbow)) outOfRange++;
     return { base, elbow, tilt: g.tilt[tool], pressure: tool === "lift" ? 0 : g.pressure };

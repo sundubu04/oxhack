@@ -8,7 +8,9 @@ export const DEFAULT_CONFIG = {
   board: { width: 350, height: 350, standoff: 40 },
   drawing: { size: 180 },
   elbow: "up",
-  pen: { drawTilt: -14, liftTilt: -2, eraseTilt: 16, pressure: 60, eraserWidth: 20 },
+  // Tilts from the pen lying flat, and where the nib and the eraser touch across the forearm's tip: the 60° mount
+  // from docs/pages/pen-mount.html, for a 140 mm marker clamped at its middle (re-run it with the real pen).
+  pen: { drawTilt: -62, liftTilt: -55, eraseTilt: 62, nibSide: 35, eraserSide: -35, pressure: 60, eraserWidth: 20 },
   motion: { drawSpeed: 150, travelSpeed: 300, leadIn: 3 },   // leadIn: mm of pen-up glide onto each stroke
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
   // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both.
@@ -39,6 +41,7 @@ export function geomFrom(cfg) {
     standoff: +c.board.standoff, board: +c.board.height, boardW: +c.board.width,
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     tilt: { draw: +c.pen.drawTilt, lift: +c.pen.liftTilt, erase: +c.pen.eraseTilt },
+    nibSide: +c.pen.nibSide, eraserSide: +c.pen.eraserSide,
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn,
     servo: { speed: +c.servos.speed, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },

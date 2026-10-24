@@ -1,0 +1,366 @@
+<title>Pen mount study</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&display=swap">
+<style>
+/* One reading column, left aligned; sections separated by space. The side view is the one picture. */
+:root {
+  --bg: #fcfbfb; --ink: #1f1a1d; --ink-2: #5f575b; --ink-3: #8a8186;
+  --wash: #f4f0f2; --line: #e6dfe3; --accent: #b23a6e; --accent-wash: #fbe6ee;
+  --ok: #2e7a4f; --warn: #9a5a06; --stop: #b42318; --felt: #9fb8c9; --board: #ffffff;
+  --display: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; --felt: #6f8ea3; --board: #201b1e; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161214; --ink: #f2edf0; --ink-2: #b4abb0; --ink-3: #8c8388;
+  --wash: #241e21; --line: #352d31; --accent: #ec8fb6; --accent-wash: #3b1f2c;
+  --ok: #72c79a; --warn: #e3a95a; --stop: #f08b80; --felt: #6f8ea3; --board: #201b1e; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.page { max-width: 46rem; margin: 0 auto; padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 44px; }
+header { display: grid; gap: 10px; }
+h1 { font: 600 2rem/1.15 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.25rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.answer { font-size: 1.125rem; }
+.meta { color: var(--ink-3); font-size: .875rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+section { display: grid; gap: 14px; min-width: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+
+/* controls */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 10px; background: var(--wash); }
+.seg button { font: 500 .875rem/1 var(--body); color: var(--ink-2); background: none; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.btn { font: 500 .875rem/1 var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.btn:hover { background: var(--wash); }
+
+figure { margin: 0; }
+canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 10px; background: var(--wash); touch-action: none; }
+figcaption { color: var(--ink-2); font-size: .875rem; margin-top: 8px; }
+.readout { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: .9375rem; }
+.readout b { font-weight: 600; }
+
+.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
+@media (max-width: 560px) { .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: .875rem; color: var(--ink-2); }
+.field input { font: 400 1rem var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.angles { display: flex; flex-wrap: wrap; gap: 16px 40px; }
+.angles div b { display: block; font: 600 1.75rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.angles div span { color: var(--ink-2); font-size: .875rem; }
+
+.rows { overflow-x: auto; }
+.rows table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+.rows th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0 16px 8px 0; white-space: nowrap; vertical-align: bottom; }
+.rows td { padding: 8px 16px 8px 0; vertical-align: top; }
+.rows td:first-child { white-space: nowrap; font-weight: 500; }
+#spec td:first-child { font-weight: 400; color: var(--ink-2); white-space: normal; width: 42%; }
+.rows td:last-child, .rows th:last-child { padding-right: 0; }
+.rows tr[data-current] td { background: var(--accent-wash); }
+.rows tr[data-current] td:first-child { border-radius: 6px 0 0 6px; padding-left: 8px; }
+.rows tr[data-current] td:last-child { border-radius: 0 6px 6px 0; }
+
+.state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.state[data-tone="ok"] { color: var(--ok); }
+.state[data-tone="warn"] { color: var(--warn); }
+.state[data-tone="warn"]::before { border-radius: 2px; }
+.state[data-tone="stop"] { color: var(--stop); }
+.state[data-tone="stop"]::before { border-radius: 0; transform: rotate(45deg); }
+
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 65ch; }
+details { color: var(--ink-2); font-size: .875rem; }
+summary { cursor: pointer; }
+details ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <h1>Pen mount study</h1>
+    <p class="answer" id="answer">Clamp the marker at its middle on the third servo, with the servo shaft running along the forearm and about 61 mm off the board. The pen then meets the board at 60°, the way a hand holds it. Ink and eraser are 120° apart on the servo, and the servo itself sets the pressure. Trim the eraser's felt to 60° so it sits flat.</p>
+    <p class="meta"><span>OxHack · Clockwork arm</span><span>24 Oct 2026</span><span id="pen-note">Placeholder pen, 140 mm × 17 mm: enter yours below</span></p>
+  </header>
+
+  <section aria-labelledby="h-spec">
+    <h2 id="h-spec">Tilt specification</h2>
+    <p class="muted" id="spec-intro">For the recommended mount and the pen measured below.</p>
+    <div class="rows"><table id="spec"></table></div>
+  </section>
+
+  <section aria-labelledby="h-see">
+    <h2 id="h-see">See it move</h2>
+    <p class="muted">Side view, looking along the forearm: the board is the line at the bottom, the circle is the servo shaft. One servo swings the marker between drawing, lifted and erasing.</p>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="Mount" id="designs"></div>
+    </div>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="Pose" id="poses">
+        <button type="button" data-pose="draw" aria-pressed="true">Draw</button>
+        <button type="button" data-pose="lift" aria-pressed="false">Lifted</button>
+        <button type="button" data-pose="erase" aria-pressed="false">Erase</button>
+      </div>
+      <button class="btn" type="button" id="cycle">Play the cycle</button>
+    </div>
+    <figure>
+      <canvas id="cv" width="960" height="720" aria-label="Side view of the marker on the servo against the whiteboard"></canvas>
+      <figcaption id="cap">Moves at a quarter of the servo's real speed.</figcaption>
+    </figure>
+    <div class="readout" id="readout"></div>
+  </section>
+
+  <section aria-labelledby="h-pen">
+    <h2 id="h-pen">Your pen</h2>
+    <p class="muted">Measure the marker with its caps on. The numbers on this page update as you type.</p>
+    <div class="fields">
+      <div class="field"><label for="f-L">Length, nib to eraser (mm)</label><input id="f-L" type="number" inputmode="decimal" value="140"></div>
+      <div class="field"><label for="f-D">Barrel width (mm)</label><input id="f-D" type="number" inputmode="decimal" value="17"></div>
+      <div class="field"><label for="f-t">Nib sticks out (mm)</label><input id="f-t" type="number" inputmode="decimal" value="12"></div>
+      <div class="field"><label for="f-a">Clamp, from the nib (mm)</label><input id="f-a" type="number" inputmode="decimal" value="70"></div>
+      <div class="field"><label for="f-c">Lift clear of the board (mm)</label><input id="f-c" type="number" inputmode="decimal" value="3"></div>
+      <div class="field"><label for="f-p">Press into the board (mm)</label><input id="f-p" type="number" inputmode="decimal" value="1"></div>
+    </div>
+    <p class="muted" id="angles-intro">For the chosen mount, put these in Clockwork's Arm setup (degrees from the pen lying flat):</p>
+    <div class="angles" id="angles"></div>
+  </section>
+
+  <section aria-labelledby="h-compare">
+    <h2 id="h-compare">Four ways compared</h2>
+    <p class="muted">Same pen, same SG92R servo, clamp where you set it. The shaft height is the only thing that changes, and it fixes everything else.</p>
+    <div class="rows"><table id="table"></table></div>
+  </section>
+
+  <details>
+    <summary>Why 60°: the same pen at every angle</summary>
+    <div class="rows" style="margin-top:10px"><table id="sweep"></table></div>
+    <p style="margin-top:10px">Lower angles slide less at each touch but bring the barrel's edge close to the board, and the eraser meets it more on its rim. Higher angles slide more and use more of the servo's travel. 55° to 65° all work; 60° leaves the most margin on both sides.</p>
+  </details>
+
+  <section aria-labelledby="h-build">
+    <h2 id="h-build">How to attach it</h2>
+    <ol class="steps" id="steps">
+      <li><b>Servo at the end of the forearm, shaft along the forearm.</b> The pen then swings across the forearm, so ink and eraser touch to either side of the arm, not ahead of it or behind it. The arm's reach is the same for both.</li>
+      <li><b>Shaft <span class="num" id="s-d">61 mm</span> off the board.</b> A ball caster under the bracket, on a post of that height, keeps the distance fixed as the arm moves.</li>
+      <li><b>Clamp the pen at its balance point</b>, a printed collar with a screw, fixed to the servo's own horn. Balanced, its weight puts no load on the servo on an upright board.</li>
+      <li><b>Trim the eraser felt to <span class="num" id="s-trim">60°</span></b>, or glue a felt pad on a printed wedge at that angle, so it wipes with its whole face rather than its rim.</li>
+      <li><b>Find the three angles on the real arm.</b> Start from the numbers above, then nudge draw and erase until the nib and the felt just bend.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-soft">
+    <h2 id="h-soft">What changes in the app</h2>
+    <p>The nib and the eraser now touch <span class="num" id="s-off">35 mm</span> either side of the shaft, not at its tip. Clockwork needs that offset per tool so it steers the nib for drawing and the felt for erasing. The three tilt angles go into Arm setup as they are.</p>
+  </section>
+
+  <details>
+    <summary>How the numbers are worked out</summary>
+    <ul>
+      <li>The pen is a straight bar clamped at a point, turning about a shaft parallel to the board. With the shaft at height d, a pen end at distance r from the clamp meets the board at angle asin(d / r).</li>
+      <li>Servo turn from ink to eraser is the ink angle plus the eraser angle. Time at the SG92R's 0.1 s per 60° (4.8 V datasheet).</li>
+      <li>The barrel's edge clears the board while nib length × sin(angle) is more than barrel radius × cos(angle).</li>
+      <li>The slide while pressing is how far the nib moves along the board between first touch and the press depth. It shows up as a short tail at each stroke start and end.</li>
+      <li>Servo load per newton of pen force is the clamp-to-nib distance × cos(angle). SG92R stall torque is 2.5 kg·cm, 24.5 N·cm.</li>
+      <li>The old spec's 15° rocker came from iRobot Root, whose arm carries a pen and a separate eraser that both face the board. A single marker with its eraser at the far end can't work that way.</li>
+      <li>Pen size is a placeholder until measured: whiteboard markers vary.</li>
+    </ul>
+  </details>
+</main>
+
+<script>
+(() => {
+const $ = (s) => document.querySelector(s);
+const D2R = Math.PI / 180, SPEED = 600;   // SG92R: 0.1 s per 60 deg
+const STALL = 24.5;                        // N·cm, 2.5 kg·cm
+const DESIGNS = [
+  { id: "flip", name: "Flip", beta: 90 },
+  { id: "a60", name: "Angled 60°", beta: 60 },
+  { id: "a45", name: "Angled 45°", beta: 45 },
+  { id: "rocker", name: "Rocker 15°", beta: 15 },
+];
+let design = "a60", pose = "draw";
+const P = { L: 140, D: 17, t: 12, a: 70, c: 3, p: 1 };
+try { Object.assign(P, JSON.parse(localStorage.getItem("penmount") || "{}")); } catch (e) {}
+
+// Geometry of one design for the current pen. Angles are tilt from the pen lying flat; negative brings the nib down.
+function solve(beta) {
+  const a = Math.max(5, Math.min(P.a, P.L - 5)), b = P.L - a, R = P.D / 2;
+  const d = a * Math.sin(beta * D2R);
+  const be = d <= b ? Math.asin(d / b) / D2R : null;           // eraser's angle to the board
+  const press = (r, ang) => { const z = (d + P.p) / r; return z <= 1 ? Math.asin(z) / D2R - ang : 90 - ang; };
+  const lift = (r, ang) => { const z = (d - P.c) / r; return ang - Math.asin(Math.max(-1, Math.min(1, z))) / D2R; };
+  const drawT = -(beta + press(a, beta)), liftT = -(beta - lift(a, beta)), eraseT = be == null ? null : be + press(b, be);
+  // slide while the nib presses p mm: horizontal travel between first touch and the press pose
+  const slide = (r, ang, extra) => Math.abs(r * (Math.cos(ang * D2R) - Math.cos((ang + extra) * D2R)));
+  const servoPresses = (d + P.p) / a <= 1;
+  const tail = servoPresses ? slide(a, beta, press(a, beta)) : Math.sqrt(Math.max(0, 2 * a * P.p - P.p * P.p));
+  return {
+    servoPresses,
+    beta, a, b, d, be, drawT, liftT, eraseT,
+    turn: be == null ? null : beta + be,
+    shoulder: P.t * Math.sin(beta * D2R) - R * Math.cos(beta * D2R),
+    tail,
+    offInk: a * Math.cos(beta * D2R), offEr: be == null ? null : b * Math.cos(be * D2R),
+    torque: (a / 10) * Math.cos(beta * D2R),
+    travel: be == null ? null : (eraseT - drawT),
+  };
+}
+
+function verdict(s) {
+  if (s.be == null) return ["stop", "Eraser can't reach"];
+  if (s.shoulder < 0) return ["stop", "Barrel hits first"];
+  if (s.travel > 170) return ["warn", "Needs the servo's full travel"];
+  if (!s.servoPresses) return ["warn", "Needs a spring; smears at each touch"];
+  if (s.tail > 4) return ["warn", "Smears at each touch"];
+  if (s.be < 75) return ["ok", "Works; trim the eraser"];
+  return ["ok", "Works"];
+}
+
+const f1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
+const f0 = (v) => Math.round(v).toString();
+function render() {
+  const cur = DESIGNS.find((x) => x.id === design), s = solve(cur.beta);
+  // design buttons
+  $("#designs").innerHTML = DESIGNS.map((x) => `<button type="button" data-d="${x.id}" aria-pressed="${x.id === design}">${x.name}</button>`).join("");
+  // the angles to enter
+  $("#angles").innerHTML = s.be == null ? `<p>The eraser end can't reach the board with this shaft height.</p>` :
+    `<div><b>${f0(s.drawT)}°</b><span>draw tilt</span></div><div><b>${f0(s.liftT)}°</b><span>lift tilt</span></div><div><b>+${f0(s.eraseT)}°</b><span>erase tilt</span></div><div><b>${f0(s.d)} mm</b><span>shaft above the board</span></div>`;
+  // table
+  const rows = DESIGNS.map((x) => {
+    const r = solve(x.beta), [tone, word] = verdict(r);
+    return `<tr ${x.id === design ? "data-current" : ""}><td>${x.name}</td><td class="num">${f0(r.d)} mm</td><td class="num">${r.travel == null ? "–" : `${f0(r.travel)}°, ${(r.travel / SPEED).toFixed(2)} s`}</td>
+      <td class="num">${f0(x.beta)}° / ${r.be == null ? "–" : f0(r.be) + "°"}</td><td class="num">${r.shoulder >= 0 ? `clears by ${f1(r.shoulder)} mm` : `<span class="state" data-tone="stop">hits by ${f1(-r.shoulder)} mm</span>`}</td>
+      <td class="num">${f1(r.tail)} mm</td><td class="num">${f0(r.offInk)} / ${r.offEr == null ? "–" : f0(r.offEr)} mm</td><td class="num">${f1(r.torque)} N·cm</td>
+      <td><span class="state" data-tone="${tone}">${word}</span></td></tr>`;
+  }).join("");
+  $("#table").innerHTML = `<thead><tr><th>Mount</th><th>Shaft height</th><th>Ink to eraser</th><th>Meets board, nib / eraser</th><th>Barrel</th><th>Slide per press</th><th>Nib / eraser off shaft</th><th>Servo per newton</th><th></th></tr></thead><tbody>${rows}</tbody>`;
+  // the specification, for the recommended 60° mount
+  const best = solve(60), srv = (v) => f0(90 + v);
+  $("#spec").innerHTML = `<tbody>
+    <tr><td>Pen meets the board at</td><td class="num"><b>60°</b> (55° to 65° works)</td></tr>
+    <tr><td>Servo shaft</td><td>along the forearm, <span class="num">${f0(best.d)} mm</span> above the board</td></tr>
+    <tr><td>Clamp</td><td>at the pen's balance point, <span class="num">${f0(best.a)} mm</span> from the nib</td></tr>
+    <tr><td>Tilt from flat: draw, lift, erase</td><td class="num"><b>${f0(best.drawT)}°, ${f0(best.liftT)}°, +${f0(best.eraseT ?? 0)}°</b></td></tr>
+    <tr><td>Same in servo degrees (flat = 90°)</td><td class="num">${srv(best.drawT)}°, ${srv(best.liftT)}°, ${srv(best.eraseT ?? 0)}°</td></tr>
+    <tr><td>Ink to eraser</td><td class="num">${f0(best.travel ?? 0)}° of servo, ${((best.travel ?? 0) / SPEED).toFixed(2)} s</td></tr>
+    <tr><td>Lift</td><td class="num">${f1(best.liftT - best.drawT)}° up from draw clears the board by ${f1(P.c)} mm</td></tr>
+    <tr><td>Pressure</td><td class="num">${f1(P.p)} mm into the board, set by the servo; the nib slides ${f1(best.tail)} mm as it lands</td></tr>
+    <tr><td>Barrel</td><td class="num">clears the board by ${f1(best.shoulder)} mm at the draw angle</td></tr>
+    <tr><td>Eraser</td><td class="num">meets the board at ${f0(best.be ?? 0)}°: trim the felt to that angle</td></tr>
+    <tr><td>Where each end touches</td><td class="num">nib ${f0(best.offInk)} mm to one side of the shaft, eraser ${f0(best.offEr ?? 0)} mm to the other</td></tr>
+    <tr><td>Servo load</td><td class="num">${f1(best.torque)} N·cm per newton of pen force; the SG92R stalls at ${STALL} N·cm</td></tr>
+  </tbody>`;
+  $("#sweep").innerHTML = `<thead><tr><th>Angle</th><th>Shaft</th><th>Ink to eraser</th><th>Slide per press</th><th>Barrel clears by</th><th>Servo per newton</th></tr></thead><tbody>${[40, 45, 50, 55, 60, 65, 70, 75, 80].map((g) => { const r = solve(g); return `<tr ${g === 60 ? "data-current" : ""}><td class="num">${g}°</td><td class="num">${f0(r.d)} mm</td><td class="num">${r.travel == null ? "–" : f0(r.travel) + "°"}</td><td class="num">${f1(r.tail)} mm</td><td class="num">${r.shoulder >= 0 ? f1(r.shoulder) + " mm" : `<span class="state" data-tone="stop">hits</span>`}</td><td class="num">${f1(r.torque)} N·cm</td></tr>`; }).join("")}</tbody>`;
+  // text that follows the pen
+  $("#s-d").textContent = `${f0(best.d)} mm`; $("#s-trim").textContent = `${f0(best.be ?? 60)}°`;
+  $("#s-off").textContent = best.offEr != null && Math.abs(best.offInk - best.offEr) > 2 ? `${f0(best.offInk)} mm and ${f0(best.offEr)} mm` : `${f0(best.offInk)} mm`;
+  $("#pen-note").textContent = `Pen ${f0(P.L)} mm × ${f0(P.D)} mm${P.L === 140 && P.D === 17 ? ", a placeholder: enter yours below" : ""}`;
+  target = poseAngle(s); if (!anim) { shown = target; draw(); }
+  readout(s);
+}
+
+function poseAngle(s) { return pose === "draw" ? s.drawT : pose === "erase" ? (s.eraseT ?? 0) : s.liftT; }
+
+function readout(s) {
+  const [tone, word] = verdict(s);
+  $("#readout").innerHTML = `<span><b>${DESIGNS.find((x) => x.id === design).name}</b></span><span>servo ${f0(shown)}° from flat</span><span>${s.travel == null ? "eraser out of reach" : `ink to eraser ${f0(s.travel)}° (${(s.travel / SPEED).toFixed(2)} s)`}</span><span class="state" data-tone="${tone}">${word}</span>`;
+}
+
+// ---------- side view ----------
+const cv = $("#cv"), ctx = cv.getContext("2d");
+let shown = -60, target = -60, anim = 0, cycleTimer = 0;
+function col(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function draw() {
+  const cur = DESIGNS.find((x) => x.id === design), s = solve(cur.beta);
+  const W = cv.width, H = cv.height, span = Math.max(P.L * 1.25, 180);
+  const sc = Math.min(W / span, (H * 0.86) / (s.d + Math.max(s.a, s.b) + 10));
+  const ox = W / 2, oy = H * 0.9;
+  const X = (x) => ox + x * sc, Y = (z) => oy - z * sc;
+  ctx.clearRect(0, 0, W, H);
+  // board, edge on
+  ctx.fillStyle = col("--board"); ctx.fillRect(0, oy, W, H - oy);
+  ctx.strokeStyle = col("--ink-3"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
+  ctx.fillStyle = col("--ink-3"); ctx.font = `${Math.round(13 * W / 640)}px ${col("--body")}`; ctx.fillText("whiteboard", 12, oy + 22 * W / 640);
+  // ball caster post behind the pen
+  ctx.strokeStyle = col("--line"); ctx.lineWidth = 6 * W / 640; ctx.beginPath(); ctx.moveTo(X(0), Y(s.d)); ctx.lineTo(X(0), Y(6)); ctx.stroke();
+  ctx.fillStyle = col("--line"); ctx.beginPath(); ctx.arc(X(0), Y(6), 6 * sc, 0, 7); ctx.fill();
+  // pen: from the nib end through the clamp to the eraser end
+  const th = shown * D2R, ux = -Math.cos(th), uz = Math.sin(th);    // unit vector from clamp toward the nib
+  const ax = 0, az = s.d, R = P.D / 2;
+  const nib = [ax + ux * s.a, az + uz * s.a], er = [ax - ux * s.b, az - uz * s.b], sh = [ax + ux * (s.a - P.t), az + uz * (s.a - P.t)];
+  const nx = -uz, nz = ux;   // across the pen
+  const quad = (p, q, r1, r2) => { ctx.beginPath(); ctx.moveTo(X(p[0] + nx * r1), Y(p[1] + nz * r1)); ctx.lineTo(X(q[0] + nx * r2), Y(q[1] + nz * r2)); ctx.lineTo(X(q[0] - nx * r2), Y(q[1] - nz * r2)); ctx.lineTo(X(p[0] - nx * r1), Y(p[1] - nz * r1)); ctx.closePath(); };
+  const capEnd = [er[0] + ux * 6, er[1] + uz * 6];
+  ctx.fillStyle = col("--wash"); ctx.strokeStyle = col("--ink-2"); ctx.lineWidth = 2;
+  quad(sh, capEnd, R, R); ctx.fill(); ctx.stroke();                 // barrel
+  ctx.fillStyle = col("--felt"); quad(capEnd, er, R, R); ctx.fill(); ctx.stroke();   // eraser felt
+  ctx.fillStyle = col("--ink"); quad(sh, nib, R * 0.45, R * 0.18); ctx.fill();          // nib
+  // shaft and horn
+  ctx.fillStyle = col("--bg"); ctx.strokeStyle = col("--ink"); ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(X(ax), Y(az), 7 * sc, 0, 7); ctx.fill(); ctx.stroke();
+  // what touches
+  const nibZ = nib[1], erZ = er[1] - 0;
+  const touch = (pt, z, c) => { if (z <= 0.6) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(X(pt[0]), oy, 5 * W / 640, 0, 7); ctx.fill(); } };
+  touch(nib, nibZ, col("--accent")); touch(er, erZ, col("--felt"));
+  // the barrel's edge on the nib side, if it would hit the board
+  if (s.shoulder < 0 && pose === "draw") {
+    ctx.strokeStyle = col("--stop"); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(sh[0] - nx * R), Y(sh[1] - nz * R), 9 * W / 640, 0, 7); ctx.stroke();
+  }
+  // labels
+  ctx.fillStyle = col("--ink-2"); ctx.font = `${Math.round(13 * W / 640)}px ${col("--body")}`;
+  ctx.fillText("nib", X(nib[0]) - 26 * W / 640, Y(nib[1]) - 10 * W / 640);
+  ctx.fillText("eraser", X(er[0]) + 8 * W / 640, Y(er[1]) - 10 * W / 640);
+  ctx.fillText(`shaft ${f0(s.d)} mm up`, X(ax) + 14 * W / 640, Y(az) - 12 * W / 640);
+}
+
+function step(ts) {
+  if (!step.last) step.last = ts;
+  const dt = Math.min(0.05, (ts - step.last) / 1000); step.last = ts;
+  const v = (SPEED / 4) * dt, d = target - shown;
+  shown += Math.max(-v, Math.min(v, d));
+  draw(); readout(solve(DESIGNS.find((x) => x.id === design).beta));
+  if (Math.abs(target - shown) > 0.01) anim = requestAnimationFrame(step); else { anim = 0; step.last = 0; }
+}
+function go(p) {
+  pose = p; document.querySelectorAll("#poses button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pose === p)));
+  target = poseAngle(solve(DESIGNS.find((x) => x.id === design).beta));
+  if (!anim) anim = requestAnimationFrame(step);
+}
+
+$("#designs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; design = b.dataset.d; render(); go(pose); });
+$("#poses").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; stopCycle(); go(b.dataset.pose); });
+function stopCycle() { clearTimeout(cycleTimer); cycleTimer = 0; $("#cycle").textContent = "Play the cycle"; }
+$("#cycle").addEventListener("click", () => {
+  if (cycleTimer) { stopCycle(); return; }
+  const seq = ["draw", "lift", "erase", "lift"]; let i = 0;
+  $("#cycle").textContent = "Stop";
+  const next = () => { go(seq[i++ % seq.length]); cycleTimer = setTimeout(next, 1600); };
+  next();
+});
+["L", "D", "t", "a", "c", "p"].forEach((k) => {
+  const el = $(`#f-${k}`); el.value = P[k];
+  el.addEventListener("input", () => {
+    const v = parseFloat(el.value); if (!isFinite(v) || v <= 0) return;
+    if (k === "L" && Math.abs(P.a - P.L / 2) < 0.5) { P.a = v / 2; $("#f-a").value = P.a; }   // keep the clamp centred until it's moved
+    P[k] = v; try { localStorage.setItem("penmount", JSON.stringify(P)); } catch (e) {}
+    render();
+  });
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", draw);
+render();
+})();
+</script>
