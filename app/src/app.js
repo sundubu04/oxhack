@@ -280,7 +280,8 @@ function repeatTurn(text) {
     return { said: n === 1 ? "Stopped the repeat." : `Stopped all ${n} repeats.` };
   }
   const m = text.match(/\b(?:every|each)\s+(?:(\d+|an?|one|two|three|four|five|ten|fifteen|twenty|thirty)\s+)?(sec\w*|min\w*|hours?|hrs?)\b|\bhourly\b/i);
-  const keepClock = /\b(clock|time)\b/.test(t) && /\b(keep|kept|auto\W?updat\w*|updat\w*|refresh\w*|right|correct|on time|up to date|ticking|live|current|follow\w*)\b/.test(t);
+  // a clock that keeps time: said outright, or any clock with a repeat ("a working clock, every 5 minutes")
+  const keepClock = /\b(clock|time)\b/.test(t) && (!!m || /\b(keep|kept|auto\W?updat\w*|updat\w*|refresh\w*|right|correct|on time|up to date|tick\w*|live|current|follow\w*|real|working|running|run|going|loop\w*)\b/.test(t));
   if (!m && !keepClock) return null;
   let every = 1;
   if (m) {
@@ -296,6 +297,9 @@ function repeatTurn(text) {
 }
 function addHook(prompt, every = 1) {
   every = Math.max(1, Math.round(Number(every) || 1));
+  // a repeat about a clock (the model's, say "refresh the clock") is the clock drawn here at the time it runs: exact,
+  // and no model call every few minutes
+  if (/\bclock\b/i.test(prompt) || isClock(prompt)) prompt = "draw the time";
   let h = hooks.find((x) => x.prompt.toLowerCase() === prompt.toLowerCase() || (isClock(x.prompt) && isClock(prompt)));
   if (!h) { h = { id: newId(), prompt, every }; hooks.push(h); }
   h.every = every; h.slot = null; h.error = null;
