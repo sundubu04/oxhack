@@ -494,7 +494,7 @@ async function cameraOn() {
   try {
     // Presage has the camera to itself: the page opening it too changed the frame size under the SDK, which aborted it
     await moodCall("/start"); moodCam = true;
-    clearInterval(moodTimer); moodTimer = setInterval(moodTick, 300);
+    clearInterval(moodTimer); moodTimer = setInterval(moodTick, 300); showFace();
   } catch (e) { toast(e.message, "circle-alert"); }
   finally { $("#mood-camera").disabled = false; renderMood(); }
 }
@@ -503,6 +503,30 @@ async function cameraOff() {
   try { await moodCall("/stop"); } catch (e) {}
   renderMood();
 }
+// Your face at the top right of the board: the frames Presage's SDK hands back (its videoOutput), fetched one at a
+// time while the camera is on, so the page never opens the camera itself.
+let faceBusy = false;
+async function showFace() {
+  if (faceBusy) return; faceBusy = true;
+  const fig = $("#face"), cv = $("#face-view"), ctx = cv.getContext("2d");
+  try {
+    while (moodCam && doc?.mood) {
+      const r = await fetch("./api/mood/frame", { cache: "no-store" }).catch(() => null);
+      if (r?.status === 200) {
+        const w = +r.headers.get("X-Width"), h = +r.headers.get("X-Height"), rgb = new Uint8Array(await r.arrayBuffer());
+        if (w && h && rgb.length >= w * h * 3) {
+          if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+          const img = ctx.createImageData(w, h);
+          for (let i = 0, j = 0; i < w * h; i++, j += 3) { img.data[i * 4] = rgb[j]; img.data[i * 4 + 1] = rgb[j + 1]; img.data[i * 4 + 2] = rgb[j + 2]; img.data[i * 4 + 3] = 255; }
+          ctx.putImageData(img, 0, 0); fig.hidden = false;
+        }
+      }
+      const m = moodRead; $("#face-word").textContent = m?.on && m.mood && m.age < 1500 ? `${MOOD_WORD[m.mood]} ${m.scores?.[0]?.confidence ?? ""}%` : m?.hint || "";
+      await new Promise((done) => setTimeout(done, 125));
+    }
+  } finally { faceBusy = false; fig.hidden = true; }
+}
+
 // the latest reading; with Follow my face on, a new mood that has held for 2 s is drawn once the arm is free
 async function moodTick() {
   try { await moodCall(""); } catch (e) {}

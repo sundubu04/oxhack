@@ -179,3 +179,8 @@ button.dl-nav__item { width: 100%; border: 0; background: none; font: inherit; c
 .cw-mood__bars { display: grid; grid-template-columns: 76px minmax(0, 1fr) 40px; align-items: center; gap: 6px 10px; font-size: var(--dl-fs-sm); }
 .cw-mood__bars b { font-weight: 400; text-align: right; color: var(--dl-text-3); }
 .cw-mood__bars [data-top] { font-weight: 600; }
+/* your face, as Presage's camera sees it, top right of the board (Emotion mode) */
+.cw-face { position: absolute; top: 12px; right: 12px; z-index: 2; width: min(220px, 34%); margin: 0; border-radius: var(--dl-r-card); overflow: hidden; background: var(--dl-surface-2); box-shadow: var(--dl-shadow-float); }
+.cw-face canvas { display: block; width: 100%; height: auto; transform: scaleX(-1); }
+.cw-face figcaption { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: var(--dl-r-tag); background: var(--dl-raised); font-size: var(--dl-fs-sm); }
+.cw-face figcaption:empty { display: none; }

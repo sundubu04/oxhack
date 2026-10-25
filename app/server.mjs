@@ -132,9 +132,13 @@ async function api(req, res, path) {
     } catch (e) { return send(res, 502, { error: e.message }); }
     return;
   }
-  // Mood mode: the camera through Presage (lib/presage.mjs). GET: the latest mood; POST start | stop.
+  // Emotion mode: the camera through Presage (lib/presage.mjs). GET: the latest mood, /frame: what it sees; POST start | stop.
   if (path === "/api/mood" || path.startsWith("/api/mood/")) {
     try {
+      if (path === "/api/mood/frame") {   // the camera's view, raw RGB, its size in the headers
+        const f = presage.frame(); if (!f) { res.writeHead(204, { "Cache-Control": "no-store" }).end(); return; }
+        res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Width": f.w, "X-Height": f.h }); res.end(f.rgb); return;
+      }
       if (req.method === "GET") return send(res, 200, presage.status(keys().presage));
       if (path === "/api/mood/start") return send(res, 200, await presage.start(keys().presage));
       if (path === "/api/mood/stop") return send(res, 200, await presage.stop());

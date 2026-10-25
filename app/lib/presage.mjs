@@ -6,7 +6,7 @@
 // under the SDK, which aborts it.
 import { fork } from "node:child_process";
 
-let child = null, stopping = false;
+let child = null, stopping = false, picture = null;   // picture: the latest small frame, { w, h, rgb, at }
 const st = { on: false, status: "off", face: false, hint: null, error: null, mood: null, scores: [], stable: false, at: 0 };
 
 // Presage's eight expressions -> the five moods: fear reads as surprise, disgust and contempt as anger
@@ -16,9 +16,13 @@ const STATUS = ["uninitialized", "idle", "starting", "running", "stopping", "err
 const HINTS = { 1: "No face found", 2: "More than one face", 3: "Centre your face", 4: "Move a little closer or further", 5: "Too dark", 6: "Too bright",
   10: "Camera adjusting", 11: "Camera too slow", 12: "Hold still", 13: "Move back a little", 14: "Move closer", 15: "Move down a little", 16: "Move up a little", 17: "Face the camera" };
 
+// the camera's view for the app to show (RGB, w x h), while it is fresh
+export function frame() { return picture && Date.now() - picture.at < 2000 ? picture : null; }
+
 export function status(key) { return { ...st, ready: !!key, age: st.at ? Date.now() - st.at : null }; }
 
 function heard(m) {
+  if (m.kind === "frame") { picture = { w: m.w, h: m.h, rgb: Buffer.from(m.rgb), at: Date.now() }; return; }
   if (m.kind === "status") st.status = STATUS[m.s] || String(m.s);
   else if (m.kind === "validation") { st.face = m.code === 0; st.hint = m.code === 0 ? null : HINTS[m.code] || m.hint || "Adjusting"; }
   else if (m.kind === "error") st.error = m.message;
@@ -37,11 +41,12 @@ export async function start(key) {
   Object.assign(st, { on: true, status: "starting", face: false, hint: null, error: null, mood: null, scores: [], stable: false, at: 0 });
   stopping = false;
   const last = [];   // its last words on stderr: what to say if it dies
-  child = fork(new URL("./presage-worker.mjs", import.meta.url), { env: { ...process.env, PRESAGE_API_KEY: key }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+  // advanced serialization carries the frames as bytes, not JSON
+  child = fork(new URL("./presage-worker.mjs", import.meta.url), { env: { ...process.env, PRESAGE_API_KEY: key }, stdio: ["ignore", "ignore", "pipe", "ipc"], serialization: "advanced" });
   child.stderr.on("data", (b) => { for (const l of b.toString().split("\n")) if (l.trim() && !/feedback_manager|avfoundation|absl::|model path|NORM_RECT/.test(l)) { last.push(l.trim()); if (last.length > 5) last.shift(); } });
   child.on("message", heard);
   child.on("exit", (code, signal) => {
-    child = null; Object.assign(st, { on: false, status: "off", face: false });
+    child = null; picture = null; Object.assign(st, { on: false, status: "off", face: false });
     if (!stopping) st.error = `The camera reader stopped${signal ? ` (${signal})` : code ? ` (${code})` : ""}${last.length ? `: ${last.at(-1).replace(/^.*error: /, "").slice(0, 160)}` : ""}. Start it again.`;
   });
   return status(key);
@@ -53,7 +58,7 @@ export async function stop() {
     c.send("stop");
     await new Promise((done) => { const t = setTimeout(() => { try { c.kill("SIGKILL"); } catch (e) {} done(); }, 4000); c.once("exit", () => { clearTimeout(t); done(); }); });
   }
-  Object.assign(st, { on: false, status: "off", face: false, hint: null });
+  picture = null; Object.assign(st, { on: false, status: "off", face: false, hint: null });
   return status(true);
 }
 process.on("exit", () => { try { child?.kill(); } catch (e) {} });
