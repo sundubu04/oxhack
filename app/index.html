@@ -55,6 +55,13 @@
           <div class="cw-stage" id="stage">
             <figure class="cw-face" id="face" hidden><canvas id="face-view" aria-label="Your face, as the camera sees it"></canvas><figcaption id="face-word"></figcaption></figure>
             <canvas class="cw-board" id="board" aria-label="The whiteboard and the arm"></canvas>
+            <div class="cw-own" id="own-tools" hidden>
+              <div class="dl-seg" role="group" aria-label="What pressing on the board does" id="own-tool">
+                <button type="button" aria-pressed="true" data-own="draw">Write</button>
+                <button type="button" aria-pressed="false" data-own="erase">Erase</button>
+              </div>
+              <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="own-done">Done</button>
+            </div>
             <p class="cw-empty" id="empty">The arm draws here first, to scale</p>
             <div class="cw-3d" id="view3d" hidden>
               <div class="dl-seg cw-3d__cams" role="group" aria-label="Camera" id="cams">
@@ -338,16 +345,5 @@
   </dialog>
   <div class="dl-toasts" id="toasts" role="region" aria-live="polite" aria-label="Notices"></div>
   <script type="module" src="./src/app.js"></script>
-  <!-- draw your own: live drawing, full screen so the tablet's whole area is the board's drawing area -->
-  <div class="cw-pad" id="pad" hidden>
-    <div class="cw-pad__bar">
-      <span class="cw-pad__title">Draw your own</span><span class="dl-meta" id="pad-note">Press to write, lift the pen to stop</span>
-      <span class="cw-pad__gap"></span>
-      <button class="dl-btn dl-btn--primary" type="button" id="pad-connect" hidden><i data-icon="usb"></i>Connect arm</button>
-      <button class="dl-btn dl-btn--ghost" type="button" id="pad-clear">Clear the screen</button>
-      <button class="dl-btn dl-btn--secondary" type="button" id="pad-close">Close</button>
-    </div>
-    <canvas class="cw-pad__sheet" id="pad-sheet" aria-label="Drawing pad: draw with the tablet pen or the mouse"></canvas>
-  </div>
 </body>
 </html>

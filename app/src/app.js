@@ -103,6 +103,7 @@ function markCurrent() {
   (row || $(`.cw-rail [data-page="${pageNow}"]`))?.setAttribute("aria-current", "page");
   if (pageNow === "studio" && doc?.clock) $("#open-clock").setAttribute("aria-current", "page");   // the clock is open
   $("#open-mood").removeAttribute("aria-current"); if (pageNow === "studio" && doc?.mood) $("#open-mood").setAttribute("aria-current", "page");
+  $("#open-own").removeAttribute("aria-current"); if (pageNow === "studio" && ownTool) $("#open-own").setAttribute("aria-current", "page");
   row?.scrollIntoView({ block: "nearest" });
 }
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -577,88 +578,73 @@ function wireMood() {
 }
 
 // ---------- draw your own ----------
-// Live drawing: a full-screen pad (the Wacom tablet maps to the whole screen, so a pad that fills it uses the whole
-// tablet) whose square is the board's drawing area. Pressing writes: the arm travels there lifted and puts the nib
-// down, follows the pen while it is pressed, and lifts it when the pen comes up. Closing sends the arm home.
-let pad = null, padInk = [];   // pad: { cur, last } while open; padInk: the lines drawn so far ([[u, v], ...], 0-100, y down)
-const MARKER_MM = 2;
-// a pad point -> board mm, through the drawing area (y up)
-function padMm([u, v]) { const b = boxMm(FULL, g); return { x: b.x + (u / 100) * b.w, y: b.y + b.h - (v / 100) * b.h }; }
-function padStatus() {
-  const on = arm.connected(); $("#pad-connect").hidden = on;
-  $("#pad-note").textContent = !on ? "The arm isn't connected: lines only show here" : armBusy ? "The arm is drawing something else: stop it first" : "Press to write, lift the pen to stop";
-}
-function openPad() {
-  pad = { cur: null, last: null };
-  $("#pad").hidden = false; fitPad(); padStatus();
-  document.documentElement.requestFullscreen?.().catch(() => {});   // the whole page, so toasts still show
-}
-function closePad() {
-  if (!pad) return;
-  penUp(); pad = null; $("#pad").hidden = true;
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  if (arm.connected() && !armBusy) arm.park().catch(() => {});   // home, as after every drawing
-}
-function fitPad() {
-  if (!pad) return;
-  const cv = $("#pad-sheet"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  paintPad();
-}
-function paintPad() {
-  const cv = $("#pad-sheet"), ctx = cv.getContext("2d"), css = getComputedStyle(cv);
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.strokeStyle = ctx.fillStyle = css.color; ctx.lineCap = ctx.lineJoin = "round";
-  ctx.lineWidth = (MARKER_MM / (2 * g.half)) * cv.width;   // the marker's width, to the drawing area's scale
-  for (const s of padInk) inkPad(ctx, cv, s, 0);
-}
-// draw a line on the pad from point `from` on, so a pen move only adds its new piece
-function inkPad(ctx, cv, s, from) {
-  const k = cv.width / 100;
-  if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0][0] * k, s[0][1] * k, ctx.lineWidth / 2, 0, 2 * Math.PI); ctx.fill(); return; }
-  const i0 = Math.max(1, from);
-  ctx.beginPath(); ctx.moveTo(s[i0 - 1][0] * k, s[i0 - 1][1] * k);
-  for (let i = i0; i < s.length; i++) ctx.lineTo(s[i][0] * k, s[i][1] * k);
-  ctx.stroke();
-}
-function padPoint(e) {
-  const r = $("#pad-sheet").getBoundingClientRect();
-  return [Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100)), Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100))];
-}
+// Live drawing on the studio's diamond board: Draw your own turns pressing on the board into the pen. Write puts the
+// nib down, Erase the eraser; a press somewhere new travels there lifted first and puts the tool down on arrival,
+// dragging carries on, letting go lifts it where it is. The sim's arm does the same and lays or wipes the board's
+// ink as it goes; the real arm follows when it is connected (the server's live point: lift, travel, lower). What is
+// drawn by hand is the board's ink, not part of the plan. Done sends the arm home.
+let ownTool = null, ownStroke = null, ownLower = null;   // ownTool: "draw" | "erase" while drawing your own
 const armFree = () => arm.connected() && !armBusy;
-function penDown(e) {
-  const p = padPoint(e); pad.cur = [p]; padInk.push(pad.cur); pad.last = p;
-  inkPad($("#pad-sheet").getContext("2d"), $("#pad-sheet"), pad.cur, 0);
-  if (armFree()) { const m = padMm(p); arm.point(m.x, m.y, "draw", true); }   // travel there lifted, then the nib down
-  padStatus();
+function ownMode(tool) {
+  if (!tool) ownUp();
+  ownTool = tool;
+  $("#own-tools").hidden = !tool; if (tool) $("#empty").hidden = true;   // the board isn't empty for long
+  $$("#own-tool button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.own === tool)));
+  markCurrent();
 }
-function penMove(e) {
-  const cv = $("#pad-sheet"), n = pad.cur.length;
-  for (const c of e.getCoalescedEvents?.() || [e]) pad.cur.push(padPoint(c));   // a tablet reports far more often than frames
-  inkPad(cv.getContext("2d"), cv, pad.cur, n);
-  const p = pad.cur.at(-1), m = padMm(p), q = padMm(pad.last);
-  if (Math.hypot(m.x - q.x, m.y - q.y) < 1) return;   // 1 mm is the finest a marker shows
-  pad.last = p; if (armFree()) arm.point(m.x, m.y, "draw");
+function openOwn() {
+  go("studio"); if (view !== "board") setView("board");
+  ownMode(ownTool || "draw");
 }
-function penUp() {
-  if (!pad?.cur) return; pad.cur = null; paintPad();   // once more whole, without the seams of drawing it piece by piece
+function ownDone() {
+  if (!ownTool) return;
+  ownMode(null);
+  if (armFree()) arm.park().catch(() => {});   // home, as after every drawing
+}
+// the base and elbow that put this tool's end on p, or null when the arm can't get there
+function ownPose(p, tool) {
+  const r = toAngles([{ x: p.x, y: p.y, pen: 1, tool }], g), a = r.path[0];
+  return a.out_of_reach || r.outOfRange ? null : a;
+}
+function ownDown(p) {
+  if (playing || sending) { toast("Wait for the drawing to finish, or stop it", "circle-alert"); return false; }
+  if (armBusy) { toast("The arm is drawing something else: stop it first", "circle-alert"); return false; }
+  const a = ownPose(p, ownTool); if (!a) { toast("That's out of the arm's reach", "circle-alert"); return false; }
+  ownStroke = { tool: ownTool, last: p };
+  sim.manual = { base: a.base, elbow: a.elbow, tilt: g.tilt.lift }; ownLower = ownTool;
+  if (armFree()) arm.point(p.x, p.y, ownTool, true);
+  kick(); return true;
+}
+function ownMove(p) {
+  if (!ownStroke || Math.hypot(p.x - ownStroke.last.x, p.y - ownStroke.last.y) < 1) return;   // 1 mm is the finest a marker shows
+  const a = ownPose(p, ownStroke.tool); if (!a) return;
+  ownStroke.last = p; sim.manual = { base: a.base, elbow: a.elbow, tilt: sim.manual?.tilt ?? g.tilt.lift };
+  if (armFree()) arm.point(p.x, p.y, ownStroke.tool);
+  kick();
+}
+function ownUp() {
+  if (!ownStroke) return; ownStroke = null; ownLower = null;
+  if (sim.manual) sim.manual = { ...sim.manual, tilt: g.tilt.lift };
   if (armFree()) arm.servos(undefined, undefined, cfg.penServo.lift);   // lift it where it is
+  kick(); saveSoon();
+}
+// the tool goes down once the sim's arm has reached the press, as the real one does
+function lowerOwn() {
+  const m = sim.manual;
+  if (ownLower && m && Math.abs(sim.j.base - m.base) < 0.6 && Math.abs(sim.j.elbow - m.elbow) < 0.6) { sim.manual = { ...m, tilt: ownLower === "erase" ? g.tilt.erase : g.tilt.draw }; ownLower = null; }
 }
 function wireOwn() {
-  $("#open-own").addEventListener("click", openPad);
-  $("#pad-clear").addEventListener("click", () => { padInk = []; if (pad) paintPad(); });
-  $("#pad-close").addEventListener("click", closePad);
-  $("#pad-connect").addEventListener("click", async () => { await connectArm(); padStatus(); });
-  const cv = $("#pad-sheet");
+  $("#open-own").addEventListener("click", openOwn);
+  $("#own-tool").addEventListener("click", (e) => { const b = e.target.closest("[data-own]"); if (b) ownMode(b.dataset.own); });
+  $("#own-done").addEventListener("click", ownDone);
+  const cv = $("#board"), at = (e) => board.toWorld(e.clientX, e.clientY);
   cv.addEventListener("pointerdown", (e) => {
-    if (!pad || e.button !== 0) return;   // the pen's tip (or the mouse's left button); its side buttons do nothing
-    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-    penDown(e);
+    if (!ownTool || e.button !== 0) return;   // the pen's tip (or the mouse's left button)
+    if (ownDown(at(e))) try { cv.setPointerCapture(e.pointerId); } catch (err) {}
   });
-  cv.addEventListener("pointermove", (e) => { if (pad?.cur) penMove(e); });
-  cv.addEventListener("pointerup", penUp); cv.addEventListener("pointercancel", penUp);
-  window.addEventListener("resize", fitPad);
-  document.addEventListener("keydown", (e) => { if (pad && e.key === "Escape" && !document.fullscreenElement) closePad(); });
+  cv.addEventListener("pointermove", (e) => { if (ownStroke) for (const c of e.getCoalescedEvents?.() || [e]) ownMove(at(c)); });   // a tablet reports far more often than frames
+  cv.addEventListener("pointerup", ownUp); cv.addEventListener("pointercancel", ownUp);
+  document.addEventListener("keydown", (e) => { if (ownTool && e.key === "Escape" && !e.target.closest("input, textarea, dialog")) ownDone(); });
 }
 
 // ---------- stop ----------
@@ -776,6 +762,7 @@ function frame(ts) {
   let moving = false;
   if (playing && active) { sim.advance(dt * speed, onInk); moving = true; if (sim.done) finished(); }
   else if (settling(sim)) { sim.advance(dt, onInk, true); moving = true; }
+  if (ownLower) { lowerOwn(); moving = true; }
   draw(); syncLive();
   if (moving || playing) kick();
 }
@@ -889,6 +876,7 @@ function setView(v) {
   $$("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
   $("#board").hidden = v !== "board"; $("#picture").hidden = v !== "picture"; $("#angles").hidden = v !== "angles";
   $("#view3d").hidden = v !== "3d"; v3?.show(v === "3d");
+  if (v !== "board" && ownTool) ownDone();   // drawing your own is on the flat board
   if (v === "3d") open3d();
   if (v === "board") draw();
   if (v === "angles") { lastRow = -1; syncLive(true); }
@@ -988,6 +976,7 @@ function go(page) {
 function showPage(page) {
   page = pageNow = page === "arm" ? "arm" : "studio";
   $("#page-studio").hidden = page !== "studio"; $("#page-arm").hidden = page !== "arm";
+  if (page !== "studio" && ownTool) ownDone();
   markCurrent();
   $("#app").removeAttribute("data-nav-open");
   if (page === "arm") { fillSetup(cfg); requestAnimationFrame(renderSetup); }
@@ -1244,8 +1233,8 @@ function wire() {
   $("#palette-list").addEventListener("pointermove", (e) => { const li = e.target.closest("[data-i]"); if (li && +li.dataset.i !== palIndex) movePalette(+li.dataset.i - palIndex); });
   $("#palette").addEventListener("click", (e) => { if (e.target === $("#palette")) $("#palette").close(); });
 
-  jogOn($("#board"), () => board, () => sim, (h) => { hover = h; }, () => !playing && !sending, () => { draw(); syncLive(true); kick(); if (sim.manual) arm.jog(sim.manual, g); },
-    (p) => { const c = cellAt(p); if (c < 0 || thinking) return false; send(cap(cellName(c))); return true; });
+  jogOn($("#board"), () => board, () => sim, (h) => { hover = h; }, () => !playing && !sending && !ownTool, () => { draw(); syncLive(true); kick(); if (sim.manual && !ownTool) arm.jog(sim.manual, g); },
+    (p) => { const c = cellAt(p); if (ownTool || c < 0 || thinking) return false; send(cap(cellName(c))); return true; });
   jogOn($("#setup-board"), () => setupBoard, () => setupSim, (h) => { setupHover = h; }, () => false, () => renderSetup());
 
   $("#setup").addEventListener("input", () => { setupSim.manual = null; renderSetup(); $("#save-note").textContent = dirty() ? "Not saved yet" : ""; });
