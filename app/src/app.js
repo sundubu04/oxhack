@@ -121,7 +121,7 @@ async function openSim(id) {
   await enter(s); renderSims(); go("studio");
 }
 async function enter(s) {
-  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}), ...(s.mood ? { mood: true, moodShown: s.moodShown || null } : {}) };
+  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}), ...(s.mood ? { mood: true, moodShown: s.moodShown || null } : {}), ...(s.hand?.length ? { hand: s.hand } : {}) };
   messages = s.messages || []; scene = s.scene || emptyScene(); hooks = s.hooks || [];
   pause(); active = null; planned = null; inkBefore = null;
   await board.setInk(s.ink); inkDirty = true;
@@ -385,16 +385,20 @@ async function runDemo() {
 }
 // Reset: the arm wipes the whole clock, or (the board cleaned by hand) the app just forgets it and nothing moves.
 // Either way it stops keeping time, so it isn't drawn again at the next mark.
-// A mode's reset (Clock, Emotion): wipe has the arm erase all of it; otherwise the board was wiped by hand, so the
-// app forgets the drawing and nothing moves. what names it in the reply. False when there was nothing to reset.
+// A mode's reset (Clock, Emotion, Draw your own's Clear): wipe has the arm erase all of it, what it drew by plan and
+// what was drawn by hand; otherwise the board was wiped by hand, so the app forgets it all and nothing moves. what
+// names it in the reply. False when there was nothing to reset.
 function resetBoard(wipe, what) {
+  const hand = handStrokes();
   if (wipe) {
-    if (!boardStrokes.length) { toast("The board is already empty"); return false; }
+    if (!boardStrokes.length && !hand.length) { toast("The board is already empty"); return false; }
     quietReply = false;
+    boardStrokes = [...boardStrokes, ...hand]; doc.hand = [];   // the planner wipes what it is told is on the board
     change(applyActions(scene, [{ type: "clear" }]).scene);
     messages.push({ role: "assistant", text: `Wiping the ${what}.` });
   } else {
-    if (!boardStrokes.length && !scene.items.length) { toast("The board is already empty"); return false; }
+    if (!boardStrokes.length && !scene.items.length && !hand.length) { toast("The board is already empty"); return false; }
+    doc.hand = [];
     pause(); finishJob(); active = null; planned = null;
     scene = emptyScene(); boardStrokes = []; board.clearInk(); inkDirty = true; sim.reset();
     renderTitle(); renderPicture(); renderAngles(); renderPlanEmpty(); $("#empty").hidden = false; draw();
@@ -585,6 +589,9 @@ function wireMood() {
 // drawn by hand is the board's ink, not part of the plan. Done sends the arm home.
 let ownTool = null, ownStroke = null, ownLower = null;   // ownTool: "draw" | "erase" while drawing your own
 const armFree = () => arm.connected() && !armBusy;
+// the lines written by hand (doc.hand: [[[x, y], ...], ...], board mm), kept so Clear knows where to wipe
+const handStrokes = () => (doc?.hand || []).map((s) => s.map(([x, y]) => ({ x, y })));
+const mm1 = (v) => Math.round(v * 10) / 10;
 function ownMode(tool) {
   if (!tool) ownUp();
   ownTool = tool;
@@ -595,6 +602,17 @@ function ownMode(tool) {
 function openOwn() {
   go("studio"); if (view !== "board") setView("board");
   ownMode(ownTool || "draw");
+}
+// Clear: the arm wipes the whole board, the hand-drawn lines and anything planned
+function ownClear() {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  if (playing || sending || armBusy) return toast("Wait for the arm to finish, or stop it", "circle-alert");
+  ownUp();
+  const before = active;
+  if (!resetBoard(true, "board")) return;
+  $("#empty").hidden = true; renderThread(); saveSoon();
+  // change() sends it when the arm follows the sim; otherwise send it here, as the drawing went live
+  if (armFree() && !S.follow && active && active !== before) sendToArm(active);
 }
 function ownDone() {
   if (!ownTool) return;
@@ -610,7 +628,8 @@ function ownDown(p) {
   if (playing || sending) { toast("Wait for the drawing to finish, or stop it", "circle-alert"); return false; }
   if (armBusy) { toast("The arm is drawing something else: stop it first", "circle-alert"); return false; }
   const a = ownPose(p, ownTool); if (!a) { toast("That's out of the arm's reach", "circle-alert"); return false; }
-  ownStroke = { tool: ownTool, last: p };
+  ownStroke = { tool: ownTool, last: p, hand: ownTool === "draw" ? [[mm1(p.x), mm1(p.y)]] : null };
+  if (ownStroke.hand) (doc.hand ||= []).push(ownStroke.hand);
   sim.manual = { base: a.base, elbow: a.elbow, tilt: g.tilt.lift }; ownLower = ownTool;
   if (armFree()) arm.point(p.x, p.y, ownTool, true);
   kick(); return true;
@@ -618,12 +637,14 @@ function ownDown(p) {
 function ownMove(p) {
   if (!ownStroke || Math.hypot(p.x - ownStroke.last.x, p.y - ownStroke.last.y) < 1) return;   // 1 mm is the finest a marker shows
   const a = ownPose(p, ownStroke.tool); if (!a) return;
-  ownStroke.last = p; sim.manual = { base: a.base, elbow: a.elbow, tilt: sim.manual?.tilt ?? g.tilt.lift };
+  ownStroke.last = p; ownStroke.hand?.push([mm1(p.x), mm1(p.y)]); sim.manual = { base: a.base, elbow: a.elbow, tilt: sim.manual?.tilt ?? g.tilt.lift };
   if (armFree()) arm.point(p.x, p.y, ownStroke.tool);
   kick();
 }
 function ownUp() {
-  if (!ownStroke) return; ownStroke = null; ownLower = null;
+  if (!ownStroke) return;
+  const h = ownStroke.hand; if (h?.length === 1) h.push([h[0][0] + 0.5, h[0][1]]);   // a tap is a dot of marker
+  ownStroke = null; ownLower = null;
   if (sim.manual) sim.manual = { ...sim.manual, tilt: g.tilt.lift };
   if (armFree()) arm.servos(undefined, undefined, cfg.penServo.lift);   // lift it where it is
   kick(); saveSoon();
@@ -637,6 +658,7 @@ function wireOwn() {
   $("#open-own").addEventListener("click", openOwn);
   $("#own-tool").addEventListener("click", (e) => { const b = e.target.closest("[data-own]"); if (b) ownMode(b.dataset.own); });
   $("#own-done").addEventListener("click", ownDone);
+  $("#own-clear").addEventListener("click", ownClear);
   const cv = $("#board"), at = (e) => board.toWorld(e.clientX, e.clientY);
   cv.addEventListener("pointerdown", (e) => {
     if (!ownTool || e.button !== 0) return;   // the pen's tip (or the mouse's left button)
