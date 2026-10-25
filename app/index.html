@@ -111,6 +111,14 @@
               <div class="dl-field"><label class="dl-label" for="clock-step">Sweeps apart</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-step" type="number" min="0.5" step="any" inputmode="decimal"><span>mm</span></span></div>
               <p class="dl-meta">Half to each side of the hand, much wider than drawings get, so a hand the eraser misses by a little still goes. Sweeps close together leave nothing between them.</p>
             </section>
+            <section class="cw-sec">
+              <h2 class="dl-kicker">Reset</h2>
+              <div class="cw-actions">
+                <button class="dl-btn dl-btn--secondary" type="button" id="clock-wipe">Wipe the clock</button>
+                <button class="dl-btn dl-btn--ghost" type="button" id="clock-forget">Board already clean</button>
+              </div>
+              <p class="dl-meta">Wipe the clock: the arm erases all of it. Board already clean: after wiping it by hand, the app forgets the clock and nothing moves. Either way the clock stops keeping time.</p>
+            </section>
           </div>
           <div class="cw-chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
             <div class="dl-thread cw-thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></div>

@@ -350,6 +350,25 @@ function setClock(date, whole = false) {
   messages.push({ role: "assistant", text: `${whole || !boardStrokes.length ? "Drawing the clock at" : "Setting the hands to"} ${hhmm(date)}.` });
   renderThread(); renderClock(); saveSoon();
 }
+// Reset: the arm wipes the whole clock, or (the board cleaned by hand) the app just forgets it and nothing moves.
+// Either way it stops keeping time, so it isn't drawn again at the next mark.
+function resetClock(wipe) {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  const h = clockHook(); if (h) removeHook(h.id);
+  if (wipe) {
+    if (!boardStrokes.length) return toast("The board is already empty");
+    quietReply = false;
+    change(applyActions(scene, [{ type: "clear" }]).scene);
+    messages.push({ role: "assistant", text: "Wiping the clock." });
+  } else {
+    pause(); finishJob(); active = null; planned = null;
+    scene = emptyScene(); boardStrokes = []; board.clearInk(); inkDirty = true; sim.reset();
+    renderTitle(); renderPicture(); renderAngles(); renderPlanEmpty(); $("#empty").hidden = false; draw();
+    messages.push({ role: "assistant", text: "Forgot the clock: the board is clean." });
+  }
+  doc.clockAt = null; $("#clock-time").value = hhmm(now());
+  renderThread(); renderClock(); saveSoon();
+}
 async function openClock() {
   const s = sims.find((x) => x.clock) || sims.find((x) => x.title === "Clock");
   if (s) { await openSim(s.id); selectTab("clock"); return; }
@@ -363,7 +382,7 @@ function renderClock() {
   if (!on) { if ($("#tab-clock").getAttribute("aria-selected") === "true") selectTab("chat"); return; }
   const has = scene.items.some((i) => i.id === "clock"), h = clockHook();
   status($("#clock-status"), has ? `Shows ${doc.clockAt ? hhmm(new Date(doc.clockAt)) : "a time"}` : "No clock yet", { mark: has ? "dot" : "" });
-  $("#clock-update").disabled = !has;
+  $("#clock-update").disabled = !has; $("#clock-wipe").disabled = !has; $("#clock-forget").disabled = !has;
   $("#clock-keep").setAttribute("aria-checked", String(!!h));
   if (document.activeElement !== $("#clock-every")) $("#clock-every").value = h ? h.every : (+cfg.clock?.every || 5);
   if (document.activeElement !== $("#clock-sweep")) $("#clock-sweep").value = +cfg.clock?.sweep || 40;
@@ -381,6 +400,8 @@ function wireClock() {
   $("#clock-now").addEventListener("click", () => { $("#clock-time").value = hhmm(now()); });
   $("#clock-update").addEventListener("click", () => setClock(clockTimeAsked()));
   $("#clock-draw").addEventListener("click", () => setClock(clockTimeAsked(), true));
+  $("#clock-wipe").addEventListener("click", () => resetClock(true));
+  $("#clock-forget").addEventListener("click", () => resetClock(false));
   $("#clock-keep").addEventListener("click", () => {
     const h = clockHook();
     if (h) { removeHook(h.id); toast("The clock stays as it is"); }
