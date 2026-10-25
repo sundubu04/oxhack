@@ -103,6 +103,7 @@ function markCurrent() {
   (row || $(`.cw-rail [data-page="${pageNow}"]`))?.setAttribute("aria-current", "page");
   if (pageNow === "studio" && doc?.clock) $("#open-clock").setAttribute("aria-current", "page");   // the clock is open
   $("#open-mood").removeAttribute("aria-current"); if (pageNow === "studio" && doc?.mood) $("#open-mood").setAttribute("aria-current", "page");
+  $("#open-own").removeAttribute("aria-current"); if (pageNow === "studio" && doc?.own) $("#open-own").setAttribute("aria-current", "page");
   row?.scrollIntoView({ block: "nearest" });
 }
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -120,7 +121,7 @@ async function openSim(id) {
   await enter(s); renderSims(); go("studio");
 }
 async function enter(s) {
-  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}), ...(s.mood ? { mood: true, moodShown: s.moodShown || null } : {}) };
+  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}), ...(s.mood ? { mood: true, moodShown: s.moodShown || null } : {}), ...(s.own ? { own: true } : {}) };
   messages = s.messages || []; scene = s.scene || emptyScene(); hooks = s.hooks || [];
   pause(); active = null; planned = null; inkBefore = null;
   await board.setInk(s.ink); inkDirty = true;
@@ -321,7 +322,7 @@ setInterval(() => {
   if (due) runHook(due);
 }, 1000);
 function renderHooks() {
-  renderClock(); renderMood();
+  renderClock(); renderMood(); renderOwn();
   const el = $("#repeats"); el.hidden = !hooks.length;
   el.innerHTML = (hooksPaused && hooks.length ? `<div class="cw-repeat">${icon("pause")}<div class="cw-repeat__text"><span class="cw-repeat__what">Repeats paused</span><span class="cw-repeat__when">Stopped by you</span></div><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-resume>Resume</button></div>` : "") + hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
     + `<span class="cw-repeat__when${h.error ? " cw-msg-fail" : ""}">${h.error ? esc(h.error) : `Every ${everyWords(h.every)}${h.last ? `, last at ${hhmm(new Date(h.last))}` : ""}`}</span></div>`
@@ -384,7 +385,7 @@ async function runDemo() {
 }
 // Reset: the arm wipes the whole clock, or (the board cleaned by hand) the app just forgets it and nothing moves.
 // Either way it stops keeping time, so it isn't drawn again at the next mark.
-// A mode's reset (Clock, Emotion): wipe has the arm erase all of it; otherwise the board was wiped by hand, so the
+// A mode's reset (Clock, Emotion, Draw your own): wipe has the arm erase all of it; otherwise the board was wiped by hand, so the
 // app forgets the drawing and nothing moves. what names it in the reply. False when there was nothing to reset.
 function resetBoard(wipe, what) {
   if (wipe) {
@@ -574,6 +575,169 @@ function wireMood() {
   $("#mood-wipe").addEventListener("click", () => resetMood(true));
   $("#mood-forget").addEventListener("click", () => resetMood(false));
   window.addEventListener("pagehide", () => { if (moodCam) navigator.sendBeacon?.("./api/mood/stop"); });
+}
+
+// ---------- draw your own ----------
+// People draw on the Wacom tablet (or with a mouse) on a full-screen pad: the tablet maps to the whole screen, so a
+// pad that fills it uses the whole tablet. The square is the board's drawing area (100 x 100 units, y down, as an
+// SVG's), lines show at the marker's width, and Draw it puts the drawing on the board as one item ("own"), which the
+// planner draws (or adds to) like any other. Each drawing is its own simulation, so they are all kept.
+const OWN = "own", MARKER_MM = 2;
+let pad = null, ownDraft = null;   // pad: { strokes: [[[x, y], ...], ...], cur }; ownDraft: { id, strokes } kept on Close
+const ownItem = () => scene.items.find((i) => i.id === OWN);
+// the drawing's strokes back from its SVG (the paths ownSVG writes)
+function ownStrokes() {
+  const svg = ownItem()?.svg || "";
+  return [...svg.matchAll(/ d="([^"]+)"/g)].map((m) => { const n = m[1].match(/-?\d+(?:\.\d+)?/g).map(Number), s = []; for (let i = 0; i + 1 < n.length; i += 2) s.push([n[i], n[i + 1]]); return s; }).filter((s) => s.length > 1);
+}
+// keep the points the line needs (Douglas-Peucker, eps in units: 0.1 = 0.2 mm), a tap becomes a dot of marker
+function simplify(s, eps = 0.1) {
+  if (s.length < 3) return s;
+  const keep = new Uint8Array(s.length); keep[0] = keep[s.length - 1] = 1;
+  const stack = [[0, s.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop(), [ax, ay] = s[a], [bx, by] = s[b], L = Math.hypot(bx - ax, by - ay);   // 0 for a closed loop: measure from its start
+    let far = -1, d = eps;
+    for (let i = a + 1; i < b; i++) { const e = L > 1e-6 ? Math.abs((bx - ax) * (ay - s[i][1]) - (ax - s[i][0]) * (by - ay)) / L : Math.hypot(s[i][0] - ax, s[i][1] - ay); if (e > d) { d = e; far = i; } }
+    if (far > 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+  }
+  return s.filter((_, i) => keep[i]);
+}
+function ownSVG(strokes) {
+  const r = (v) => Math.round(v * 10) / 10;
+  const d = strokes.map((s) => (s.length === 1 ? [s[0], [s[0][0] + 0.4, s[0][1]]] : simplify(s))).map((s) => `<path d="M${s.map(([x, y]) => `${r(x)} ${r(y)}`).join("L")}"/>`).join("");
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="black">${d}</svg>`;
+}
+async function openOwn() {
+  const s = sims.find((x) => x.own);
+  if (s) { await openSim(s.id); selectTab("own"); return; }
+  await newOwn();
+}
+async function newOwn() {
+  await leaveSim();
+  doc = { id: newId(), title: `Drawing ${hhmm(now())}`, own: true, created: Date.now(), updated: Date.now() };
+  await enter({ ...doc, messages: [], scene: emptyScene(), ink: null });
+  await saveNow(); listSims(); go("studio"); selectTab("own");
+}
+function renderOwn() {
+  const on = !!doc?.own; $("#tab-own").hidden = !on;
+  if (!on) { if ($("#tab-own").getAttribute("aria-selected") === "true") selectTab("chat"); return; }
+  const n = ownStrokes().length, draft = ownDraft?.id === doc.id;
+  status($("#own-status"), draft ? "Not drawn yet" : n ? `${n} ${n === 1 ? "line" : "lines"}` : "Empty", { mark: n && !draft ? "dot" : "" });
+  $("#own-pad").textContent = n || draft ? "Keep drawing" : "Draw on the tablet";
+}
+
+// the pad: open full screen (the whole page, so toasts still show), fit the square, draw what is there
+function openPad() {
+  if (!doc?.own) return;
+  pad = { strokes: ownDraft?.id === doc.id ? ownDraft.strokes : ownStrokes(), cur: null };
+  $("#pad").hidden = false; fitPad();
+  document.documentElement.requestFullscreen?.().catch(() => {});
+}
+function closePad(keep = true) {
+  if (!pad) return;
+  if (keep) ownDraft = { id: doc.id, strokes: pad.strokes };
+  pad = null; $("#pad").hidden = true;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  renderOwn();
+}
+function fitPad() {
+  if (!pad) return;
+  const cv = $("#pad-sheet"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  paintPad();
+}
+function paintPad() {
+  const cv = $("#pad-sheet"), ctx = cv.getContext("2d"), css = getComputedStyle(cv);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = css.color; ctx.fillStyle = css.color; ctx.lineCap = ctx.lineJoin = "round";
+  ctx.lineWidth = (MARKER_MM / (2 * g.half)) * cv.width;   // the marker's width, to the drawing area's scale
+  for (const s of pad.strokes) inkPad(ctx, cv, s, 0);
+}
+// draw a stroke on the pad from point `from` on (so a pen move only adds its new piece)
+function inkPad(ctx, cv, s, from) {
+  const k = cv.width / 100;
+  if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0][0] * k, s[0][1] * k, ctx.lineWidth / 2, 0, 2 * Math.PI); ctx.fill(); return; }
+  ctx.beginPath(); ctx.moveTo(s[Math.max(0, from - 1)][0] * k, s[Math.max(0, from - 1)][1] * k);
+  for (let i = Math.max(1, from); i < s.length; i++) ctx.lineTo(s[i][0] * k, s[i][1] * k);
+  ctx.stroke();
+}
+function padPoint(e) {
+  const r = $("#pad-sheet").getBoundingClientRect();
+  return [Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100)), Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100))];
+}
+// what the browser sees: a pen (the tablet with its driver, with pressure) or a mouse (the tablet without it)
+function padPen(e) {
+  $("#pad-pen").textContent = e.pointerType === "pen" ? `Pen${e.pressure ? `, pressure ${Math.round(e.pressure * 100)}%` : ""}` : e.pointerType === "touch" ? "Touch" : "Mouse (or the tablet without its driver)";
+}
+function padDone() {
+  const strokes = pad?.strokes || [];
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  const had = !!ownItem();
+  if (!strokes.length && !had) return toast("Draw something first");
+  closePad(false); ownDraft = null;
+  quietReply = false;
+  const before = active;
+  const said = change(applyActions(scene, [strokes.length ? (had ? { type: "edit", id: OWN, svg: ownSVG(strokes) } : { type: "draw", id: OWN, name: "your drawing", box: FULL, svg: ownSVG(strokes) }) : { type: "erase", id: OWN }]).scene);
+  messages.push({ role: "assistant", text: `Your drawing: ${said.charAt(0).toLowerCase()}${said.slice(1)}` });
+  renderThread(); renderOwn(); saveSoon();
+  // Draw it means the arm too: change() sends it when the arm follows the sim; otherwise send it here
+  if (arm.connected() && !S.follow && active && active !== before) sendToArm(active);
+  else if (!arm.connected()) toast("Saved. Connect the arm to draw it on the board");
+}
+function resetOwn(wipe) {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  if (!resetBoard(wipe, "drawing")) return;
+  ownDraft = null; renderThread(); renderOwn(); saveSoon();
+}
+// the drawing as a PNG: black marker on a white board, the drawing area's square
+function savePNG() {
+  const strokes = ownDraft?.id === doc?.id ? ownDraft.strokes : ownStrokes();
+  if (!strokes.length) return toast("Draw something first");
+  const cv = document.createElement("canvas"); cv.width = cv.height = 1200;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = ctx.fillStyle = "#000"; ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = (MARKER_MM / (2 * g.half)) * cv.width;
+  for (const s of strokes) inkPad(ctx, cv, s, 0);
+  cv.toBlob((b) => {
+    const a = document.createElement("a"), t = new Date(), p = (n) => String(n).padStart(2, "0");
+    a.href = URL.createObjectURL(b); a.download = `clockedin-drawing-${t.getFullYear()}${p(t.getMonth() + 1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}.png`;
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, "image/png");
+}
+function wireOwn() {
+  $("#open-own").addEventListener("click", openOwn);
+  $("#tab-own").addEventListener("click", () => selectTab("own"));
+  $("#own-pad").addEventListener("click", openPad);
+  $("#own-new").addEventListener("click", newOwn);
+  $("#own-png").addEventListener("click", savePNG);
+  $("#own-wipe").addEventListener("click", () => resetOwn(true));
+  $("#own-forget").addEventListener("click", () => resetOwn(false));
+  $("#pad-undo").addEventListener("click", () => { if (pad?.strokes.length) { pad.strokes = pad.strokes.slice(0, -1); paintPad(); } });
+  $("#pad-clear").addEventListener("click", () => { if (pad) { pad.strokes = []; paintPad(); } });
+  $("#pad-close").addEventListener("click", () => closePad());
+  $("#pad-done").addEventListener("click", padDone);
+  const cv = $("#pad-sheet");
+  cv.addEventListener("pointerdown", (e) => {
+    if (!pad || e.button !== 0) return;   // the pen's tip (or the mouse's left button); its side buttons do nothing
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} padPen(e);
+    pad.cur = [padPoint(e)]; pad.strokes = [...pad.strokes, pad.cur]; inkPad(cv.getContext("2d"), cv, pad.cur, 0);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!pad) return; padPen(e);
+    if (!pad.cur) return;
+    const n = pad.cur.length;
+    for (const c of e.getCoalescedEvents?.() || [e]) pad.cur.push(padPoint(c));   // a tablet reports far more often than frames
+    inkPad(cv.getContext("2d"), cv, pad.cur, n);
+  });
+  const lift = () => { if (pad) pad.cur = null; };
+  cv.addEventListener("pointerup", lift); cv.addEventListener("pointercancel", lift);
+  window.addEventListener("resize", fitPad);
+  document.addEventListener("keydown", (e) => {
+    if (!pad) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); $("#pad-undo").click(); }
+    else if (e.key === "Escape" && !document.fullscreenElement) closePad();
+  });
 }
 
 // ---------- stop ----------
@@ -809,8 +973,8 @@ function setView(v) {
   if (v === "angles") { lastRow = -1; syncLive(true); }
 }
 function selectTab(which) {
-  if ((which === "clock" && !doc?.clock) || (which === "mood" && !doc?.mood)) which = "chat";
-  for (const t of ["chat", "plan", "clock", "mood"]) {
+  if ((which === "clock" && !doc?.clock) || (which === "mood" && !doc?.mood) || (which === "own" && !doc?.own)) which = "chat";
+  for (const t of ["chat", "plan", "clock", "mood", "own"]) {
     const on = t === which; $(`#tab-${t}`).setAttribute("aria-selected", String(on)); $(`#tab-${t}`).tabIndex = on ? 0 : -1; $(`#panel-${t}`).hidden = !on;
   }
 }
@@ -1476,7 +1640,7 @@ async function start() {
   buildJoints(); buildSetup();
   $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  wire(); wireLive(); wireClock(); wireMood(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
+  wire(); wireLive(); wireClock(); wireMood(); wireOwn(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
   await listSims();
   let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];

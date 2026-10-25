@@ -26,6 +26,7 @@
       <a class="dl-nav__item" href="#arm" data-page="arm"><i data-icon="ruler"></i><span class="dl-nav__label">Arm setup</span></a>
       <button class="dl-nav__item" type="button" id="open-clock"><i data-icon="clock"></i><span class="dl-nav__label">Clock</span></button>
       <button class="dl-nav__item" type="button" id="open-mood"><i data-icon="smile"></i><span class="dl-nav__label">Emotion</span></button>
+      <button class="dl-nav__item" type="button" id="open-own"><i data-icon="pen-tool"></i><span class="dl-nav__label">Draw your own</span></button>
       <p class="dl-nav__group">Simulations</p>
       <div id="sims" class="cw-navlist"></div>
       <button class="dl-btn dl-btn--secondary cw-stop" type="button" id="stop-all" hidden><i data-icon="circle-stop"></i><span>Stop</span><kbd class="dl-kbd">⌘.</kbd></button>
@@ -88,6 +89,7 @@
             <button class="dl-tabs__item" type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Plan</button>
             <button class="dl-tabs__item" type="button" role="tab" id="tab-clock" aria-controls="panel-clock" aria-selected="false" tabindex="-1" hidden>Clock</button>
             <button class="dl-tabs__item" type="button" role="tab" id="tab-mood" aria-controls="panel-mood" aria-selected="false" tabindex="-1" hidden>Emotion</button>
+            <button class="dl-tabs__item" type="button" role="tab" id="tab-own" aria-controls="panel-own" aria-selected="false" tabindex="-1" hidden>Draw</button>
           </div>
           <!-- emotion mode: the camera reads your face through Presage and the arm draws the emotion; only in the Emotion simulation -->
           <div class="cw-inspector" id="panel-mood" role="tabpanel" aria-labelledby="tab-mood" hidden>
@@ -115,6 +117,30 @@
                 <button class="dl-btn dl-btn--ghost" type="button" id="mood-forget">Board already clean</button>
               </div>
               <p class="dl-meta">Wipe the face: the arm erases all of it. Board already clean: after wiping it by hand, the app forgets the face and nothing moves. Either way Follow my face turns off.</p>
+            </section>
+          </div>
+          <!-- draw your own: a pad for the tablet (or a mouse); only in a Draw your own simulation -->
+          <div class="cw-inspector" id="panel-own" role="tabpanel" aria-labelledby="tab-own" hidden>
+            <section class="cw-sec">
+              <div class="cw-sec__head"><h2 class="dl-kicker">Your drawing</h2><span class="dl-status" id="own-status">Empty</span></div>
+              <div class="cw-actions">
+                <button class="dl-btn dl-btn--primary" type="button" id="own-pad">Draw on the tablet</button>
+                <button class="dl-btn dl-btn--ghost" type="button" id="own-new">New drawing</button>
+              </div>
+              <p class="dl-meta">The pad fills the screen, so the whole tablet is the drawing, and lines show at the marker's width. Draw it puts it on the board; with the arm connected, the arm draws it.</p>
+            </section>
+            <section class="cw-sec">
+              <h2 class="dl-kicker">Save</h2>
+              <div class="cw-actions"><button class="dl-btn dl-btn--secondary" type="button" id="own-png"><i data-icon="download"></i>Save as image</button></div>
+              <p class="dl-meta">Each drawing is kept as its own simulation in the list. Save as image downloads it as a PNG.</p>
+            </section>
+            <section class="cw-sec">
+              <h2 class="dl-kicker">Reset</h2>
+              <div class="cw-actions">
+                <button class="dl-btn dl-btn--secondary" type="button" id="own-wipe">Wipe the drawing</button>
+                <button class="dl-btn dl-btn--ghost" type="button" id="own-forget">Board already clean</button>
+              </div>
+              <p class="dl-meta">Wipe the drawing: the arm erases all of it. Board already clean: after wiping it by hand, the app forgets the drawing and nothing moves.</p>
             </section>
           </div>
           <!-- clock mode: the numbered clock's own controls; only in the Clock simulation -->
@@ -337,5 +363,17 @@
   </dialog>
   <div class="dl-toasts" id="toasts" role="region" aria-live="polite" aria-label="Notices"></div>
   <script type="module" src="./src/app.js"></script>
+  <!-- draw your own: the drawing pad, full screen so the tablet's whole area is the drawing -->
+  <div class="cw-pad" id="pad" hidden>
+    <div class="cw-pad__bar">
+      <span class="cw-pad__title">Draw your own</span><span class="dl-meta" id="pad-pen">Touch the tablet with the pen</span>
+      <span class="cw-pad__gap"></span>
+      <button class="dl-btn dl-btn--ghost" type="button" id="pad-undo"><i data-icon="undo-2"></i>Undo</button>
+      <button class="dl-btn dl-btn--ghost" type="button" id="pad-clear">Clear</button>
+      <button class="dl-btn dl-btn--secondary" type="button" id="pad-close">Close</button>
+      <button class="dl-btn dl-btn--primary" type="button" id="pad-done">Draw it</button>
+    </div>
+    <canvas class="cw-pad__sheet" id="pad-sheet" aria-label="Drawing pad: draw with the tablet pen or the mouse"></canvas>
+  </div>
 </body>
 </html>
