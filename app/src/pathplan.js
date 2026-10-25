@@ -181,6 +181,20 @@ export function scrub(path, amp, period = 12) {
   return out;
 }
 
+// The eraser sweeps across a line instead of along it: from `half` mm one side to `half` mm the other, then `step` mm
+// along the line, then back across, so the rubber moves at right angles to the line and each sweep wipes `step` mm of
+// it with the eraser's edge that lies along the line (the longer edge, when it is mounted so).
+export function sweepAcross(path, half, step) {
+  if (!(half > 0) || !(step > 0) || path.length < 2) return path;
+  const pts = resample(path, step), out = [];
+  pts.forEach((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = (-(b.y - a.y) / L) * half, ny = ((b.x - a.x) / L) * half, s = i % 2 ? 1 : -1;
+    out.push({ x: p.x + nx * s, y: p.y + ny * s }, { x: p.x - nx * s, y: p.y - ny * s });
+  });
+  return out;
+}
+
 // A wipe over the drawing area with the eraser end: rows `width * 0.7` apart so passes overlap, drawn as one
 // zigzag so the eraser never lifts between rows, scrubbing side to side as it goes (config erase.zigzag). Returns
 // a toolpath in the same shape as plan()'s.
