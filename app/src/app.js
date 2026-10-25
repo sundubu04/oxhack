@@ -56,6 +56,8 @@ let messages = [], thinking = false;
 let planned = null;                  // { toolpath, angles, job, res, ink, wiped } for the last change
 let active = null, inkBefore = null; // the job the sim is running, and the ink it started on
 let playing = false, speed = 1, view = "board", sending = null;
+// Stop pauses repeats until resumed, and keeps a reply already on its way from starting the arm (until the next ask)
+let hooksPaused = false, quietReply = false, armBusy = false;
 let hooks = [];   // this simulation's repeats: { id, prompt, every (minutes), slot, last, error }
 
 function load(k, d) {
@@ -213,6 +215,7 @@ async function send(text, hook = null) {
   if (!text || thinking) return;
   if (!doc) await newSim({ focus: false });
   if (!hook) {
+    quietReply = false;
     messages.push({ role: "user", text }); lastAsk = text;
     if (doc.title === "New simulation") { doc.title = cap(text).slice(0, 48); renderTitle(); renderSims(); }
     $("#prompt").value = ""; autosize(); selectTab("chat");
@@ -303,16 +306,36 @@ function removeHook(id) { hooks = hooks.filter((h) => h.id !== id); renderHooks(
 const slotOf = (h) => { const t = now(); return Math.floor((t.getTime() / 60000 - t.getTimezoneOffset()) / h.every); };
 function runHook(h) { h.slot = slotOf(h); return send(h.prompt, h); }
 setInterval(() => {
-  if (!doc || thinking || playing || !hooks.length) return;
+  if (!doc || thinking || playing || !hooks.length || hooksPaused) return;
   const due = hooks.find((h) => h.slot !== slotOf(h));
   if (due) runHook(due);
 }, 1000);
 function renderHooks() {
   const el = $("#repeats"); el.hidden = !hooks.length;
-  el.innerHTML = hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
+  el.innerHTML = (hooksPaused && hooks.length ? `<div class="cw-repeat">${icon("pause")}<div class="cw-repeat__text"><span class="cw-repeat__what">Repeats paused</span><span class="cw-repeat__when">Stopped by you</span></div><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-resume>Resume</button></div>` : "") + hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
     + `<span class="cw-repeat__when${h.error ? " cw-msg-fail" : ""}">${h.error ? esc(h.error) : `Every ${everyWords(h.every)}${h.last ? `, last at ${hhmm(new Date(h.last))}` : ""}`}</span></div>`
     + `<button class="dl-icon-btn" type="button" data-unhook="${esc(h.id)}" aria-label="Stop: ${esc(h.prompt)}" title="Stop">${icon("x")}</button></div>`).join("");
 }
+
+// ---------- stop ----------
+// One Stop for whatever is running: the arm eases to a halt and lifts its pen, the sim pauses, repeats pause until
+// resumed, and a reply still on its way plans in the sim but doesn't start the arm. It shows while anything runs.
+async function stopAll() {
+  quietReply = true;
+  if (hooks.length) { hooksPaused = true; renderHooks(); }
+  if (sending) sending.abort();
+  pause();
+  if (arm.connected()) { try { await arm.stop(); } catch (e) {} }
+  armBusy = false; syncStop();
+  toast(hooks.length ? "Stopped, and repeats paused" : "Stopped");
+}
+function syncStop() {
+  const running = armBusy || playing || thinking || !!sending || (hooks.length > 0 && !hooksPaused);
+  $("#stop-all").hidden = !running;
+}
+// the arm can be busy with a job another tab or a repeat started: ask the server now and then
+setInterval(() => { arm.refresh().then((s) => { armBusy = s?.job?.state === "running"; syncStop(); }).catch(() => {}); }, 2000);
+setInterval(syncStop, 500);
 
 function friendly(msg) {
   // the browser's own words when the request never reached the server (stopped, or restarting)
@@ -346,7 +369,7 @@ function change(next, { quiet = false } = {}) {
   steps.set("path", "done", `${res.best.name === "none" ? "" : `${res.best.name} wipe, `}${(performance.now() - t0).toFixed(0)} ms`);
   steps.set("angles", "done", `${tp.length} points`); steps.set("sim", "next", ""); steps.bar(0.75);
   renderAngles(); renderPlanStats(); startJob(job); play();
-  if (!quiet && arm.connected() && S.follow) sendToArm(job);
+  if (!quiet && !quietReply && arm.connected() && S.follow) sendToArm(job);
   const parts = [];
   if (res.remove.length) parts.push(`wipes ${res.remove.length} ${res.remove.length === 1 ? "stroke" : "strokes"}`);
   if (res.add.length) parts.push(`draws ${res.add.length}`);
@@ -736,6 +759,7 @@ function commandList(q) {
     ...STARTERS.map((s) => ({ label: s, icon: "pencil", run: () => { go("studio"); send(s); } })),
     { label: playing ? "Pause" : "Play the change", icon: playing ? "pause" : "play", run: () => (playing ? pause() : play()), off: !active },
     { label: "Start the change again", icon: "rotate-ccw", run: () => seek(0), off: !active },
+    { label: "Stop everything: the arm, the sim and repeats", icon: "circle-stop", run: () => stopAll() },
     { label: "Clear the board", icon: "eraser", run: () => send("Clear the board") },
     { label: clockHook() ? "Stop keeping the clock on time" : "Keep the clock on time: redraw its hands every minute", icon: "clock", run: () => { go("studio"); const h = clockHook(); if (h) removeHook(h.id); else runHook(addHook("draw the time", 1)); } },
     { label: S.physics ? "Ideal servos" : "Real servo limits", icon: "sliders-horizontal", run: () => togglePhysics() },
@@ -858,6 +882,9 @@ function wire() {
   document.addEventListener("change", (e) => { if (e.target.id === "voice-id") { S.voice = e.target.value.trim(); store("clockedin.prefs", S); } });
   document.addEventListener("click", (e) => { if (e.target.closest("#voice-test")) voice.say("Hello. I'm the Clockedin arm, and this is how I sound.", { voice: ($("#voice-id").value || "").trim() || undefined }); });
   document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); } });
+  document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); stopAll(); } });   // ⌘. stops, as on a Mac
+  $("#stop-all").addEventListener("click", stopAll);
+  $("#repeats").addEventListener("click", (e) => { if (e.target.closest("[data-resume]")) { hooksPaused = false; hooks.forEach((h) => { h.slot = slotOf(h); }); renderHooks(); syncStop(); toast("Repeats back on"); } });
   $("#palette-input").addEventListener("input", renderPalette);
   $("#palette-input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); movePalette(1); }

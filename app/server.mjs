@@ -162,7 +162,8 @@ async function api(req, res, path) {
 //   POST /api/arm/run {keys}               keyframes the app planned
 //   POST /api/arm/tune {interval, minStep, speed, accel}   live moves: ms apart, smallest step, glide deg/s, deg/s²
 //   POST /api/arm/park                     lift the pen where it is, then glide to the saved home pose
-//   POST /api/arm/stop | disconnect
+//   POST /api/arm/stop                     ease to a halt (a job along its path), then lift the pen where it stopped
+//   POST /api/arm/disconnect
 async function arm(req, sub) {
   if (req.method === "GET") return armLink.status();
   const b = await body(req, 4e6), g = geomFrom(withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8"))));
@@ -175,7 +176,7 @@ async function arm(req, sub) {
     case "/tune": return armLink.tune(b);
     case "/park": { const c = withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8")));
       return armLink.home([+c.park.base, +c.park.elbow, +c.penServo.lift]); }   // home and the rest angle as saved now
-    case "/stop": return armLink.stop();
+    case "/stop": { const c = withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8"))); return armLink.stop(+c.penServo.lift); }
     case "/run": return armLink.run(b.keys);
     case "/draw": {
       const h = homePose(g), from = toolPoint(h.base * Math.PI / 180, h.elbow * Math.PI / 180, g);

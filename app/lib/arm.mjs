@@ -144,8 +144,19 @@ export async function home(a) {
   return status();
 }
 
-// Stop: a job eases to a halt along its path; a glide stops where it can.
-export function stop() { if (child) write("S"); pending = null; return status(); }
+// Stop: a job eases to a halt along its path, a glide stops where it can; then, given the rest angle (servo
+// degrees), the pen lifts where the arm has stopped, so nothing is left pressing on the board.
+export async function stop(lift) {
+  pending = null; clearTimeout(timer); timer = null;
+  if (!child) return status();
+  const running = st.job?.state === "running";
+  write("S"); await expect((l) => l === "STOPPED", running ? 3000 : 600);
+  if (Number.isFinite(lift) && st.firmware?.protocol >= 3) {
+    write("W"); const pos = await expect((l) => l.startsWith("POS "), 600);
+    if (pos) { const a = pos.split(" ").slice(1, 4).map((v) => +v / 100); a[2] = lift; write(`J ${a.map((v) => Math.round(v * 100)).join(" ")}`); st.sent = a; lastSent = Date.now(); }
+  }
+  return status();
+}
 
 // A job's keyframes [{ t ms, a: [b, e, w] centi-degrees }], streamed as the board frees slots.
 export async function run(keys) {

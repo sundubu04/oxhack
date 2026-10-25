@@ -169,3 +169,5 @@
 .cw-pens__what { display: block; color: var(--dl-text-3); font-size: var(--dl-fs-xs); font-weight: 400; }
 .cw-pens .cw-unit > .dl-input { padding-right: 28px; }
 .cw-nudge { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 8px 4px; }
+.cw-stop { justify-content: flex-start; gap: 8px; margin-top: auto; }
+.cw-stop kbd { margin-left: auto; }
