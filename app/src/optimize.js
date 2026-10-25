@@ -1,7 +1,7 @@
 // What the arm does when the board changes: which strokes are already there, which must go, how to wipe them, and
 // what to draw, in the order and with the wipe that the sim says take least time. Pure: no DOM. Strokes are
 // [{x,y}] in board mm. Every candidate is timed with the same schedule the sim and the motors run (makeJob).
-import { resample, drawPath, order, bbox, erasePlan, scrub, sweepAcross } from "./pathplan.js";
+import { resample, drawPath, order, bbox, erasePlan, scrub, sweepAcross, bubbles } from "./pathplan.js";
 import { toAngles } from "./ik.js";
 import { makeJob } from "./sim.js";
 
@@ -153,9 +153,10 @@ export function planChange(oldS, newS, g, { from = null, tol = 1.5, only = null 
   const how = g.erase?.how, ways = how === "area" ? ["box"] : how === "lines" ? ["trace"] : Object.keys(strategies);
   const names = remove.length ? (only ? [only] : ways) : ["none"];
   for (const name of names) {
-    // a traced line is swept across (erase.sweep "across") or waved along; rows wave along, as they cover an area
-    const z = g.erase || {}, rows = name !== "trace", across = !rows && z.sweep !== "along";
-    const move = (p) => (across ? sweepAcross(p, z.zigzag, z.step) : scrub(p, z.zigzag, z.period));
+    // how the rubber moves (erase.sweep): bubbles, lines and rows alike; or a traced line swept across, or waved along;
+    // rows wave along, as they cover an area
+    const z = g.erase || {}, rows = name !== "trace", across = !rows && z.sweep === "across";
+    const move = (p) => (z.sweep === "bubbles" ? bubbles(p, z.radius, z.step) : across ? sweepAcross(p, z.zigzag, z.step) : scrub(p, z.zigzag, z.period));
     const paths = name === "none" ? [] : strategies[name](remove, g, from).map((p) => move(overAgain(p, z.passes, z.apart, rows)));
     // what the wipe also takes off strokes that stay
     const touched = [];

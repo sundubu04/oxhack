@@ -54,16 +54,30 @@ export function makeJob(toolpath, angles, g) {
 
 // Split every move longer than STEP; the joints for the new points come from the IK, so a long move is a straight
 // line on the board too. The first move, from the park pose, is a pen-up travel move.
+// A pen-up move goes joint by joint instead (each joint turning evenly from one pose to the next, about a degree
+// a point): the route on the board doesn't matter with the pen up, and a straight line out of a folded pose such
+// as the build's home passes close to the base, where a few mm of pen means a big swing of the base (a jerk).
 function densify(toolpath, angles, g) {
-  const out = []; let split = false;
-  const home = homePose(g), start = toolPoint(home.base * D2R, home.elbow * D2R, g, firstTool(toolpath));
+  const out = [], outA = []; let split = false;
+  const hand = firstTool(toolpath), home = homePose(g), start = toolPoint(home.base * D2R, home.elbow * D2R, g, hand);
   toolpath.forEach((q, i) => {
-    const p = i ? toolpath[i - 1] : start, k = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / STEP);
-    for (let s = 1; s < k; s++) out.push({ ...(i ? q : { pen: 0, tool: "lift" }), x: p.x + (q.x - p.x) * s / k, y: p.y + (q.y - p.y) * s / k });
-    if (k > 1) split = true;
-    out.push(q);
+    const p = i ? toolpath[i - 1] : start, pa = i ? angles.path[i - 1] : home, qa = angles.path[i];
+    const lifted = !i || (q.tool || (q.pen ? "draw" : "lift")) === "lift";
+    if (lifted && !pa.out_of_reach && !qa.out_of_reach) {
+      const k = Math.ceil(Math.max(Math.abs(qa.base - pa.base), Math.abs(qa.elbow - pa.elbow), Math.hypot(q.x - p.x, q.y - p.y) / STEP));
+      for (let s = 1; s < k; s++) {
+        const a = { ...qa, base: pa.base + ((qa.base - pa.base) * s) / k, elbow: pa.elbow + ((qa.elbow - pa.elbow) * s) / k };
+        out.push({ ...toolPoint(a.base * D2R, a.elbow * D2R, g, hand), pen: 0, tool: "lift" }); outA.push(a);
+      }
+      if (k > 1) split = true;
+    } else {
+      const k = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / STEP);
+      const pts = []; for (let s = 1; s < k; s++) pts.push({ ...q, x: p.x + (q.x - p.x) * s / k, y: p.y + (q.y - p.y) * s / k });
+      if (pts.length) { out.push(...pts); outA.push(...toAngles(pts, g).path); split = true; }
+    }
+    out.push(q); outA.push(qa);
   });
-  return split ? { toolpath: out, angles: toAngles(out, g) } : { toolpath, angles };
+  return split ? { toolpath: out, angles: { ...angles, path: outA } } : { toolpath, angles };
 }
 function firstTool(tp) { const q = tp.find((p) => p.tool === "erase" || p.pen); return q?.tool === "erase" ? "erase" : "draw"; }
 

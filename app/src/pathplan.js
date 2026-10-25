@@ -195,6 +195,21 @@ export function sweepAcross(path, half, step) {
   return out;
 }
 
+// Bubbles: the eraser goes round in circles of `radius` mm while their middle moves along the path, `step` mm per
+// circle, so the rubber scrubs every way over a band 2 * radius wide, centred on the path, and never turns sharply
+// (no jerks at the ends of a swing, as a zigzag has).
+export function bubbles(path, radius, step) {
+  if (!(radius > 0) || !(step > 0) || path.length < 2) return path;
+  const per = 16, mid = resample(path, step / per), out = [];   // 16 points round each circle
+  mid.forEach((p, i) => {
+    const a = mid[Math.max(0, i - 1)], b = mid[Math.min(mid.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L, th = (2 * Math.PI * i) / per;
+    const along = radius * Math.sin(th), side = -radius * Math.cos(th);   // round the circle, starting to the right
+    out.push({ x: p.x + ux * along - uy * side, y: p.y + uy * along + ux * side });
+  });
+  return out;
+}
+
 // A wipe over the drawing area with the eraser end: rows `width * 0.7` apart so passes overlap, drawn as one
 // zigzag so the eraser never lifts between rows, scrubbing side to side as it goes (config erase.zigzag). Returns
 // a toolpath in the same shape as plan()'s.

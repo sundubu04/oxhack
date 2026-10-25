@@ -31,7 +31,8 @@ export const DEFAULT_CONFIG = {
   // team's ask, 25 Oct) or waves along it (sweep "along": `zigzag` mm each side once every `period` mm); rows always
   // wave. It goes over each wipe `passes` times, each pass `apart` mm to one side of the last, to catch a line the
   // error carries it past.
-  erase: { how: "area", sweep: "across", zigzag: 4, step: 4, period: 12, passes: 3, apart: 3 },
+  // sweep "bubbles": little circles of `radius` mm, `step` mm along the path per circle.
+  erase: { how: "area", sweep: "across", zigzag: 4, step: 4, radius: 5, period: 12, passes: 3, apart: 3 },
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
@@ -97,7 +98,7 @@ export function geomFrom(cfg) {
     // the marker's pivot height and swing, from where its two ends were measured to touch (for the 3D view)
     pen: { ...penGeometry(c.pen), ...measuredPen(+c.pen.length, Math.hypot(+c.tool.eraser.along - +c.tool.nib.along, +c.tool.eraser.side - +c.tool.nib.side), +c.pen.pivot) },
     park: { base: joint("base", c.park.base), elbow: joint("elbow", c.park.elbow) },
-    pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth, erase: { how: c.erase.how, sweep: c.erase.sweep, zigzag: +c.erase.zigzag, step: +c.erase.step || +c.pen.eraserWidth * 0.8, period: +c.erase.period, passes: Math.max(1, Math.round(+c.erase.passes || 1)), apart: +c.erase.apart || 0 },
+    pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth, erase: { how: c.erase.how, sweep: c.erase.sweep, radius: +c.erase.radius || 0, zigzag: +c.erase.zigzag, step: +c.erase.step || +c.pen.eraserWidth * 0.8, period: +c.erase.period, passes: Math.max(1, Math.round(+c.erase.passes || 1)), apart: +c.erase.apart || 0 },
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, eraseSpeed: +c.motion.eraseSpeed || +c.motion.drawSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,
     servo: { speed: +c.servos.speed, accel: +c.servos.accel, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
   };

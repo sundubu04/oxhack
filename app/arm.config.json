@@ -1,5 +1,5 @@
 {
-  "rev": 44,
+  "rev": 46,
   "name": "Clockedin arm",
   "measured": true,
   "links": {
@@ -47,6 +47,7 @@
     "sweep": "across",
     "zigzag": 6,
     "step": 4,
+    "radius": 5,
     "period": 8,
     "passes": 3,
     "apart": 3
