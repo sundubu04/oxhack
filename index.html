@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clockedin booth</title>
+<!-- The booth screen: the film looping beside a QR code that opens it on a phone. Runs from local files, so it needs
+     no Wi-Fi. Open with the film's link: index.html?v=https://youtu.be/... (and &video=path to play another file).
+     Click once for full screen; the pointer hides itself. QR encoder: qrcode-generator 1.4.4, Kazuhiko Arase, MIT. -->
+<script src="vendor/qrcode.js"></script>
+<style>
+  :root { --bg: #fbfaf9; --ink: #1d1d1f; --muted: #6e6a6c; --hue: #a34a69; --hue-soft: #f6dfe7; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  body.idle { cursor: none; }
+  /* designed at 1920 x 1080 and scaled to whatever screen the booth has */
+  #stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .film { position: absolute; left: 110px; top: 50%; width: 1140px; height: 641px; margin-top: -320px; border-radius: 28px; overflow: hidden;
+    box-shadow: 0 50px 120px rgb(60 30 40 / .16), 0 0 0 1px rgb(0 0 0 / .05); background: #000; }
+  .film video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .side { position: absolute; left: 1350px; top: 50%; width: 480px; transform: translateY(-50%); }
+  .now { font-size: 30px; font-weight: 600; color: var(--hue); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .now i { font-style: normal; transition: opacity .2s; }
+  .name { font-size: 112px; font-weight: 760; letter-spacing: -0.045em; line-height: 1; margin: 18px 0 22px; }
+  .line { font-size: 30px; line-height: 1.32; color: var(--muted); letter-spacing: -0.01em; max-width: 440px; }
+  .qr { margin-top: 64px; width: 300px; height: 300px; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .scan { margin-top: 26px; font-size: 30px; font-weight: 650; letter-spacing: -0.015em; }
+  .url { margin-top: 6px; font-size: 21px; color: var(--muted); }
+  .empty { width: 300px; height: 300px; border-radius: 22px; background: var(--hue-soft); display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 30px; box-sizing: border-box; font-size: 20px; color: var(--hue); line-height: 1.4; }
+  /* a quiet arrival, once */
+  .rise { opacity: 0; transform: translateY(24px); animation: rise .9s cubic-bezier(.16, 1, .3, 1) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="film rise" style="animation-delay:.05s"><video id="film" muted autoplay loop playsinline preload="auto"></video></div>
+  <div class="side">
+    <div class="now rise" style="animation-delay:.2s">It's <span id="hh">00</span><i id="colon">:</i><span id="mm">00</span>. Ask Clocky to draw it.</div>
+    <div class="name rise" style="animation-delay:.3s">Clockedin</div>
+    <div class="line rise" style="animation-delay:.4s">A robot arm that draws the time, and anything you ask.</div>
+    <div class="qr rise" id="qr" style="animation-delay:.55s"></div>
+    <div class="scan rise" style="animation-delay:.65s">Scan to watch the film</div>
+    <div class="url rise" id="url" style="animation-delay:.7s"></div>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+// the film on YouTube (unlisted); ?v= still overrides it
+const link = params.get("v") || "https://youtu.be/4st-I-ifkBU";
+// Opened from the laptop, the film plays from disk (no Wi-Fi needed); served on the web (GitHub Pages), from YouTube
+const ytId = (link.match(/(?:youtu\.be\/|v=)([\w-]{6,})/) || [])[1];
+if (params.get("video") || location.protocol === "file:" || !ytId) {
+  document.getElementById("film").src = params.get("video") || "../out/clockedin-final-small.mp4";
+} else {
+  document.getElementById("film").outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0&modestbranding=1&playsinline=1&rel=0"
+    title="Clockedin film" allow="autoplay; encrypted-media; picture-in-picture" style="width:100%;height:100%;border:0;display:block"></iframe>`;
+}
+
+// fit the 1920 x 1080 design to the screen
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080), st = document.getElementById("stage");
+  st.style.transform = `scale(${s}) translate(-50%, -50%)`;
+}
+addEventListener("resize", fit); fit();
+
+// the time, live, with the colon ticking each second
+function tick() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  document.getElementById("hh").textContent = p(d.getHours());
+  document.getElementById("mm").textContent = p(d.getMinutes());
+  document.getElementById("colon").style.opacity = d.getSeconds() % 2 ? 0.25 : 1;
+}
+setInterval(tick, 250); tick();
+
+// The QR code as rounded modules, with a small clock in the middle (level H keeps it readable with the mark there)
+function qrSVG(text) {
+  const q = qrcode(0, "H"); q.addData(text); q.make();
+  const n = q.getModuleCount(), quiet = 2, size = n + quiet * 2, ink = "#1d1d1f";
+  const finder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+  const hole = (r, c) => { const m = n / 2, h = n * 0.11; return Math.abs(r + 0.5 - m) < h + 0.6 && Math.abs(c + 0.5 - m) < h + 0.6; };
+  let cells = "";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!q.isDark(r, c) || finder(r, c) || hole(r, c)) continue;
+    cells += `<rect x="${c + quiet + 0.08}" y="${r + quiet + 0.08}" width=".84" height=".84" rx=".28"/>`;
+  }
+  const eye = (r, c) => `<rect x="${c + quiet + 0.5}" y="${r + quiet + 0.5}" width="6" height="6" rx="1.9" fill="none" stroke="${ink}" stroke-width="1"/>
+    <rect x="${c + quiet + 2}" y="${r + quiet + 2}" width="3" height="3" rx=".9"/>`;
+  const m = size / 2, R = n * 0.085;
+  const mark = `<circle cx="${m}" cy="${m}" r="${R}" fill="none" stroke="#a34a69" stroke-width="${R * 0.22}"/>
+    <path d="M${m} ${m} L${m - R * 0.38} ${m - R * 0.22} M${m} ${m} L${m + R * 0.55} ${m - R * 0.32}" stroke="#a34a69" stroke-width="${R * 0.2}" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="QR code for ${text}"><rect width="${size}" height="${size}" fill="#fff" rx="2.2"/><g fill="${ink}">${cells}${eye(0, 0)}${eye(0, n - 7)}${eye(n - 7, 0)}</g>${mark}</svg>`;
+}
+if (link) {
+  document.getElementById("qr").innerHTML = qrSVG(link);
+  document.getElementById("url").textContent = link.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+} else {
+  document.getElementById("qr").innerHTML = `<div class="empty">Add the film's link to the address: ?v=https://…</div>`;
+}
+
+// one click for full screen; the pointer hides after two still seconds
+addEventListener("click", () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {}); });
+let idle; addEventListener("mousemove", () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add("idle"), 2000); });
+</script>
+</body>
+</html>
