@@ -176,7 +176,6 @@
 /* the Clock entry is a button among links: look like them */
 button.dl-nav__item { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 /* mood mode */
-.cw-mood__video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--dl-r-card); background: var(--dl-surface-2); transform: scaleX(-1); }
 .cw-mood__bars { display: grid; grid-template-columns: 76px minmax(0, 1fr) 40px; align-items: center; gap: 6px 10px; font-size: var(--dl-fs-sm); }
 .cw-mood__bars b { font-weight: 400; text-align: right; color: var(--dl-text-3); }
 .cw-mood__bars [data-top] { font-weight: 600; }

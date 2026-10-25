@@ -463,7 +463,7 @@ function wireClock() {
 // new mood wipes and redraws only the brows and mouth. Follow my face draws a new mood once it has held for 2 s and
 // the arm is free; the buttons draw a mood without the camera.
 const MOOD_WORD = { happy: "Happy", sad: "Sad", surprised: "Surprised", angry: "Angry", neutral: "Neutral" };
-let moodRead = null, moodTimer = 0, moodCam = false, moodFollow = false, moodSeen = null, moodSince = 0, moodStream = null;
+let moodRead = null, moodTimer = 0, moodCam = false, moodFollow = false, moodSeen = null, moodSince = 0;
 function drawMood(mood) {
   if (!MOODS.includes(mood)) return;
   if (thinking) return toast("Wait for the answer first", "circle-alert");
@@ -492,22 +492,21 @@ async function moodCall(path) {
 async function cameraOn() {
   $("#mood-camera").disabled = true;
   try {
+    // Presage has the camera to itself: the page opening it too changed the frame size under the SDK, which aborted it
     await moodCall("/start"); moodCam = true;
-    // your own picture beside the reading (the browser's view of the same camera; Presage reads it on the server)
-    try { moodStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); $("#mood-video").srcObject = moodStream; $("#mood-video").hidden = false; } catch (e) {}
     clearInterval(moodTimer); moodTimer = setInterval(moodTick, 300);
   } catch (e) { toast(e.message, "circle-alert"); }
   finally { $("#mood-camera").disabled = false; renderMood(); }
 }
 async function cameraOff() {
   clearInterval(moodTimer); moodTimer = 0; moodCam = false;
-  moodStream?.getTracks().forEach((t) => t.stop()); moodStream = null; $("#mood-video").hidden = true;
   try { await moodCall("/stop"); } catch (e) {}
   renderMood();
 }
 // the latest reading; with Follow my face on, a new mood that has held for 2 s is drawn once the arm is free
 async function moodTick() {
   try { await moodCall(""); } catch (e) {}
+  if (moodCam && moodRead && !moodRead.on && moodRead.error) { clearInterval(moodTimer); moodTimer = 0; moodCam = false; }
   const m = moodRead, fresh = m?.mood && m.age != null && m.age < 1500 && (m.stable || (m.scores?.[0]?.confidence || 0) >= 50);
   if (fresh && m.mood !== moodSeen) { moodSeen = m.mood; moodSince = Date.now(); }
   if (moodFollow && fresh && moodSeen !== doc?.moodShown && Date.now() - moodSince >= 2000 && !playing && !sending && !thinking && !armBusy) drawMood(moodSeen);

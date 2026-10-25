@@ -1,8 +1,12 @@
 // Presage SmartSpectra (the MLH sponsor's SDK): the Mac's camera as a sensor. The SDK opens the camera and runs its
 // models on this machine (the key is checked with Presage) and reports facial expressions; this keeps the latest one
-// for the app's Mood mode, folded into the five moods the arm can draw. Needs PRESAGE_API_KEY in app/.env. The SDK
-// is loaded only when the camera starts, so the server runs without it.
-let sdk = null, mod = null;
+// for the app's Emotion mode, folded into the five moods the arm can draw. The SDK runs in a child process
+// (presage-worker.mjs), so a crash in its native code can't take the server or the arm down. Needs PRESAGE_API_KEY
+// in app/.env. Only one thing should use the camera while it runs: another opening it can change the frame size
+// under the SDK, which aborts it.
+import { fork } from "node:child_process";
+
+let child = null, stopping = false;
 const st = { on: false, status: "off", face: false, hint: null, error: null, mood: null, scores: [], stable: false, at: 0 };
 
 // Presage's eight expressions -> the five moods: fear reads as surprise, disgust and contempt as anger
@@ -14,37 +18,42 @@ const HINTS = { 1: "No face found", 2: "More than one face", 3: "Centre your fac
 
 export function status(key) { return { ...st, ready: !!key, age: st.at ? Date.now() - st.at : null }; }
 
-export async function start(key) {
-  if (!key) throw new Error("Presage needs its key: add PRESAGE_API_KEY to app/.env and restart the server");
-  if (sdk) return status(key);
-  mod ??= await import("@smartspectra/node-sdk");
-  const { SmartSpectraSDK, CameraSelection, faceMetrics, decodeMetrics } = mod;
-  Object.assign(st, { on: true, status: "starting", face: false, hint: null, error: null, mood: null, scores: [], stable: false, at: 0 });
-  sdk = new SmartSpectraSDK({ apiKey: key, requestedMetrics: [...faceMetrics], enableTelemetry: false });
-  sdk.on("processingStatus", (s) => { st.status = STATUS[s] || String(s); });
-  sdk.on("validationStatus", (code, _ts, hint) => { st.face = code === 0; st.hint = code === 0 ? null : HINTS[code] || hint || "Adjusting"; });
-  sdk.on("error", (_code, message) => { st.error = message; });
-  sdk.on("metrics", (buf) => {
-    const m = decodeMetrics(buf); if (!m || Buffer.isBuffer(m)) return;
-    const e = m.face?.expression?.at(-1); if (!e?.scores?.length) return;
+function heard(m) {
+  if (m.kind === "status") st.status = STATUS[m.s] || String(m.s);
+  else if (m.kind === "validation") { st.face = m.code === 0; st.hint = m.code === 0 ? null : HINTS[m.code] || m.hint || "Adjusting"; }
+  else if (m.kind === "error") st.error = m.message;
+  else if (m.kind === "expression") {
     // the eight scores, folded into moods (a mood's score is its best expression's)
     const best = {};
-    for (const s of e.scores) {
-      const name = EXPRESSIONS[s.type] || String(s.type).toLowerCase(), mood = MOOD[name]; if (!mood) continue;
-      best[mood] = Math.max(best[mood] || 0, +s.confidence || 0);
-    }
+    for (const [type, confidence] of m.scores) { const mood = MOOD[EXPRESSIONS[type]]; if (mood) best[mood] = Math.max(best[mood] || 0, confidence); }
     st.scores = Object.entries(best).map(([mood, confidence]) => ({ mood, confidence: Math.round(confidence) })).sort((a, b) => b.confidence - a.confidence);
-    st.mood = st.scores[0]?.mood || null; st.stable = !!e.stable; st.at = Date.now();
+    st.mood = st.scores[0]?.mood || null; st.stable = m.stable; st.at = Date.now();
+  }
+}
+
+export async function start(key) {
+  if (!key) throw new Error("Presage needs its key: add PRESAGE_API_KEY to app/.env and restart the server");
+  if (child) return status(key);
+  Object.assign(st, { on: true, status: "starting", face: false, hint: null, error: null, mood: null, scores: [], stable: false, at: 0 });
+  stopping = false;
+  const last = [];   // its last words on stderr: what to say if it dies
+  child = fork(new URL("./presage-worker.mjs", import.meta.url), { env: { ...process.env, PRESAGE_API_KEY: key }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+  child.stderr.on("data", (b) => { for (const l of b.toString().split("\n")) if (l.trim() && !/feedback_manager|avfoundation|absl::|model path|NORM_RECT/.test(l)) { last.push(l.trim()); if (last.length > 5) last.shift(); } });
+  child.on("message", heard);
+  child.on("exit", (code, signal) => {
+    child = null; Object.assign(st, { on: false, status: "off", face: false });
+    if (!stopping) st.error = `The camera reader stopped${signal ? ` (${signal})` : code ? ` (${code})` : ""}${last.length ? `: ${last.at(-1).replace(/^.*error: /, "").slice(0, 160)}` : ""}. Start it again.`;
   });
-  try { sdk.useCamera(CameraSelection.default); sdk.start(); }
-  catch (e) { const msg = e.message; await stop(); st.error = msg; throw new Error(msg); }
   return status(key);
 }
 
 export async function stop() {
-  const s = sdk; sdk = null;
-  if (s) { try { await s.stopAsync(); } catch (e) {} try { await s.destroy(); } catch (e) {} }
+  const c = child; stopping = true;
+  if (c) {
+    c.send("stop");
+    await new Promise((done) => { const t = setTimeout(() => { try { c.kill("SIGKILL"); } catch (e) {} done(); }, 4000); c.once("exit", () => { clearTimeout(t); done(); }); });
+  }
   Object.assign(st, { on: false, status: "off", face: false, hint: null });
   return status(true);
 }
-process.on("exit", () => { try { sdk?.stopAsync(); } catch (e) {} });
+process.on("exit", () => { try { child?.kill(); } catch (e) {} });
