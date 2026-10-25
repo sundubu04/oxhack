@@ -9,7 +9,7 @@ import { planChange } from "./optimize.js";
 import * as voice from "./voice.js";
 import * as arm from "./arm.js";
 import { SAMPLES, clockSVG } from "./sample.js";
-import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle } from "./config.js";
+import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle, DEFAULT_CONFIG } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
 import { bestZeros, boardShare } from "./zeros.js";
 import { createBoard } from "./board.js";
@@ -624,17 +624,29 @@ function showPage(page) {
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
-  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["penServo.draw", "Pen servo, nib down", "°"], ["penServo.lift", "Pen servo, lifted", "°"], ["penServo.erase", "Pen servo, eraser down", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
+  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
 const put = (o, path, v) => { const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k) => { a = a[k] ??= {}; }); a[ks.at(-1)] = v; };
+// The pen servo's three angles, to play with: each slider moves the pen there as it slides (the real one too, when
+// connected), and pressing on the board uses them at once, saved or not. Defaults are the jog sketch's.
+const PENS = [["lift", "Rest", "lifted"], ["draw", "Write", "nib down"], ["erase", "Erase", "eraser down"]];
+function penGroup() {
+  const d = DEFAULT_CONFIG.penServo;
+  return `<div class="cw-group" role="group" aria-labelledby="g-pen-angles"><h2 class="dl-kicker" id="g-pen-angles">Pen angles</h2><div class="cw-pens">${PENS.map(([k, name, what]) =>
+    `<label class="dl-label" for="f-penServo-${k}">${name} <span class="cw-pens__what">${what}</span></label>
+     <input class="cw-range" type="range" min="0" max="180" step="0.5" data-pen-range="${k}" aria-label="${name}, pen servo degrees">
+     <span class="cw-unit"><input class="dl-input dl-num" id="f-penServo-${k}" data-path="penServo.${k}" type="number" step="any" inputmode="decimal"><span>°</span></span>
+     <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-pen-try="${k}">Try</button>`).join("")}</div>
+    <div><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="pen-defaults">Defaults: rest ${d.lift}°, write ${d.draw}°, erase ${d.erase}°</button></div></div>`;
+}
 function buildSetup() {
   const id = (p) => `f-${p.replace(/\./g, "-")}`;
   const gid = (legend) => `g-${legend.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  $("#setup").innerHTML = FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="${gid(legend)}"><h2 class="dl-kicker" id="${gid(legend)}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit, options]) => options
+  $("#setup").innerHTML = penGroup() + FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="${gid(legend)}"><h2 class="dl-kicker" id="${gid(legend)}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit, options]) => options
     ? `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="dl-select"><select class="dl-input" id="${id(p)}" data-path="${p}" data-text>${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>${icon("chevron-down")}</span></div>`
     : `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id(p)}" data-path="${p}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`).join("")}</div></div>`).join("") +
     `<div class="cw-group" role="group" aria-labelledby="g-servos"><h2 class="dl-kicker" id="g-servos">Servos</h2><div class="cw-fields">
@@ -646,6 +658,7 @@ function buildSetup() {
 }
 function fillSetup(c) {
   $$("#setup [data-path]").forEach((el) => { el.value = get(c, el.dataset.path) ?? ""; });
+  syncPenRanges();
   $("#placeholder").hidden = !!c.measured; $("#save-note").textContent = "";
 }
 function readSetup() {
@@ -893,7 +906,7 @@ function calibrate(what) {
   if (what === "elbow") set("servos.elbow.offset", e);                                          // links in line: elbow joint 0
   if (what === "home") { set("park.base", b); set("park.elbow", e); }
   if (what === "draw" || what === "lift" || what === "erase") set(`penServo.${what}`, p);
-  $("#setup").dispatchEvent(new Event("input")); toast("Copied: Save to keep it");
+  syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); toast("Copied: Save to keep it");
 }
 // Pressing on the board, flat or in 3D, uses the tool chosen above it. Write puts the nib down (the pen servo's
 // nib-down angle, 4 deg on the build), Erase the eraser (150 deg), Move only travels, pen lifted (40 deg); dragging
@@ -911,7 +924,7 @@ function pressAt(p) {
   const a = poseAt(p, setupTool); if (!a) return false;
   stroke = { tool: setupTool, pts: [p] };
   setupSim.manual = { ...a, tilt: setupSim.g.tilt.lift }; lowerAt = setupTool === "lift" ? null : setupTool;
-  if (arm.connected()) arm.point(p.x, p.y, setupTool, setupTool !== "lift");
+  if (arm.connected()) arm.point(p.x, p.y, setupTool, setupTool !== "lift", readSetup().penServo);
   kickSetup(); renderLive(); return true;
 }
 function dragTo(p) {
@@ -919,7 +932,7 @@ function dragTo(p) {
   if (Math.hypot(p.x - q.x, p.y - q.y) < 1) return;   // 1 mm is the finest a marker shows
   const a = poseAt(p, stroke.tool); if (!a) return;
   stroke.pts.push(p); setupSim.manual = { ...a, tilt: setupSim.manual?.tilt ?? setupSim.g.tilt.lift };
-  if (arm.connected()) arm.point(p.x, p.y, stroke.tool);
+  if (arm.connected()) arm.point(p.x, p.y, stroke.tool, false, readSetup().penServo);
   kickSetup();
 }
 function releasePen() {
@@ -936,6 +949,16 @@ function lowerIfThere() {
   if (lowerAt && m && Math.abs(setupSim.j.base - m.base) < 0.6 && Math.abs(setupSim.j.elbow - m.elbow) < 0.6) {
     const T = setupSim.g.tilt; setupSim.manual = { ...m, tilt: lowerAt === "erase" ? T.erase : T.draw }; lowerAt = null;
   }
+}
+function syncPenRanges() { for (const [k] of PENS) { const r = $(`[data-pen-range="${k}"]`), n = $(`[data-path="penServo.${k}"]`); if (r && n && document.activeElement !== r) r.value = n.value; } }
+// put the pen at one of its angles where the arm is now: the sim, and the real servo when connected
+function tryPen(k) {
+  const v = +$(`[data-path="penServo.${k}"]`).value; if (!Number.isFinite(v)) return;
+  const gg = geomFrom(readSetup()); setupSim.setGeom(gg);
+  const pose = setupSim.manual || { base: setupSim.j.base, elbow: setupSim.j.elbow };
+  setupSim.manual = { base: pose.base, elbow: pose.elbow, tilt: gg.tilt[k] }; lowerAt = null; kickSetup();
+  if (arm.connected()) arm.servos(undefined, undefined, v);
+  const a = sliders(); a[2] = v; setSliders(a);
 }
 function setTool(t) {
   setupTool = t; $$("#setup-tools button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t))); renderLive();
@@ -973,6 +996,17 @@ function wireLive() {
   $("#sketch-clear").addEventListener("click", () => { sketch = []; setupBoard.clearInk(); setupInk = false; setupInkDirty = true; renderSetup(); renderLive(); });
   $("#sketch-draw").addEventListener("click", () => arm.draw(sketch).then(() => { toast("Drawing it again, in the shortest order"); refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
   $$("[data-cal]").forEach((b) => b.addEventListener("click", () => calibrate(b.dataset.cal)));
+  // pen angles: a slider moves its number and the pen; Try sends it there; Defaults puts back the jog sketch's
+  $("#setup").addEventListener("input", (e) => {
+    const k = e.target.dataset.penRange; if (k) { $(`[data-path="penServo.${k}"]`).value = e.target.value; $("#setup").dispatchEvent(new Event("input")); tryPen(k); return; }
+    if (/^penServo\./.test(e.target.dataset.path || "")) syncPenRanges();
+  });
+  // a typed angle moves the pen once it is finished, not on every keystroke (typing 150 would pass through 1 and 15)
+  $("#setup").addEventListener("change", (e) => { const m = /^penServo\.(\w+)$/.exec(e.target.dataset.path || ""); if (m) tryPen(m[1]); });
+  $("#setup").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-pen-try]"); if (t) tryPen(t.dataset.penTry);
+    if (e.target.closest("#pen-defaults")) { for (const [k] of PENS) $(`[data-path="penServo.${k}"]`).value = DEFAULT_CONFIG.penServo[k]; syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); tryPen("lift"); toast("Pen angles back to the defaults: Save to keep them"); }
+  });
   // live settings change on the board as they are typed, saved or not
   $("#setup").addEventListener("input", (e) => {
     if (!/^(live\.|servos\.accel)/.test(e.target.dataset.path || "") || !arm.connected()) return;

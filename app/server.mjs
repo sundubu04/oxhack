@@ -150,8 +150,9 @@ async function api(req, res, path) {
 //   GET  /api/arm                          status: ports, connection, firmware, live settings, job, last lines
 //   POST /api/arm/connect {port?}          open the port (the first Arduino when no port is given)
 //   POST /api/arm/servos {base, elbow, pen}   servo degrees, 0 to 180; any left out stay put
-//   POST /api/arm/point {x, y, tool, start}   a board point in mm for the nib (tool draw or lift) or the eraser
-//                                          (erase); start: a stroke's first point, reached lifted, then pen down
+//   POST /api/arm/point {x, y, tool, start, pen, lift}   a board point in mm for the nib (tool draw or lift) or the
+//                                          eraser (erase); start: a stroke's first point, reached lifted, then pen down;
+//                                          pen, lift: pen servo degrees to use instead of the saved ones
 //   POST /api/arm/draw {strokes} | {svg}   strokes in board mm, drawn as they are, or an SVG fitted to the drawing
 //                                          square: ordered for least travel, solved, timed with ramps, streamed
 //   POST /api/arm/run {keys}               keyframes the app planned
@@ -165,7 +166,7 @@ async function arm(req, sub) {
       const s = await armLink.connect(b.port || undefined); return s.firmware ? armLink.tune({ ...c.live, accel: c.servos.accel }) : s; }
     case "/disconnect": return armLink.disconnect();
     case "/servos": return armLink.servos(b);
-    case "/point": return armLink.point(+b.x, +b.y, ["draw", "lift", "erase"].includes(b.tool) ? b.tool : "draw", g, servosAt(g), !!b.start);
+    case "/point": return armLink.point(+b.x, +b.y, ["draw", "lift", "erase"].includes(b.tool) ? b.tool : "draw", g, servosAt(g, b), !!b.start);
     case "/tune": return armLink.tune(b);
     case "/park": return armLink.park();
     case "/stop": return armLink.stop();
@@ -183,12 +184,15 @@ async function arm(req, sub) {
   }
   throw new Error("no such arm call");
 }
-// a board point -> servo degrees for that end of the pen, or null when the arm can't get there
-function servosAt(g) {
+// a board point -> servo degrees for that end of the pen, or null when the arm can't get there; the request's own pen
+// angles (pen, lift: servo degrees) win over the saved ones, so Arm setup can try them before saving
+function servosAt(g, b = {}) {
+  const num = (v) => (v !== null && v !== "" && Number.isFinite(+v) ? Math.min(180, Math.max(0, +v)) : null);
   return (x, y, tool) => {
     const r = toAngles([{ x, y, pen: tool === "lift" ? 0 : 1, tool }], g), a = r.path[0];
     if (a.out_of_reach || r.outOfRange) return null;
-    return { servo: [servoAngle("base", a.base, g), servoAngle("elbow", a.elbow, g), servoAngle("tilt", a.tilt, g)], lift: servoAngle("tilt", g.tilt.lift, g) };
+    const lift = num(b.lift) ?? servoAngle("tilt", g.tilt.lift, g);
+    return { servo: [servoAngle("base", a.base, g), servoAngle("elbow", a.elbow, g), num(b.pen) ?? (tool === "lift" ? lift : servoAngle("tilt", a.tilt, g))], lift };
   };
 }
 
