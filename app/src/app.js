@@ -742,11 +742,12 @@ function renderSetup() {
   $("#save").disabled = !dirty(); $("#revert").disabled = !dirty();
 }
 let setupHover = null;
+// Save: every setting on the form that differs from what is saved, one by one, the way a change saves itself
 async function save() {
-  const c = readSetup(); c.measured = true;
+  const form = readSetup(), paths = [];
+  (function walk(a, b, at) { for (const k of Object.keys(a)) { const p = at ? `${at}.${k}` : k; if (a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) walk(a[k], b?.[k] || {}, p); else if (JSON.stringify(a[k]) !== JSON.stringify(b?.[k])) paths.push(p); } })(form, cfg, "");
   const b = $("#save"); b.setAttribute("aria-busy", "true"); b.innerHTML = `<span class="dl-spinner" aria-hidden="true"></span>Save`;
-  try { cfg = await saveConfig(c); applyConfig(); fillSetup(cfg); renderSetup(); toast("Saved to arm.config.json"); if (arm.connected()) arm.tune({ ...cfg.live, accel: cfg.servos.accel }).catch(() => {}); }
-  catch (e) { $("#save-note").textContent = e.message; }
+  try { await saveParts(paths.filter((p) => p !== "rev"), () => "Saved to arm.config.json"); }
   finally { b.removeAttribute("aria-busy"); b.textContent = "Save"; renderSetup(); }
 }
 function applyConfig() { g = geomFrom(cfg); board.setGeom(g); sim.setGeom(g); v3?.setGeom(g, cfg.pen); buildJoints(); replan(); }
@@ -999,26 +1000,31 @@ function lowerIfThere() {
     const T = setupSim.g.tilt; setupSim.manual = { ...m, tilt: lowerAt === "erase" ? T.erase : T.draw }; lowerAt = null;
   }
 }
-// Save just some parts of the form (the pen angles, the nib and eraser offsets, how to wipe), a moment after the last
-// change, merged into what is saved now; any other unsaved edits stay unsaved. Resolves once saved.
-let partTimer = 0, partKeys = new Set(), partWaiters = [];
-function saveParts(keys, said) {
-  keys.forEach((k) => partKeys.add(k)); clearTimeout(partTimer);
+// Every setting saves itself once it changes (Enter, or leaving the field; a moment after a slider): just the settings
+// changed (paths such as "motion.drawSpeed", or a whole part such as "penServo") are written into what is saved now,
+// so nothing waits for a Save and a page opened earlier can't put old values back. Resolves once saved.
+let partTimer = 0, partPaths = new Set(), partWaiters = [], partSaid = null;
+function saveParts(paths, said) {
+  paths.forEach((k) => partPaths.add(k)); if (said) partSaid = said; clearTimeout(partTimer);
   return new Promise((done) => {
     partWaiters.push(done);
     partTimer = setTimeout(async () => {
-      const ks = [...partKeys], waiters = partWaiters; partKeys = new Set(); partWaiters = [];
-      const form = readSetup(), changed = ks.filter((k) => JSON.stringify(form[k]) !== JSON.stringify(cfg[k]));
+      const ps = [...partPaths], waiters = partWaiters, say = partSaid; partPaths = new Set(); partWaiters = []; partSaid = null;
+      const form = readSetup(), changed = ps.filter((k) => JSON.stringify(get(form, k)) !== JSON.stringify(get(cfg, k)));
       if (changed.length) {
         try {
-          const c = await loadConfig(); changed.forEach((k) => { c[k] = form[k]; }); cfg = await saveConfig(c); applyConfig(); renderSetup();
-          if (said) toast(said(form));
+          const c = await loadConfig(); changed.forEach((k) => put(c, k, structuredClone(get(form, k)))); c.measured = true;
+          cfg = await saveConfig(c); applyConfig(); renderSetup(); $("#save-note").textContent = "";
+          if (arm.connected() && changed.some((k) => /^(live|servos)/.test(k))) arm.tune({ ...cfg.live, accel: cfg.servos.accel }).catch(() => {});
+          toast(say ? say(form) : `Saved: ${changed.map(labelOf).join(", ")}`);
         } catch (e) { toast(`Couldn't save: ${e.message}`, "circle-alert"); }
       }
       waiters.forEach((w) => w());
     }, 600);
   });
 }
+// what a setting is called on the page, for "Saved: Draw speed"
+function labelOf(path) { const el = $(`#setup [data-path="${path}"]`); return (el && (($(`label[for="${el.id}"]`)?.textContent) || el.getAttribute("aria-label"))) || path; }
 const savePens = () => saveParts(["penServo"], (f) => `Pen angles saved: rest ${f.penServo.lift}°, write ${f.penServo.draw}°, erase ${f.penServo.erase}°`);
 function syncPenRanges() { for (const [k] of PENS) { const r = $(`[data-pen-range="${k}"]`), n = $(`[data-path="penServo.${k}"]`); if (r && n && document.activeElement !== r) r.value = n.value; } }
 // put the pen at one of its angles where the arm is now: the sim, and the real servo when connected
@@ -1055,7 +1061,7 @@ async function centreEraser() {
   const set = (path, v) => { $(`[data-path="${path}"]`).value = Math.round(v * 2) / 2; };
   set("tool.eraser.along", along); set("tool.eraser.side", side);
   $("#setup").dispatchEvent(new Event("input")); renderEraserCheck();
-  await saveParts(["tool"], () => `Eraser offset: ${(Math.round(along * 2) / 2)} mm past the tip, ${Math.abs(Math.round(side * 2) / 2)} mm ${side >= 0 ? "left" : "right"} of the forearm's line`);
+  await saveParts(["tool.eraser.along", "tool.eraser.side"], () => `Eraser offset: ${(Math.round(along * 2) / 2)} mm past the tip, ${Math.abs(Math.round(side * 2) / 2)} mm ${side >= 0 ? "left" : "right"} of the forearm's line`);
 }
 // which end of the pen is down: the pen servo's angle last sent (or the sim's), nearer write, rest or erase
 function endDown() {
@@ -1069,7 +1075,7 @@ async function centreHere() {
   set("drawing.x", p.x);
   if (c.board.base === "corner") set("drawing.reach", p.y); else set("board.standoff", p.y - c.board.height / 2);
   $("#setup").dispatchEvent(new Event("input")); renderSetup();
-  await saveParts(["drawing", "board"], () => `Drawings now centre on ${Math.round(p.x)}, ${Math.round(p.y)} mm from the base`);
+  await saveParts(["drawing.x", "drawing.reach", "board.standoff"], () => `Drawings now centre on ${Math.round(p.x)}, ${Math.round(p.y)} mm from the base`);
 }
 // a circle, 100 mm across, round the drawing's middle; the sim inks it at once, the real arm draws it as a job
 async function drawShape(strokes, label) {
@@ -1101,7 +1107,7 @@ async function eraserCheck(what) {
     if (what !== "place") {
       const f = (path) => $(`[data-path="${path}"]`), step = { out: ["along", 1], in: ["along", -1], left: ["side", 1], right: ["side", -1] }[what];
       const el = f(`tool.eraser.${step[0]}`); el.value = +(+el.value + step[1]).toFixed(1);
-      $("#setup").dispatchEvent(new Event("input")); await saveParts(["tool"]);
+      $("#setup").dispatchEvent(new Event("input")); await saveParts(["tool.eraser.along", "tool.eraser.side"]);
     }
     // eraser down on the cross's middle: in the sim, and on the arm (lifted first if it is somewhere else)
     const a = poseAt({ x: cx, y: cy }, "erase"); if (!a) return toast("The eraser can't reach the middle of the drawing", "circle-alert");
@@ -1169,13 +1175,11 @@ function wireLive() {
   });
   // a typed angle moves the pen and saves once it is finished, not on every keystroke (typing 150 would pass
   // through 1 and 15)
+  // any setting, once changed, saves itself (the pen angles also move the pen there)
   $("#setup").addEventListener("change", (e) => {
     const path = e.target.dataset.path || "", m = /^penServo\.(\w+)$/.exec(path);
-    if (m) { tryPen(m[1]); savePens(); }
-    if (/^(tool|erase)\./.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("tool") ? "Nib and eraser offsets saved" : "Wiping saved"));
-    if (/^(drawing\.(x|reach)|correct\.)/.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("correct") ? "Scale saved" : "Centre saved"));
-    if (path === "motion.eraseSpeed" || path === "pen.eraserWidth") saveParts([path.split(".")[0]], () => "Wiping saved");
-    if (path === "motion.home") saveParts(["motion"], () => (e.target.value === "stay" ? "The arm now stays where a drawing ends" : "The arm now goes home after each drawing"));
+    if (m) { tryPen(m[1]); savePens(); return; }
+    if (path) saveParts([path]);
   });
   $("#setup").addEventListener("click", (e) => {
     const t = e.target.closest("[data-pen-try]"); if (t) tryPen(t.dataset.penTry);
