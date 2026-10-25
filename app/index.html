@@ -213,6 +213,21 @@
               </div>
               <p class="dl-meta">Each one copies the sliders into the fields on the left. Save keeps them.</p>
             </details>
+            <details class="cw-live__cal" id="eraser-check">
+              <summary>Line the eraser up with the ink</summary>
+              <p class="dl-meta">Write a cross, put the eraser on its middle, then say where the eraser lands, a press per millimetre (left and right as seen along the forearm, from the elbow). Each press saves and puts the eraser down again.</p>
+              <div class="cw-actions">
+                <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-ec="mark">Write a cross</button>
+                <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-ec="place">Eraser on the cross</button>
+              </div>
+              <div class="cw-nudge" role="group" aria-label="Nudge the eraser">
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-ec="out">It lands past</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-ec="in">It lands short</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-ec="left">It lands left</button>
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-ec="right">It lands right</button>
+              </div>
+              <p class="dl-meta" id="ec-offset"></p>
+            </details>
             <pre class="cw-live__log" id="live-log" aria-label="What the board said last"></pre>
           </section>
           <section class="cw-sec">

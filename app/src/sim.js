@@ -10,8 +10,8 @@ const SETTLE = 0.05;   // s the arm holds after a tilt, while the marker settles
 // When each waypoint is commanded. A hobby servo told to stop dead overshoots, so nothing starts or stops at once:
 // the pen speeds up and slows down at `accel` (mm/s²), takes a right-angle corner at `cornerSpeed` (sharper ones
 // slower, gentler ones faster) and stops before each tilt; no joint turns faster than the servo can or speeds up
-// faster than `servo.accel` (deg/s²). Tilts ease in and out. The pen draws at drawSpeed and travels at
-// travelSpeed. Long moves are split every STEP mm first, so the job's toolpath and path are longer than the plan's.
+// faster than `servo.accel` (deg/s²). Tilts ease in and out. The pen draws at drawSpeed, wipes at eraseSpeed and
+// travels at travelSpeed. Long moves are split every STEP mm first, so the job's toolpath and path are longer than the plan's.
 // tTilt[i]: the tilt for waypoint i starts; tLand[i]: it is there; tGo[i]: the arm sets off for waypoint i;
 // tCmd[i]: it should have arrived.
 export function makeJob(toolpath, angles, g) {
@@ -26,7 +26,7 @@ export function makeJob(toolpath, angles, g) {
   for (let i = 0; i < n; i++) {
     const a = path[i], p = i ? toolpath[i - 1] : start, q = toolpath[i];
     const d = Math.hypot(q.x - p.x, q.y - p.y), dj = a.out_of_reach ? 0 : Math.max(Math.abs(a.base - last.base), Math.abs(a.elbow - last.elbow));
-    const v = (q.tool || (q.pen ? "draw" : "lift")) === "lift" ? g.travelSpeed : g.drawSpeed;
+    const tool = q.tool || (q.pen ? "draw" : "lift"), v = tool === "lift" ? g.travelSpeed : tool === "erase" ? g.eraseSpeed || g.drawSpeed : g.drawSpeed;
     len[i] = d; dir[i] = d > 1e-9 && [(q.x - p.x) / d, (q.y - p.y) / d];
     if (d > 1e-9) { const k = dj / d; vTop[i] = k ? Math.min(v, wj / k) : v; acc[i] = k ? Math.min(A, Aj / k) : A; }
     else turn[i] = dj;   // the joints turn with the pen on one spot (rare): a move of its own, from rest to rest

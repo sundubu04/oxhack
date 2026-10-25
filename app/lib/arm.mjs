@@ -46,7 +46,9 @@ export async function connect(port = ports()[0]) {
     for (const l of lines.map((s) => s.trim()).filter(Boolean)) { note("<", l); listeners.forEach((fn) => fn(l)); }
   });
   child.stderr.on("data", (b) => { st.error = b.toString().trim(); });
-  child.on("exit", (code) => { if (code) st.error ||= `The port closed (${code})`; child = null; st.open = false; });
+  // the cable pulled or the port taken away: say so, so nothing looks connected that isn't
+  const mine = child;
+  child.on("exit", (code) => { if (child !== mine) return; st.error ||= `The USB link closed${code ? ` (${code})` : ""}: connect again`; child = null; st.open = false; st.firmware = null; if (st.job?.state === "running") st.job.state = "failed"; });
   st.open = true;
   // the board resets when the port opens, and a Mega's bootloader can hang on to bytes that arrive while it starts:
   // wait 2 s, then ask until it answers, for up to 4 s more

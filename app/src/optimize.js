@@ -1,7 +1,7 @@
 // What the arm does when the board changes: which strokes are already there, which must go, how to wipe them, and
 // what to draw, in the order and with the wipe that the sim says take least time. Pure: no DOM. Strokes are
 // [{x,y}] in board mm. Every candidate is timed with the same schedule the sim and the motors run (makeJob).
-import { resample, drawPath, order, bbox, erasePlan } from "./pathplan.js";
+import { resample, drawPath, order, bbox, erasePlan, scrub } from "./pathplan.js";
 import { toAngles } from "./ik.js";
 import { makeJob } from "./sim.js";
 
@@ -100,7 +100,7 @@ const strategies = {
   },
   // the whole drawing area, as before
   full(remove, g) {
-    const tp = erasePlan(g).toolpath; return [tp.map((p) => ({ x: p.x, y: p.y }))];
+    const tp = erasePlan(g, { zigzag: 0 }).toolpath; return [tp.map((p) => ({ x: p.x, y: p.y }))];   // planChange scrubs it
   },
 };
 
@@ -129,9 +129,12 @@ export function planChange(oldS, newS, g, { from = null, tol = 1.5, only = null 
   const { keep, add, remove } = diffStrokes(oldS, newS, tol);
   const reach = g.eraserWidth / 2 + LINE / 2;
   const candidates = [];
-  const names = remove.length ? (only ? [only] : Object.keys(strategies)) : ["none"];
+  // config erase.how: "area" wipes the whole box round what goes (it can't miss a line by a few mm), "lines" follows
+  // the lines, "fastest" times all four ways and takes the quickest
+  const how = g.erase?.how, ways = how === "area" ? ["box"] : how === "lines" ? ["trace"] : Object.keys(strategies);
+  const names = remove.length ? (only ? [only] : ways) : ["none"];
   for (const name of names) {
-    const paths = name === "none" ? [] : strategies[name](remove, g, from);
+    const paths = name === "none" ? [] : strategies[name](remove, g, from).map((p) => scrub(p, g.erase?.zigzag, g.erase?.period));
     // what the wipe also takes off strokes that stay
     const touched = [];
     if (paths.length && keep.length) {

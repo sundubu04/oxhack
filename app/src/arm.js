@@ -45,6 +45,8 @@ function live(path, body) {
 export function servos(base, elbow, pen) { if (connected()) live("/servos", { base, elbow, pen }); }
 // pens: the pen servo's angles to use ({ draw, lift, erase }), when they differ from the saved config
 export function point(x, y, tool = "draw", start = false, pens) { if (connected()) live("/point", { x, y, tool, start, pen: pens?.[tool], lift: pens?.lift }); }
+// the same, waited for, so a refusal (the arm is drawing, out of reach) comes back as an error
+export const pointNow = (x, y, tool = "draw", start = false, pens) => call("/point", { x, y, tool, start, pen: pens?.[tool], lift: pens?.lift });
 // joint angles (as the app counts them) -> servo degrees through the calibration
 export function jog(j, g) { if (connected()) servos(...["base", "elbow", "tilt"].map((k) => Math.max(0, Math.min(180, servoAngle(k, j[k], g))))); }
 

@@ -25,15 +25,22 @@ export function toolLink(g, tool) {
   const side = tool === "erase" ? +(g.eraserSide || 0) : +(g.nibSide || 0), along = tool === "erase" ? +(g.eraserAlong || 0) : +(g.nibAlong || 0);
   return { L: Math.hypot(g.L2 + along, side), gamma: Math.atan2(side, g.L2 + along) };
 }
+// The scale correction from Arm setup's circle test (config correct): about the drawing's middle the arm aims
+// sx times as far across and sy times as far up as the model says, so a circle comes out round on the real board.
+// The IK takes board points through it and the FK brings them back, so the sim still shows the drawing as meant.
+function warp(g, x, y, back = false) {
+  const c = g.correct; if (!c || (c.sx === 1 && c.sy === 1) || g.cx == null) return { x, y };
+  return back ? { x: g.cx + (x - g.cx) / c.sx, y: g.cy + (y - g.cy) / c.sy } : { x: g.cx + (x - g.cx) * c.sx, y: g.cy + (y - g.cy) * c.sy };
+}
 // Joint angles that put this end of the pen on (x, y), or null when it is out of reach.
 export function ikTool(x, y, g, tool = "draw") {
-  const { L, gamma } = toolLink(g, tool), s = ik(x, y, g.L1, L, g.elbowUp);
+  const p = warp(g, x, y), { L, gamma } = toolLink(g, tool), s = ik(p.x, p.y, g.L1, L, g.elbowUp);
   return s && { t1: s.t1, t2: s.t2 - gamma, dex: s.dex };
 }
 // Where this end of the pen is for given joint angles (radians).
 export function toolPoint(t1, t2, g, tool = "draw") {
   const { L, gamma } = toolLink(g, tool), f = fk(t1, t2 + gamma, g.L1, L);
-  return { x: f.px, y: f.py };
+  return warp(g, f.px, f.py, true);
 }
 
 // Default geometry — the build (157 mm upper arm, 190 mm forearm, elbow on the left, base 40 mm below a 350 mm board, clock centred).

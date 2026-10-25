@@ -12,14 +12,23 @@ export const DEFAULT_CONFIG = {
   // reaches straight up through it, the drawing's middle `drawing.reach` mm above the base (the build, 25 Oct; the
   // jog sketch's frame). base "below": centred `standoff` mm below a square board's bottom edge, the drawing in its middle.
   board: { width: 350, height: 350, standoff: 40, base: "corner", inset: 20 },
-  drawing: { size: 160, reach: 220 },
+  // the drawing's middle: `reach` mm up from the base and `x` mm across (Arm setup's Centre here sets both)
+  drawing: { size: 160, reach: 220, x: 0 },
+  // width and height scale, from the circle test: drawings are stretched by these about their middle so they come out
+  // true on the board (1 = as the model says)
+  correct: { sx: 1, sy: 1 },
   elbow: "down",   // the build's elbow sits to the left of the line from base to pen ("up" would put it on the right)
   // Measured on the build with the team's jog sketch (firmware/jog), in servo degrees: home, and the pen servo with
   // the nib on the board, lifted, and the eraser on the board. Where each end of the marker touches, in mm from
   // the forearm's tip: along the forearm (+ further out) and across it (+ to the left, looking from the elbow).
   park: { base: 160, elbow: 10 },
   penServo: { draw: 4, lift: 40, erase: 180 },   // erase 180 from the team on 25 Oct (the jog sketch had 150)
-  tool: { nib: { along: 0, side: 0 }, eraser: { along: 14, side: -42 } },
+  // The team, 25 Oct: the pen sits on the forearm's centre line, the eraser lands dead centre and the nib a little to the
+  // left (3 mm to start: line them up with Arm setup's eraser check).
+  tool: { nib: { along: 0, side: 3 }, eraser: { along: 14, side: 0 } },
+  // Wiping: "area" covers the whole box round what goes, "lines" follows the lines, "fastest" picks the quicker. The
+  // eraser scrubs `zigzag` mm to each side once every `period` mm as it goes.
+  erase: { how: "area", zigzag: 4, period: 12 },
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
@@ -28,7 +37,7 @@ export const DEFAULT_CONFIG = {
   // leadIn: mm of pen-up glide onto each stroke. Draw speed is the jog sketch's (1 mm per 25 ms). A hobby servo
   // told to stop dead overshoots, so the pen speeds up and slows down at accel (mm/s²) and takes a right-angle
   // corner at cornerSpeed (mm/s; sharper corners slower). Lower accel if lines end in a hook.
-  motion: { drawSpeed: 40, travelSpeed: 120, leadIn: 3, accel: 1000, cornerSpeed: 15 },
+  motion: { drawSpeed: 40, travelSpeed: 120, eraseSpeed: 60, leadIn: 3, accel: 1000, cornerSpeed: 15 },   // a wipe needn't be as exact as a line
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
   // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both. accel caps
   // how fast any joint speeds up or slows down, in deg/s²: well under what an SG92R can give the loaded arm, so it
@@ -74,7 +83,8 @@ export function geomFrom(cfg) {
     L1: +c.links.L1, L2: +c.links.L2,
     standoff: +c.board.standoff, board: H, boardW: W, corner,
     bo: corner ? { x: 0, y: -(+c.board.inset || 0) } : { x: -W / 2, y: +c.board.standoff }, bang: corner ? Math.PI / 4 : 0,
-    cx: 0, cy: corner ? reach : +c.board.standoff + H / 2,
+    cx: +c.drawing.x || 0, cy: corner ? reach : +c.board.standoff + H / 2,
+    correct: { sx: +c.correct.sx || 1, sy: +c.correct.sy || 1 },
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     ...penFields(c.pen),
     // what was measured on the arm wins over what pen.js works out from the marker's size
@@ -83,8 +93,8 @@ export function geomFrom(cfg) {
     // the marker's pivot height and swing, from where its two ends were measured to touch (for the 3D view)
     pen: { ...penGeometry(c.pen), ...measuredPen(+c.pen.length, Math.hypot(+c.tool.eraser.along - +c.tool.nib.along, +c.tool.eraser.side - +c.tool.nib.side), +c.pen.pivot) },
     park: { base: joint("base", c.park.base), elbow: joint("elbow", c.park.elbow) },
-    pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
-    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,
+    pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth, erase: { how: c.erase.how, zigzag: +c.erase.zigzag, period: +c.erase.period },
+    drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, eraseSpeed: +c.motion.eraseSpeed || +c.motion.drawSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,
     servo: { speed: +c.servos.speed, accel: +c.servos.accel, resolution: +c.servos.resolution, backlash: +c.servos.backlash, compensate: c.servos.compensate !== false, base: c.servos.base, elbow: c.servos.elbow, tilt: c.servos.tilt },
   };
 }

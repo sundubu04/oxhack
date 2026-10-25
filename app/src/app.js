@@ -623,8 +623,9 @@ function showPage(page) {
 // ---------- arm setup ----------
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
-  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.inset", "Base in from the corner", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
-  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
+  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.inset", "Base in from the corner", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
+  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["tool.nib.along", "Nib past the tip", "mm"], ["tool.nib.side", "Nib across, + left", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
+  ["Erasing", [["erase.how", "How to wipe", "", [["area", "The whole area of what goes"], ["lines", "Along the lines"], ["fastest", "Whichever is quickest"]]], ["pen.eraserWidth", "Eraser width", "mm"], ["erase.zigzag", "Zigzag to each side", "mm"], ["erase.period", "One zigzag every", "mm"], ["motion.eraseSpeed", "Wipe speed", "mm/s"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
@@ -644,10 +645,23 @@ function penGroup() {
      <button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-pen-try="${k}">Try</button>`).join("")}</div>
     <div><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="pen-defaults">Defaults: rest ${d.lift}°, write ${d.draw}°, erase ${d.erase}°</button></div></div>`;
 }
+// Centre and scale: pin the drawing's middle where the nib is, and correct width and height from a circle drawn,
+// measured and typed in. All of it saves itself.
+function centreGroup() {
+  const num = (path, label, unit) => `<div class="dl-field"><label class="dl-label" for="f-${path.replace(/\./g, "-")}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="f-${path.replace(/\./g, "-")}" data-path="${path}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`;
+  const plain = (id, label) => `<div class="dl-field"><label class="dl-label" for="${id}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id}" type="number" step="any" inputmode="decimal" placeholder="100"><span>mm</span></span></div>`;
+  return `<div class="cw-group" role="group" aria-labelledby="g-centre"><h2 class="dl-kicker" id="g-centre">Centre and scale</h2>
+    <p class="dl-meta">Move the nib to where the middle of every drawing should be (the sliders, or Move on the board), then press Centre here.</p>
+    <div class="cw-fields">${num("drawing.x", "Middle, across", "mm")}${num("drawing.reach", "Middle, up from the base", "mm")}</div>
+    <div class="cw-actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="centre-here">Centre here</button><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="centre-mark">Mark the centre</button></div>
+    <p class="dl-meta">Then draw a 100 mm circle, measure it across and up, and type what you measured: the scales are worked out so the next one comes out round.</p>
+    <div class="cw-fields">${plain("circle-w", "It measures across")}${plain("circle-h", "It measures up")}${num("correct.sx", "Width scale", "×")}${num("correct.sy", "Height scale", "×")}</div>
+    <div class="cw-actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="circle-draw">Draw a 100 mm circle</button><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="circle-fix">Fix the scale</button><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="circle-reset">Scale back to 1</button></div></div>`;
+}
 function buildSetup() {
   const id = (p) => `f-${p.replace(/\./g, "-")}`;
   const gid = (legend) => `g-${legend.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  $("#setup").innerHTML = penGroup() + FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="${gid(legend)}"><h2 class="dl-kicker" id="${gid(legend)}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit, options]) => options
+  $("#setup").innerHTML = penGroup() + centreGroup() + FIELDS.map(([legend, fs]) => `<div class="cw-group" role="group" aria-labelledby="${gid(legend)}"><h2 class="dl-kicker" id="${gid(legend)}">${legend}</h2><div class="cw-fields">${fs.map(([p, label, unit, options]) => options
     ? `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="dl-select"><select class="dl-input" id="${id(p)}" data-path="${p}" data-text>${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>${icon("chevron-down")}</span></div>`
     : `<div class="dl-field"><label class="dl-label" for="${id(p)}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id(p)}" data-path="${p}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`).join("")}</div></div>`).join("") +
     `<div class="cw-group" role="group" aria-labelledby="g-servos"><h2 class="dl-kicker" id="g-servos">Servos</h2><div class="cw-fields">
@@ -951,18 +965,27 @@ function lowerIfThere() {
     const T = setupSim.g.tilt; setupSim.manual = { ...m, tilt: lowerAt === "erase" ? T.erase : T.draw }; lowerAt = null;
   }
 }
-// save just the pen angles, a moment after the last change; any other unsaved edits on the form stay unsaved
-let penSaveTimer = 0;
-function savePens() {
-  clearTimeout(penSaveTimer);
-  penSaveTimer = setTimeout(async () => {
-    const pens = readSetup().penServo; if (JSON.stringify(pens) === JSON.stringify(cfg.penServo)) return;
-    try {
-      const c = await loadConfig(); c.penServo = pens; cfg = await saveConfig(c); applyConfig(); renderSetup();   // merge into what is saved now
-      toast(`Pen angles saved: rest ${pens.lift}°, write ${pens.draw}°, erase ${pens.erase}°`);
-    } catch (e) { toast(`Couldn't save the pen angles: ${e.message}`, "circle-alert"); }
-  }, 600);
+// Save just some parts of the form (the pen angles, the nib and eraser offsets, how to wipe), a moment after the last
+// change, merged into what is saved now; any other unsaved edits stay unsaved. Resolves once saved.
+let partTimer = 0, partKeys = new Set(), partWaiters = [];
+function saveParts(keys, said) {
+  keys.forEach((k) => partKeys.add(k)); clearTimeout(partTimer);
+  return new Promise((done) => {
+    partWaiters.push(done);
+    partTimer = setTimeout(async () => {
+      const ks = [...partKeys], waiters = partWaiters; partKeys = new Set(); partWaiters = [];
+      const form = readSetup(), changed = ks.filter((k) => JSON.stringify(form[k]) !== JSON.stringify(cfg[k]));
+      if (changed.length) {
+        try {
+          const c = await loadConfig(); changed.forEach((k) => { c[k] = form[k]; }); cfg = await saveConfig(c); applyConfig(); renderSetup();
+          if (said) toast(said(form));
+        } catch (e) { toast(`Couldn't save: ${e.message}`, "circle-alert"); }
+      }
+      waiters.forEach((w) => w());
+    }, 600);
+  });
 }
+const savePens = () => saveParts(["penServo"], (f) => `Pen angles saved: rest ${f.penServo.lift}°, write ${f.penServo.draw}°, erase ${f.penServo.erase}°`);
 function syncPenRanges() { for (const [k] of PENS) { const r = $(`[data-pen-range="${k}"]`), n = $(`[data-path="penServo.${k}"]`); if (r && n && document.activeElement !== r) r.value = n.value; } }
 // put the pen at one of its angles where the arm is now: the sim, and the real servo when connected
 function tryPen(k) {
@@ -972,6 +995,59 @@ function tryPen(k) {
   setupSim.manual = { base: pose.base, elbow: pose.elbow, tilt: gg.tilt[k] }; lowerAt = null; kickSetup();
   if (arm.connected()) arm.servos(undefined, undefined, v);
   const a = sliders(); a[2] = v; setSliders(a);
+}
+// Lining the eraser up with the ink: write a cross with the nib at the drawing's middle, put the eraser down on its
+// middle, and say where it lands. Landing past the cross means the real eraser sits further out than the model has
+// it, so its offset grows by a millimetre; short, left and right likewise (each press saves and puts it down again).
+// In the sim the cross is drawn at once; the real arm writes it as a small job.
+// where the nib is now: the sim's pose, which follows the sliders (and so the real arm) or a press with Move
+function nibNow() {
+  const gg = geomFrom(readSetup()), j = setupSim.manual || setupSim.j, D = Math.PI / 180;
+  return toolPoint(j.base * D, j.elbow * D, gg);
+}
+async function centreHere() {
+  const c = readSetup(), p = nibNow(), set = (path, v) => { $(`[data-path="${path}"]`).value = Math.round(v * 2) / 2; };
+  set("drawing.x", p.x);
+  if (c.board.base === "corner") set("drawing.reach", p.y); else set("board.standoff", p.y - c.board.height / 2);
+  $("#setup").dispatchEvent(new Event("input")); renderSetup();
+  await saveParts(["drawing", "board"], () => `Drawings now centre on ${Math.round(p.x)}, ${Math.round(p.y)} mm from the base`);
+}
+// a circle, 100 mm across, round the drawing's middle; the sim inks it at once, the real arm draws it as a job
+async function drawShape(strokes, label) {
+  for (const st of strokes) for (let i = 1; i < st.length; i++) setupBoard.inkSeg(st[i - 1], st[i], "draw");
+  setupInk = setupInkDirty = true; renderSetup();
+  if (arm.connected()) { try { await arm.draw(strokes); toast(`Drawing ${label}`); } catch (e) { toast(e.message, "circle-alert"); } }
+}
+const circleStrokes = () => { const { cx, cy } = geomFrom(readSetup()); return [Array.from({ length: 73 }, (_, i) => ({ x: cx + 50 * Math.cos((i / 72) * 2 * Math.PI), y: cy + 50 * Math.sin((i / 72) * 2 * Math.PI) }))]; };
+async function fixScale() {
+  const w = +$("#circle-w").value, h = +$("#circle-h").value, c = readSetup();
+  if (!(w > 0) && !(h > 0)) return toast("Type what the circle measures across and up first", "circle-alert");
+  const sx = w > 0 ? (+c.correct.sx || 1) * (100 / w) : +c.correct.sx, sy = h > 0 ? (+c.correct.sy || 1) * (100 / h) : +c.correct.sy;
+  $('[data-path="correct.sx"]').value = +sx.toFixed(3); $('[data-path="correct.sy"]').value = +sy.toFixed(3);
+  $("#circle-w").value = $("#circle-h").value = "";
+  $("#setup").dispatchEvent(new Event("input"));
+  await saveParts(["correct"], () => `Width scale ${sx.toFixed(3)}, height scale ${sy.toFixed(3)}: draw the circle again to check`);
+}
+function crossStrokes() { const { cx, cy } = geomFrom(readSetup()); return [[{ x: cx - 12, y: cy }, { x: cx + 12, y: cy }], [{ x: cx, y: cy - 12 }, { x: cx, y: cy + 12 }]]; }
+async function eraserCheck(what) {
+  const { cx, cy } = setupSim.g;
+  try {
+    if (what === "mark") return drawShape(crossStrokes(), "the cross");
+    if (what !== "place") {
+      const f = (path) => $(`[data-path="${path}"]`), step = { out: ["along", 1], in: ["along", -1], left: ["side", 1], right: ["side", -1] }[what];
+      const el = f(`tool.eraser.${step[0]}`); el.value = +(+el.value + step[1]).toFixed(1);
+      $("#setup").dispatchEvent(new Event("input")); await saveParts(["tool"]);
+    }
+    // eraser down on the cross's middle: in the sim, and on the arm (lifted first if it is somewhere else)
+    const a = poseAt({ x: cx, y: cy }, "erase"); if (!a) return toast("The eraser can't reach the middle of the drawing", "circle-alert");
+    setupSim.manual = { ...a, tilt: setupSim.g.tilt.lift }; lowerAt = "erase"; kickSetup();
+    if (arm.connected()) await arm.pointNow(cx, cy, "erase", true, readSetup().penServo);   // says so if the arm is busy
+  } catch (e) { toast(e.message, "circle-alert"); }
+  finally { renderEraserCheck(); }
+}
+function renderEraserCheck() {
+  const t = readSetup().tool.eraser;
+  $("#ec-offset").textContent = `Eraser ${t.along} mm past the tip, ${Math.abs(t.side)} mm ${t.side > 0 ? "left" : t.side < 0 ? "right" : "across"} of the forearm's line`;
 }
 function setTool(t) {
   setupTool = t; $$("#setup-tools button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t))); renderLive();
@@ -1009,6 +1085,15 @@ function wireLive() {
   $("#sketch-clear").addEventListener("click", () => { sketch = []; setupBoard.clearInk(); setupInk = false; setupInkDirty = true; renderSetup(); renderLive(); });
   $("#sketch-draw").addEventListener("click", () => arm.draw(sketch).then(() => { toast("Drawing it again, in the shortest order"); refreshLive(); }).catch((e) => toast(e.message, "circle-alert")));
   $$("[data-cal]").forEach((b) => b.addEventListener("click", () => calibrate(b.dataset.cal)));
+  $("#eraser-check").addEventListener("click", (e) => { const b = e.target.closest("[data-ec]"); if (b) eraserCheck(b.dataset.ec); });
+  $("#setup").addEventListener("click", (e) => {
+    if (e.target.closest("#centre-here")) centreHere();
+    if (e.target.closest("#centre-mark")) drawShape(crossStrokes(), "a cross on the centre");
+    if (e.target.closest("#circle-draw")) drawShape(circleStrokes(), "a 100 mm circle");
+    if (e.target.closest("#circle-fix")) fixScale();
+    if (e.target.closest("#circle-reset")) { $('[data-path="correct.sx"]').value = 1; $('[data-path="correct.sy"]').value = 1; $("#setup").dispatchEvent(new Event("input")); saveParts(["correct"], () => "Scale back to 1"); }
+  });
+  $("#eraser-check").addEventListener("toggle", renderEraserCheck);
   // pen angles: a slider moves its number and the pen; Try sends it there; Defaults puts back the jog sketch's
   $("#setup").addEventListener("input", (e) => {
     const k = e.target.dataset.penRange; if (k) { $(`[data-path="penServo.${k}"]`).value = e.target.value; $("#setup").dispatchEvent(new Event("input")); tryPen(k); savePens(); return; }
@@ -1016,7 +1101,13 @@ function wireLive() {
   });
   // a typed angle moves the pen and saves once it is finished, not on every keystroke (typing 150 would pass
   // through 1 and 15)
-  $("#setup").addEventListener("change", (e) => { const m = /^penServo\.(\w+)$/.exec(e.target.dataset.path || ""); if (m) { tryPen(m[1]); savePens(); } });
+  $("#setup").addEventListener("change", (e) => {
+    const path = e.target.dataset.path || "", m = /^penServo\.(\w+)$/.exec(path);
+    if (m) { tryPen(m[1]); savePens(); }
+    if (/^(tool|erase)\./.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("tool") ? "Nib and eraser offsets saved" : "Wiping saved"));
+    if (/^(drawing\.(x|reach)|correct\.)/.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("correct") ? "Scale saved" : "Centre saved"));
+    if (path === "motion.eraseSpeed" || path === "pen.eraserWidth") saveParts([path.split(".")[0]], () => "Wiping saved");
+  });
   $("#setup").addEventListener("click", (e) => {
     const t = e.target.closest("[data-pen-try]"); if (t) tryPen(t.dataset.penTry);
     if (e.target.closest("#pen-defaults")) { for (const [k] of PENS) $(`[data-path="penServo.${k}"]`).value = DEFAULT_CONFIG.penServo[k]; syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); tryPen("lift"); savePens(); }

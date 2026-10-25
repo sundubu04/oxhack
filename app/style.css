@@ -168,3 +168,4 @@
 .cw-pens .dl-label { margin: 0; line-height: 1.3; }
 .cw-pens__what { display: block; color: var(--dl-text-3); font-size: var(--dl-fs-xs); font-weight: 400; }
 .cw-pens .cw-unit > .dl-input { padding-right: 28px; }
+.cw-nudge { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 8px 4px; }

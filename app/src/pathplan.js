@@ -167,19 +167,34 @@ export function drawPath(strokes, opts = {}) {
   return { toolpath, ink: Math.round(ink), travel: Math.round(travel), strokes: s };
 }
 
+// The eraser scrubs: along a wipe path it swings `amp` mm to each side, once every `period` mm, so the felt rubs
+// across the ink as well as along it and covers a band 2 * amp wider. No amp leaves the path as it is.
+export function scrub(path, amp, period = 12) {
+  if (!(amp > 0) || !(period > 0) || path.length < 2) return path;
+  const pts = resample(path, Math.min(2, period / 6)), out = []; let d = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i) d += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const o = amp * Math.sin((2 * Math.PI * d) / period);
+    out.push({ x: pts[i].x - ((b.y - a.y) / L) * o, y: pts[i].y + ((b.x - a.x) / L) * o });
+  }
+  return out;
+}
+
 // A wipe over the drawing area with the eraser end: rows `width * 0.7` apart so passes overlap, drawn as one
-// zigzag so the eraser never lifts between rows. Returns a toolpath in the same shape as plan()'s.
+// zigzag so the eraser never lifts between rows, scrubbing side to side as it goes (config erase.zigzag). Returns
+// a toolpath in the same shape as plan()'s.
 export function erasePlan(g = GEOM, opts = {}) {
   const half = (opts.half ?? g.half ?? 90) + 6, w = opts.width ?? g.eraserWidth ?? 20, step = opts.step ?? 4;
   const { cx, cy } = drawCentre(g);
   const gap = Math.max(4, w * 0.7), rows = Math.ceil((2 * half) / gap) + 1;
-  const toolpath = []; let ink = 0;
+  const path = []; let ink = 0;
   for (let r = 0; r < rows; r++) {
-    const y = cy + half - Math.min(2 * half, r * gap), ltr = r % 2 === 0;
-    const xs = [cx - half, cx + half]; if (!ltr) xs.reverse();
-    const row = resample([{ x: xs[0], y }, { x: xs[1], y }], step);
-    row.forEach((p, i) => toolpath.push({ x: p.x, y: p.y, pen: r === 0 && i === 0 ? 0 : 1, tool: r === 0 && i === 0 ? "lift" : "erase" }));
+    const y = cy + half - Math.min(2 * half, r * gap), xs = [cx - half, cx + half]; if (r % 2) xs.reverse();
+    path.push({ x: xs[0], y }, { x: xs[1], y });
     ink += 2 * half + (r ? gap : 0);
   }
+  const pts = scrub(resample(path, step), opts.zigzag ?? g.erase?.zigzag ?? 0, g.erase?.period);
+  const toolpath = pts.map((p, i) => ({ x: p.x, y: p.y, pen: i ? 1 : 0, tool: i ? "erase" : "lift" }));
   return { toolpath, ink: Math.round(ink), travel: 0, strokes: [] };
 }
