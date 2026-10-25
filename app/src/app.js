@@ -315,7 +315,7 @@ function removeHook(id) { hooks = hooks.filter((h) => h.id !== id); renderHooks(
 const slotOf = (h) => { const t = now(); return Math.floor((t.getTime() / 60000 - t.getTimezoneOffset()) / h.every); };
 function runHook(h) { h.slot = slotOf(h); return send(h.prompt, h); }
 setInterval(() => {
-  if (!doc || thinking || playing || !hooks.length || hooksPaused) return;
+  if (!doc || thinking || playing || !hooks.length || hooksPaused || demo) return;
   const due = hooks.find((h) => h.slot !== slotOf(h));
   if (due) runHook(due);
 }, 1000);
@@ -341,14 +341,45 @@ function clockTimeAsked() {
   const [hh, mm] = ($("#clock-time").value || hhmm(now())).split(":").map(Number), d = now();
   d.setHours(hh || 0, mm || 0, 0, 0); return d;
 }
-function setClock(date, whole = false) {
+function setClock(date, whole = false, { said = true } = {}) {
   if (thinking) return toast("Wait for the answer first", "circle-alert");
   quietReply = false;   // asked for now: the arm follows again after a Stop
   const { scene: next } = applyActions(scene, clockActions(date, whole));
   change(next);
   doc.clockAt = date.getTime();
-  messages.push({ role: "assistant", text: `${whole || !boardStrokes.length ? "Drawing the clock at" : "Setting the hands to"} ${hhmm(date)}.` });
+  if (said) messages.push({ role: "assistant", text: `${whole || !boardStrokes.length ? "Drawing the clock at" : "Setting the hands to"} ${hhmm(date)}.` });
   renderThread(); renderClock(); saveSoon();
+}
+
+// The demo run: the clock goes from one time to another in steps of clock time (10:00 to 11:00 every 5 minutes is
+// 12 updates), each one wiping and redrawing only the hands once the last has finished, on the arm when it follows
+// and in the sim at its speed otherwise; again and again if asked. Stop (or Stop the demo) ends it.
+let demo = null;
+const waitFor = (test) => new Promise((done) => { const t = setInterval(() => { if (test()) { clearInterval(t); done(); } }, 200); });
+async function runDemo() {
+  if (demo) { demo.stop = true; return; }
+  const at = (v) => { const [h, m] = (v || "00:00").split(":").map(Number), d = now(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); };
+  const from = at($("#demo-from").value), step = Math.max(1, Math.round(+$("#demo-step").value || 5)) * 60000;
+  let to = at($("#demo-to").value); if (to <= from) to += 24 * 3600000;   // past midnight
+  const n = Math.floor((to - from) / step) + 1;
+  demo = { stop: false, i: 0, n, from, to };
+  const h = clockHook(); if (h) removeHook(h.id);   // keeping the real time would fight the demo
+  messages.push({ role: "assistant", text: `Demo: ${hhmm(new Date(from))} to ${hhmm(new Date(to))}, every ${everyWords(step / 60000)}${$("#demo-loop").getAttribute("aria-checked") === "true" ? ", again and again" : ""}.` });
+  renderThread(); renderClock();
+  try {
+    do {
+      for (let k = 0; k < n && !demo.stop; k++) {
+        demo.i = k + 1; renderClock();
+        setClock(new Date(from + k * step), !scene.items.some((i) => i.id === "clock"), { said: false });
+        await new Promise((r) => setTimeout(r, 300));
+        await waitFor(() => demo.stop || (!playing && !sending));   // the sim has played it and the arm has finished
+        if (!demo.stop) await new Promise((r) => setTimeout(r, 800));
+      }
+    } while (!demo.stop && $("#demo-loop").getAttribute("aria-checked") === "true");
+  } finally {
+    const stopped = demo.stop; demo = null;
+    messages.push({ role: "assistant", text: stopped ? "Demo stopped." : "Demo done." }); renderThread(); renderClock(); saveSoon();
+  }
 }
 // Reset: the arm wipes the whole clock, or (the board cleaned by hand) the app just forgets it and nothing moves.
 // Either way it stops keeping time, so it isn't drawn again at the next mark.
@@ -388,6 +419,15 @@ function renderClock() {
   if (document.activeElement !== $("#clock-sweep")) $("#clock-sweep").value = +cfg.clock?.sweep || 40;
   if (document.activeElement !== $("#clock-step")) $("#clock-step").value = +cfg.clock?.step || 2;
   if (!$("#clock-time").value) $("#clock-time").value = hhmm(now());
+  $("#demo-start").textContent = demo ? "Stop the demo" : "Start the demo";
+  $("#demo-start").classList.toggle("dl-btn--primary", !demo); $("#demo-start").classList.toggle("dl-btn--secondary", !!demo);
+  ["#demo-from", "#demo-to", "#demo-step"].forEach((s) => { $(s).disabled = !!demo; });
+  $("#demo-note").textContent = demo ? `Running: ${demo.i} of ${demo.n}, now ${doc.clockAt ? hhmm(new Date(doc.clockAt)) : ""}` : (() => {
+    const at = (v) => { const [h, m] = (v || "0:0").split(":").map(Number); return h * 60 + m; };
+    let span = at($("#demo-to").value) - at($("#demo-from").value); if (span <= 0) span += 1440;
+    const n = Math.floor(span / Math.max(1, +$("#demo-step").value || 5)) + 1;
+    return `${n} updates of the hands`;
+  })();
 }
 // one setting saved straight away, merged into what is saved now
 async function saveSetting(path, value, said) {
@@ -401,6 +441,9 @@ function wireClock() {
   $("#clock-update").addEventListener("click", () => setClock(clockTimeAsked()));
   $("#clock-draw").addEventListener("click", () => setClock(clockTimeAsked(), true));
   $("#clock-wipe").addEventListener("click", () => resetClock(true));
+  $("#demo-start").addEventListener("click", runDemo);
+  $("#demo-loop").addEventListener("click", () => { const on = $("#demo-loop").getAttribute("aria-checked") !== "true"; $("#demo-loop").setAttribute("aria-checked", String(on)); });
+  ["#demo-from", "#demo-to", "#demo-step"].forEach((s) => $(s).addEventListener("input", renderClock));
   $("#clock-forget").addEventListener("click", () => resetClock(false));
   $("#clock-keep").addEventListener("click", () => {
     const h = clockHook();
@@ -418,6 +461,7 @@ function wireClock() {
 // resumed, and a reply still on its way plans in the sim but doesn't start the arm. It shows while anything runs.
 async function stopAll() {
   quietReply = true;
+  if (demo) demo.stop = true;
   if (hooks.length) { hooksPaused = true; renderHooks(); }
   if (sending) sending.abort();
   pause();
@@ -426,7 +470,7 @@ async function stopAll() {
   toast(hooks.length ? "Stopped, and repeats paused" : "Stopped");
 }
 function syncStop() {
-  const running = armBusy || playing || thinking || !!sending || (hooks.length > 0 && !hooksPaused);
+  const running = armBusy || playing || thinking || !!sending || !!demo || (hooks.length > 0 && !hooksPaused);
   $("#stop-all").hidden = !running;
 }
 // the arm can be busy with a job another tab or a repeat started: ask the server now and then

@@ -106,6 +106,17 @@
               <div class="dl-field"><label class="dl-label" for="clock-every">Every</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-every" type="number" min="1" step="1" inputmode="numeric"><span>min</span></span></div>
             </section>
             <section class="cw-sec">
+              <h2 class="dl-kicker">Demo run</h2>
+              <div class="cw-fields">
+                <div class="dl-field"><label class="dl-label" for="demo-from">From</label><input class="dl-input" type="time" id="demo-from" value="10:00"></div>
+                <div class="dl-field"><label class="dl-label" for="demo-to">To</label><input class="dl-input" type="time" id="demo-to" value="11:00"></div>
+              </div>
+              <div class="dl-field"><label class="dl-label" for="demo-step">Step, in clock time</label><span class="cw-unit"><input class="dl-input dl-num" id="demo-step" type="number" min="1" step="1" value="5" inputmode="numeric"><span>min</span></span></div>
+              <label class="dl-choice cw-choice"><span id="demo-loop-l">Again and again</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="demo-loop" aria-labelledby="demo-loop-l"></button></label>
+              <div class="cw-actions"><button class="dl-btn dl-btn--primary" type="button" id="demo-start">Start the demo</button></div>
+              <p class="dl-meta" id="demo-note"></p>
+            </section>
+            <section class="cw-sec">
               <h2 class="dl-kicker">Wiping the hands</h2>
               <div class="dl-field"><label class="dl-label" for="clock-sweep">Sweep across each hand</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-sweep" type="number" min="5" step="any" inputmode="decimal"><span>mm</span></span></div>
               <div class="dl-field"><label class="dl-label" for="clock-step">Sweeps apart</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-step" type="number" min="0.5" step="any" inputmode="decimal"><span>mm</span></span></div>
