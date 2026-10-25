@@ -336,8 +336,10 @@ function change(next, { quiet = false } = {}) {
   scene = next; boardStrokes = nextStrokes;
   renderTitle(); renderPicture();
   $("#empty").hidden = !!(scene.items.length || scene.game);
-  const tp = res.best.toolpath;
+  let tp = res.best.toolpath;
   if (!tp.length) { steps.set("path", "done", "nothing to change"); planStatus("Ready", { mark: "dot" }); return "Nothing on the board needs to change."; }
+  // then home, pen up (motion.home "after"), so the drawing is left in view and the next change starts where its plan does
+  if (cfg.motion.home !== "stay") { const h = homePose(g); tp = [...tp, { ...toolPoint(h.base * Math.PI / 180, h.elbow * Math.PI / 180, g), pen: 0 }]; }
   const angles = toAngles(tp, g), job = makeJob(tp, angles, g);
   const lenOf = (S) => S.reduce((d, s) => d + s.reduce((a, p, i) => a + (i ? Math.hypot(p.x - s[i - 1].x, p.y - s[i - 1].y) : 0), 0), 0);
   planned = { toolpath: tp, angles, job, res, ink: lenOf(res.add), wiped: lenOf(res.remove) };
@@ -628,7 +630,7 @@ const FIELDS = [
   ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.inset", "Base in from the corner", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
   ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["tool.nib.along", "Nib past the tip", "mm"], ["tool.nib.side", "Nib across, + left", "mm"]]],
   ["Erasing", [["erase.how", "How to wipe", "", [["area", "The whole area of what goes"], ["lines", "Along the lines"], ["fastest", "Whichever is quickest"]]], ["erase.sweep", "Along a line, the eraser", "", [["across", "Sweeps across it"], ["along", "Waves along it"]]], ["pen.eraserWidth", "Eraser width", "mm"], ["erase.zigzag", "Swings to each side", "mm"], ["erase.step", "Sweeps every (across)", "mm"], ["erase.period", "One wave every (along)", "mm"], ["erase.passes", "Goes over each wipe", "×"], ["erase.apart", "Each time shifted by", "mm"], ["motion.eraseSpeed", "Wipe speed", "mm/s"]]],
-  ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
+  ["Motion", [["motion.home", "After each drawing", "", [["after", "Go back home"], ["stay", "Stay where it ends"]]], ["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
 ];
@@ -1146,6 +1148,7 @@ function wireLive() {
     if (/^(tool|erase)\./.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("tool") ? "Nib and eraser offsets saved" : "Wiping saved"));
     if (/^(drawing\.(x|reach)|correct\.)/.test(path)) saveParts([path.split(".")[0]], () => (path.startsWith("correct") ? "Scale saved" : "Centre saved"));
     if (path === "motion.eraseSpeed" || path === "pen.eraserWidth") saveParts([path.split(".")[0]], () => "Wiping saved");
+    if (path === "motion.home") saveParts(["motion"], () => (e.target.value === "stay" ? "The arm now stays where a drawing ends" : "The arm now goes home after each drawing"));
   });
   $("#setup").addEventListener("click", (e) => {
     const t = e.target.closest("[data-pen-try]"); if (t) tryPen(t.dataset.penTry);

@@ -40,7 +40,8 @@ export const DEFAULT_CONFIG = {
   // leadIn: mm of pen-up glide onto each stroke. Draw speed is the jog sketch's (1 mm per 25 ms). A hobby servo
   // told to stop dead overshoots, so the pen speeds up and slows down at accel (mm/s²) and takes a right-angle
   // corner at cornerSpeed (mm/s; sharper corners slower). Lower accel if lines end in a hook.
-  motion: { drawSpeed: 40, travelSpeed: 120, eraseSpeed: 60, leadIn: 3, accel: 1000, cornerSpeed: 15 },   // a wipe needn't be as exact as a line
+  // home: "after" sends the arm home, pen up, at the end of every drawing; "stay" leaves it where the drawing ends
+  motion: { home: "after", drawSpeed: 40, travelSpeed: 120, eraseSpeed: 60, leadIn: 3, accel: 1000, cornerSpeed: 15 },   // a wipe needn't be as exact as a line
   // SG92R datasheet: 0.1 s per 60 deg at 4.8 V; about 1 deg dead band (docs/pages/arm-sim.html). backlash is the
   // gear play, in degrees at the servo horn: 0 until measured. compensate pushes commands past both. accel caps
   // how fast any joint speeds up or slows down, in deg/s²: well under what an SG92R can give the loaded arm, so it
