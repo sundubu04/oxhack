@@ -8,7 +8,7 @@ import { plan } from "./pathplan.js";
 import { planChange } from "./optimize.js";
 import * as voice from "./voice.js";
 import * as arm from "./arm.js";
-import { SAMPLES, clockSVG } from "./sample.js";
+import { SAMPLES, clockSVG, numberedClock } from "./sample.js";
 import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle, DEFAULT_CONFIG } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
 import { bestZeros, boardShare } from "./zeros.js";
@@ -99,8 +99,9 @@ function renderSims() {
 // One item in the rail is current: the open simulation while the studio shows it, otherwise the page's own link.
 function markCurrent() {
   const row = pageNow === "studio" && doc ? $(`#sims [data-sim="${CSS.escape(doc.id)}"]`) : null;
-  $$(".cw-rail [data-page], #sims [data-sim]").forEach((a) => a.removeAttribute("aria-current"));
+  $$(".cw-rail [data-page], #sims [data-sim], #open-clock").forEach((a) => a.removeAttribute("aria-current"));
   (row || $(`.cw-rail [data-page="${pageNow}"]`))?.setAttribute("aria-current", "page");
+  if (pageNow === "studio" && doc?.clock) $("#open-clock").setAttribute("aria-current", "page");   // the clock is open
   row?.scrollIntoView({ block: "nearest" });
 }
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -118,7 +119,7 @@ async function openSim(id) {
   await enter(s); renderSims(); go("studio");
 }
 async function enter(s) {
-  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now() };
+  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}) };
   messages = s.messages || []; scene = s.scene || emptyScene(); hooks = s.hooks || [];
   pause(); active = null; planned = null; inkBefore = null;
   await board.setInk(s.ink); inkDirty = true;
@@ -172,6 +173,10 @@ function localTurn(text) {
   if (/^(draw |show )?(me )?(the )?(time|clock)( now)?$/.test(t) || /what time is it/.test(t)) {
     const has = scene.items.some((i) => i.id === "clock");
     const others = scene.items.some((i) => i.id !== "clock");
+    if (doc?.clock || scene.items.find((i) => i.id === "clock")?.texts?.length) {
+      if (doc?.clock) doc.clockAt = now().getTime();
+      return { reply: `Drawing the time: ${hhmm(now())}.`, actions: clockActions(now()) };
+    }
     return { reply: `Drawing the time: ${hhmm(now())}.`, actions: [{ type: has ? "edit" : "draw", id: "clock", name: "clock", box: others ? undefined : FULL, svg: clockSVG(now()) }] };
   }
   const sm = t.match(/^(draw |show )?(me )?(a |an |the )?(cat|house|star|flower)$/);
@@ -315,10 +320,76 @@ setInterval(() => {
   if (due) runHook(due);
 }, 1000);
 function renderHooks() {
+  renderClock();
   const el = $("#repeats"); el.hidden = !hooks.length;
   el.innerHTML = (hooksPaused && hooks.length ? `<div class="cw-repeat">${icon("pause")}<div class="cw-repeat__text"><span class="cw-repeat__what">Repeats paused</span><span class="cw-repeat__when">Stopped by you</span></div><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-resume>Resume</button></div>` : "") + hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
     + `<span class="cw-repeat__when${h.error ? " cw-msg-fail" : ""}">${h.error ? esc(h.error) : `Every ${everyWords(h.every)}${h.last ? `, last at ${hhmm(new Date(h.last))}` : ""}`}</span></div>`
     + `<button class="dl-icon-btn" type="button" data-unhook="${esc(h.id)}" aria-label="Stop: ${esc(h.prompt)}" title="Stop">${icon("x")}</button></div>`).join("");
+}
+
+// ---------- clock mode ----------
+// Its own simulation (the Clock entry in the rail): a numbered clock, the time set by hand or kept by itself. Updating
+// the hands is a change like any other, so the planner wipes only the two old hands (sweeping wide across them) and
+// draws the new ones; the face and the numbers stay.
+function clockActions(date, whole = false) {
+  const { svg, texts } = numberedClock(date), has = scene.items.some((i) => i.id === "clock");
+  const draw = { type: "draw", id: "clock", name: "clock", box: FULL, svg, texts };
+  if (!has) return scene.items.length ? [{ type: "clear" }, draw] : [draw];
+  return whole ? [{ type: "clear" }, draw] : [{ type: "edit", id: "clock", svg, texts }];
+}
+function clockTimeAsked() {
+  const [hh, mm] = ($("#clock-time").value || hhmm(now())).split(":").map(Number), d = now();
+  d.setHours(hh || 0, mm || 0, 0, 0); return d;
+}
+function setClock(date, whole = false) {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  quietReply = false;   // asked for now: the arm follows again after a Stop
+  const { scene: next } = applyActions(scene, clockActions(date, whole));
+  change(next);
+  doc.clockAt = date.getTime();
+  messages.push({ role: "assistant", text: `${whole || !boardStrokes.length ? "Drawing the clock at" : "Setting the hands to"} ${hhmm(date)}.` });
+  renderThread(); renderClock(); saveSoon();
+}
+async function openClock() {
+  const s = sims.find((x) => x.clock) || sims.find((x) => x.title === "Clock");
+  if (s) { await openSim(s.id); selectTab("clock"); return; }
+  await leaveSim();
+  doc = { id: newId(), title: "Clock", clock: true, clockAt: null, created: Date.now(), updated: Date.now() };
+  await enter({ ...doc, messages: [], scene: emptyScene(), ink: null });
+  await saveNow(); listSims(); go("studio"); selectTab("clock");
+}
+function renderClock() {
+  const on = !!doc?.clock; $("#tab-clock").hidden = !on;
+  if (!on) { if ($("#tab-clock").getAttribute("aria-selected") === "true") selectTab("chat"); return; }
+  const has = scene.items.some((i) => i.id === "clock"), h = clockHook();
+  status($("#clock-status"), has ? `Shows ${doc.clockAt ? hhmm(new Date(doc.clockAt)) : "a time"}` : "No clock yet", { mark: has ? "dot" : "" });
+  $("#clock-update").disabled = !has;
+  $("#clock-keep").setAttribute("aria-checked", String(!!h));
+  if (document.activeElement !== $("#clock-every")) $("#clock-every").value = h ? h.every : (+cfg.clock?.every || 5);
+  if (document.activeElement !== $("#clock-sweep")) $("#clock-sweep").value = +cfg.clock?.sweep || 40;
+  if (document.activeElement !== $("#clock-step")) $("#clock-step").value = +cfg.clock?.step || 2;
+  if (!$("#clock-time").value) $("#clock-time").value = hhmm(now());
+}
+// one setting saved straight away, merged into what is saved now
+async function saveSetting(path, value, said) {
+  try { const c = await loadConfig(); put(c, path, value); cfg = await saveConfig(c); applyConfig(); toast(said); }
+  catch (e) { toast(`Couldn't save: ${e.message}`, "circle-alert"); }
+}
+function wireClock() {
+  $("#open-clock").addEventListener("click", openClock);
+  $("#tab-clock").addEventListener("click", () => selectTab("clock"));
+  $("#clock-now").addEventListener("click", () => { $("#clock-time").value = hhmm(now()); });
+  $("#clock-update").addEventListener("click", () => setClock(clockTimeAsked()));
+  $("#clock-draw").addEventListener("click", () => setClock(clockTimeAsked(), true));
+  $("#clock-keep").addEventListener("click", () => {
+    const h = clockHook();
+    if (h) { removeHook(h.id); toast("The clock stays as it is"); }
+    else { addHook("draw the time", Math.max(1, Math.round(+$("#clock-every").value || 5))); hooksPaused = false; toast(`The hands follow the time every ${everyWords(clockHook().every)}`); }
+    renderClock();
+  });
+  $("#clock-every").addEventListener("change", () => { const h = clockHook(), n = Math.max(1, Math.round(+$("#clock-every").value || 5)); if (h) { addHook("draw the time", n); toast(`Every ${everyWords(n)} now`); } renderClock(); });
+  $("#clock-sweep").addEventListener("change", () => { const v = +$("#clock-sweep").value; if (v > 0) saveSetting("clock.sweep", v, `The eraser now sweeps ${v} mm across each hand`); });
+  $("#clock-step").addEventListener("change", () => { const v = +$("#clock-step").value; if (v > 0) saveSetting("clock.step", v, `Sweeps ${v} mm apart now`); });
 }
 
 // ---------- stop ----------
@@ -359,7 +430,9 @@ function change(next, { quiet = false } = {}) {
   const t0 = performance.now();
   const nextStrokes = sceneStrokes(next, g);
   const from = sim.tip("draw");
-  const res = planChange(boardStrokes, nextStrokes, g, { from });
+  // in clock mode the eraser sweeps wide across each hand (config clock.sweep, half to each side), once
+  const gp = doc?.clock ? { ...g, erase: { ...g.erase, how: "lines", sweep: "across", zigzag: (+cfg.clock?.sweep || 40) / 2, step: +cfg.clock?.step || 2, passes: 1 } } : g;
+  const res = planChange(boardStrokes, nextStrokes, gp, { from });
   scene = next; boardStrokes = nextStrokes;
   renderTitle(); renderPicture();
   $("#empty").hidden = !!(scene.items.length || scene.game);
@@ -551,7 +624,8 @@ function setView(v) {
   if (v === "angles") { lastRow = -1; syncLive(true); }
 }
 function selectTab(which) {
-  for (const t of ["chat", "plan"]) {
+  if (which === "clock" && !doc?.clock) which = "chat";
+  for (const t of ["chat", "plan", "clock"]) {
     const on = t === which; $(`#tab-${t}`).setAttribute("aria-selected", String(on)); $(`#tab-${t}`).tabIndex = on ? 0 : -1; $(`#panel-${t}`).hidden = !on;
   }
 }
@@ -1217,7 +1291,7 @@ async function start() {
   buildJoints(); buildSetup();
   $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  wire(); wireLive(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
+  wire(); wireLive(); wireClock(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
   await listSims();
   let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];

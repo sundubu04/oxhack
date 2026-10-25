@@ -7,6 +7,20 @@ export const SAMPLES = {
 };
 
 // A clock face at the current time, as an SVG (the project's own subject).
+// The clock for clock mode: the same face (radius 44 of the 100-unit box), the numbers 1 to 12 in the pen's own
+// lettering in place of the ticks, and single-line hands kept short of the numbers. Returns the face and hands as SVG
+// and the numbers as texts, the way a scene item holds them.
+export function numberedClock(now = new Date()) {
+  const R = 44, cx = 50, cy = 50, h = 7, rn = R * 0.8, texts = [];
+  for (let k = 1; k <= 12; k++) {
+    const a = (k / 12) * 2 * Math.PI, x = cx + rn * Math.sin(a), y = cy - rn * Math.cos(a), w = k > 9 ? 10 : 6;
+    texts.push({ text: String(k), x: +(x - w / 2).toFixed(2), y: +(y - h / 2).toFixed(2), w, h });
+  }
+  const hr = (now.getHours() % 12) + now.getMinutes() / 60, ah = (hr / 12) * 2 * Math.PI, am = (now.getMinutes() / 60) * 2 * Math.PI;
+  const hand = (a, r) => `<line stroke="black" x1="${cx}" y1="${cy}" x2="${(cx + r * Math.sin(a)).toFixed(1)}" y2="${(cy - r * Math.cos(a)).toFixed(1)}"/>`;
+  return { svg: `<svg viewBox="0 0 100 100"><circle fill="none" stroke="black" cx="${cx}" cy="${cy}" r="${R}"/>${hand(ah, R * 0.45)}${hand(am, R * 0.66)}</svg>`, texts };
+}
+
 export function clockSVG(now = new Date()) {
   const R = 44, cx = 50, cy = 50, el = [];
   el.push(`<circle fill="none" stroke="black" cx="${cx}" cy="${cy}" r="${R}"/>`);

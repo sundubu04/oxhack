@@ -57,6 +57,10 @@ export const DEFAULT_CONFIG = {
     elbow: { min: 0, max: 180, offset: 175, dir: 1, ratio: 1 },
     tilt: { min: 0, max: 180, offset: 90, dir: 1, ratio: 1 },   // the tilt servo's neutral at 90 deg; pen tilts are relative to it
   },
+  // Clock mode (its own simulation): the eraser sweeps `sweep` mm across each hand it wipes (half to each side), the
+  // sweeps `step` mm apart (with the servos' dead band modelled, 4 mm left 13% of a hand and 2 mm none), and keeping
+  // time redraws the hands every `every` minutes.
+  clock: { sweep: 40, step: 2, every: 5 },
   // Live moves from Arm setup or /api/arm (lib/arm.mjs): the newest target goes out at most every `interval` ms,
   // only if some servo moves `minStep` deg or more, and the board glides to it at up to `speed` deg/s, speeding up
   // and slowing down at servos.accel. Raise interval or lower speed if the arm shakes.

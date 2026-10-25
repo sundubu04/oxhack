@@ -130,13 +130,15 @@ export function parseSVGDom(text, { step = 0.5 } = {}) {
   return { strokes: strokes.map((s) => thin(s, step * 0.25)), vb };
 }
 
-// drop points that sit on the line between their neighbours, keeping corners
+// Drop the points a straight line would draw anyway: from each point kept, reach as far along as every point in
+// between stays within eps of the line, keeping corners. (Checking each point against its next neighbour alone let
+// a curve's bend pile up unseen: a circle came out as 14 sides.)
 function thin(pts, eps) {
   if (pts.length < 3) return pts;
-  const out = [pts[0]];
-  for (let i = 1; i < pts.length - 1; i++) {
-    const a = out[out.length - 1], b = pts[i + 1], p = pts[i], dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
-    if (Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / L > eps) out.push(p);
+  const off = (p, u, v) => { const dx = v.x - u.x, dy = v.y - u.y, L = Math.hypot(dx, dy) || 1; return Math.abs((p.x - u.x) * dy - (p.y - u.y) * dx) / L; };
+  const out = [pts[0]]; let a = 0;
+  for (let b = 2; b < pts.length; b++) {
+    for (let i = a + 1; i < b; i++) if (off(pts[i], pts[a], pts[b]) > eps) { a = b - 1; out.push(pts[a]); break; }
   }
   out.push(pts[pts.length - 1]);
   return out;

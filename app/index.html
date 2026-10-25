@@ -24,6 +24,7 @@
       <button class="cw-find" type="button" data-open-palette><i data-icon="search"></i><span>Find a command</span><kbd class="dl-kbd">⌘K</kbd></button>
       <a class="dl-nav__item" href="#studio" data-page="studio" aria-current="page"><i data-icon="pencil"></i><span class="dl-nav__label">Studio</span></a>
       <a class="dl-nav__item" href="#arm" data-page="arm"><i data-icon="ruler"></i><span class="dl-nav__label">Arm setup</span></a>
+      <button class="dl-nav__item" type="button" id="open-clock"><i data-icon="clock"></i><span class="dl-nav__label">Clock</span></button>
       <p class="dl-nav__group">Simulations</p>
       <div id="sims" class="cw-navlist"></div>
       <button class="dl-btn dl-btn--secondary cw-stop" type="button" id="stop-all" hidden><i data-icon="circle-stop"></i><span>Stop</span><kbd class="dl-kbd">⌘.</kbd></button>
@@ -83,6 +84,33 @@
           <div class="dl-tabs cw-tabs" role="tablist" aria-label="Side panel">
             <button class="dl-tabs__item" type="button" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true">Chat</button>
             <button class="dl-tabs__item" type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Plan</button>
+            <button class="dl-tabs__item" type="button" role="tab" id="tab-clock" aria-controls="panel-clock" aria-selected="false" tabindex="-1" hidden>Clock</button>
+          </div>
+          <!-- clock mode: the numbered clock's own controls; only in the Clock simulation -->
+          <div class="cw-inspector" id="panel-clock" role="tabpanel" aria-labelledby="tab-clock" hidden>
+            <section class="cw-sec">
+              <div class="cw-sec__head"><h2 class="dl-kicker">Time</h2><span class="dl-status" id="clock-status">No clock yet</span></div>
+              <div class="cw-clock__time">
+                <input class="dl-input" type="time" id="clock-time" aria-label="Time to show">
+                <button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="clock-now">Now</button>
+              </div>
+              <div class="cw-actions">
+                <button class="dl-btn dl-btn--primary" type="button" id="clock-update">Update the hands</button>
+                <button class="dl-btn dl-btn--secondary" type="button" id="clock-draw">Draw the whole clock</button>
+              </div>
+              <p class="dl-meta">Update the hands wipes only the two hands and draws them at the time above; the face and the numbers stay.</p>
+            </section>
+            <section class="cw-sec">
+              <h2 class="dl-kicker">Keep it on time</h2>
+              <label class="dl-choice cw-choice"><span id="clock-keep-l">Update the hands by itself</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="clock-keep" aria-labelledby="clock-keep-l"></button></label>
+              <div class="dl-field"><label class="dl-label" for="clock-every">Every</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-every" type="number" min="1" step="1" inputmode="numeric"><span>min</span></span></div>
+            </section>
+            <section class="cw-sec">
+              <h2 class="dl-kicker">Wiping the hands</h2>
+              <div class="dl-field"><label class="dl-label" for="clock-sweep">Sweep across each hand</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-sweep" type="number" min="5" step="any" inputmode="decimal"><span>mm</span></span></div>
+              <div class="dl-field"><label class="dl-label" for="clock-step">Sweeps apart</label><span class="cw-unit"><input class="dl-input dl-num" id="clock-step" type="number" min="0.5" step="any" inputmode="decimal"><span>mm</span></span></div>
+              <p class="dl-meta">Half to each side of the hand, much wider than drawings get, so a hand the eraser misses by a little still goes. Sweeps close together leave nothing between them.</p>
+            </section>
           </div>
           <div class="cw-chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
             <div class="dl-thread cw-thread" id="thread" role="log" aria-live="polite" aria-label="Conversation"></div>

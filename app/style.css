@@ -171,3 +171,7 @@
 .cw-nudge { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 8px 4px; }
 .cw-stop { justify-content: flex-start; gap: 8px; margin-top: auto; }
 .cw-stop kbd { margin-left: auto; }
+.cw-clock__time { display: flex; gap: 8px; align-items: center; }
+.cw-clock__time .dl-input { flex: 1; min-width: 0; font-size: var(--dl-fs-lg, 1.25rem); }
+/* the Clock entry is a button among links: look like them */
+button.dl-nav__item { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }

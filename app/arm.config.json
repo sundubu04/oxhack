@@ -1,5 +1,5 @@
 {
-  "rev": 69,
+  "rev": 80,
   "name": "Clockedin arm",
   "measured": true,
   "links": {
@@ -14,9 +14,9 @@
     "inset": 20
   },
   "drawing": {
-    "size": 160,
+    "size": 220,
     "reach": 194.5,
-    "x": 36
+    "x": 18
   },
   "correct": {
     "sx": 0.769,
@@ -38,8 +38,8 @@
       "side": 3
     },
     "eraser": {
-      "along": -16,
-      "side": -68.5
+      "along": -12,
+      "side": -65.5
     }
   },
   "erase": {
@@ -66,7 +66,7 @@
   },
   "motion": {
     "home": "after",
-    "drawSpeed": 30,
+    "drawSpeed": 40,
     "travelSpeed": 120,
     "eraseSpeed": 200,
     "leadIn": 3,
@@ -101,6 +101,11 @@
       "dir": 1,
       "ratio": 1
     }
+  },
+  "clock": {
+    "sweep": 40,
+    "step": 2,
+    "every": 5
   },
   "live": {
     "interval": 40,

@@ -93,7 +93,7 @@ async function api(req, res, path) {
     await mkdir(SIMS, { recursive: true });
     const list = [];
     for (const f of (await readdir(SIMS)).filter((f) => f.endsWith(".json"))) {
-      try { const s = JSON.parse(await readFile(join(SIMS, f), "utf8")); list.push({ id: s.id, title: s.title, updated: s.updated }); } catch (e) {}
+      try { const s = JSON.parse(await readFile(join(SIMS, f), "utf8")); list.push({ id: s.id, title: s.title, updated: s.updated, ...(s.clock ? { clock: true } : {}) }); } catch (e) {}
     }
     return send(res, 200, list.sort((a, b) => b.updated - a.updated));
   }
