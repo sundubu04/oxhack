@@ -384,20 +384,27 @@ async function runDemo() {
 }
 // Reset: the arm wipes the whole clock, or (the board cleaned by hand) the app just forgets it and nothing moves.
 // Either way it stops keeping time, so it isn't drawn again at the next mark.
-function resetClock(wipe) {
-  if (thinking) return toast("Wait for the answer first", "circle-alert");
-  const h = clockHook(); if (h) removeHook(h.id);
+// A mode's reset (Clock, Emotion): wipe has the arm erase all of it; otherwise the board was wiped by hand, so the
+// app forgets the drawing and nothing moves. what names it in the reply. False when there was nothing to reset.
+function resetBoard(wipe, what) {
   if (wipe) {
-    if (!boardStrokes.length) return toast("The board is already empty");
+    if (!boardStrokes.length) { toast("The board is already empty"); return false; }
     quietReply = false;
     change(applyActions(scene, [{ type: "clear" }]).scene);
-    messages.push({ role: "assistant", text: "Wiping the clock." });
+    messages.push({ role: "assistant", text: `Wiping the ${what}.` });
   } else {
+    if (!boardStrokes.length && !scene.items.length) { toast("The board is already empty"); return false; }
     pause(); finishJob(); active = null; planned = null;
     scene = emptyScene(); boardStrokes = []; board.clearInk(); inkDirty = true; sim.reset();
     renderTitle(); renderPicture(); renderAngles(); renderPlanEmpty(); $("#empty").hidden = false; draw();
-    messages.push({ role: "assistant", text: "Forgot the clock: the board is clean." });
+    messages.push({ role: "assistant", text: `Forgot the ${what}: the board is clean.` });
   }
+  return true;
+}
+function resetClock(wipe) {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  const h = clockHook(); if (h) removeHook(h.id);
+  if (!resetBoard(wipe, "clock")) return;
   doc.clockAt = null; $("#clock-time").value = hhmm(now());
   renderThread(); renderClock(); saveSoon();
 }
@@ -473,6 +480,12 @@ function drawMood(mood) {
   change(applyActions(scene, actions).scene);
   doc.moodShown = mood;
   messages.push({ role: "assistant", text: `Drawing a ${mood} face.` });
+  renderThread(); renderMood(); saveSoon();
+}
+function resetMood(wipe) {
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  if (!resetBoard(wipe, "face")) return;
+  doc.moodShown = null; moodSeen = null; moodFollow = false;
   renderThread(); renderMood(); saveSoon();
 }
 async function openMood() {
@@ -558,6 +571,8 @@ function wireMood() {
   $("#mood-draw").addEventListener("click", () => { const m = moodRead?.mood; if (m) drawMood(m); });
   $("#mood-follow").addEventListener("click", () => { moodFollow = !moodFollow; renderMood(); toast(moodFollow ? "The arm follows your face" : "The arm stays as it is"); });
   $("#mood-picks").addEventListener("click", (e) => { const b = e.target.closest("[data-mood]"); if (b) drawMood(b.dataset.mood); });
+  $("#mood-wipe").addEventListener("click", () => resetMood(true));
+  $("#mood-forget").addEventListener("click", () => resetMood(false));
   window.addEventListener("pagehide", () => { if (moodCam) navigator.sendBeacon?.("./api/mood/stop"); });
 }
 
