@@ -1,5 +1,5 @@
 {
-  "rev": 12,
+  "rev": 37,
   "name": "Clockedin arm",
   "measured": true,
   "links": {
@@ -15,12 +15,12 @@
   },
   "drawing": {
     "size": 160,
-    "reach": 220,
-    "x": 0
+    "reach": 183.5,
+    "x": 39
   },
   "correct": {
-    "sx": 1,
-    "sy": 1
+    "sx": 0.769,
+    "sy": 1.111
   },
   "elbow": "down",
   "park": {
@@ -38,14 +38,14 @@
       "side": 3
     },
     "eraser": {
-      "along": 14,
-      "side": 0
+      "along": -25,
+      "side": -82
     }
   },
   "erase": {
-    "how": "area",
-    "zigzag": 4,
-    "period": 12
+    "how": "lines",
+    "zigzag": 6,
+    "period": 8
   },
   "pen": {
     "length": 165,
@@ -56,13 +56,13 @@
     "press": 1,
     "lift": 3,
     "pressure": 60,
-    "eraserWidth": 20,
+    "eraserWidth": 5,
     "pivot": 70
   },
   "motion": {
     "drawSpeed": 40,
     "travelSpeed": 120,
-    "eraseSpeed": 60,
+    "eraseSpeed": 100,
     "leadIn": 3,
     "accel": 1000,
     "cornerSpeed": 15

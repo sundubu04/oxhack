@@ -326,7 +326,8 @@ function autosize() { const t = $("#prompt"); t.style.height = "auto"; t.style.h
 
 // ---------- a change: from what is on the board to the next scene ----------
 // The planner picks what to keep, wipe and draw; the sim plays it from the arm's pose now, on top of the board's ink.
-function change(next) {
+// The real arm follows a change someone asked for, never a re-plan (quiet): a new setting shouldn't start it drawing.
+function change(next, { quiet = false } = {}) {
   finishJob();
   const t0 = performance.now();
   const nextStrokes = sceneStrokes(next, g);
@@ -343,7 +344,7 @@ function change(next) {
   steps.set("path", "done", `${res.best.name === "none" ? "" : `${res.best.name} wipe, `}${(performance.now() - t0).toFixed(0)} ms`);
   steps.set("angles", "done", `${tp.length} points`); steps.set("sim", "next", ""); steps.bar(0.75);
   renderAngles(); renderPlanStats(); startJob(job); play();
-  if (arm.connected() && S.follow) sendToArm(job);
+  if (!quiet && arm.connected() && S.follow) sendToArm(job);
   const parts = [];
   if (res.remove.length) parts.push(`wipes ${res.remove.length} ${res.remove.length === 1 ? "stroke" : "strokes"}`);
   if (res.add.length) parts.push(`draws ${res.add.length}`);
@@ -351,7 +352,8 @@ function change(next) {
   return `${cap(parts.join(", "))}, ${secs(whole(job.total))}`;
 }
 // geometry changed: draw the whole scene again, from a clean board
-function replan() { board.clearInk(); boardStrokes = []; sim.reset(); const s = scene; scene = emptyScene(); if (s.items.length || s.game) change(s); else draw(); }
+// the sim redraws the board for new settings; the real arm stays where it is
+function replan() { board.clearInk(); boardStrokes = []; sim.reset(); const s = scene; scene = emptyScene(); if (s.items.length || s.game) change(s, { quiet: true }); else draw(); }
 
 // ---------- the sim ----------
 const onInk = (a, b, mode) => { board.inkSeg(a, b, mode); inkDirty = true; };
@@ -624,7 +626,7 @@ function showPage(page) {
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
   ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.inset", "Base in from the corner", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
-  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["tool.nib.along", "Nib past the tip", "mm"], ["tool.nib.side", "Nib across, + left", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
+  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["tool.nib.along", "Nib past the tip", "mm"], ["tool.nib.side", "Nib across, + left", "mm"]]],
   ["Erasing", [["erase.how", "How to wipe", "", [["area", "The whole area of what goes"], ["lines", "Along the lines"], ["fastest", "Whichever is quickest"]]], ["pen.eraserWidth", "Eraser width", "mm"], ["erase.zigzag", "Zigzag to each side", "mm"], ["erase.period", "One zigzag every", "mm"], ["motion.eraseSpeed", "Wipe speed", "mm/s"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
@@ -651,10 +653,11 @@ function centreGroup() {
   const num = (path, label, unit) => `<div class="dl-field"><label class="dl-label" for="f-${path.replace(/\./g, "-")}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="f-${path.replace(/\./g, "-")}" data-path="${path}" type="number" step="any" inputmode="decimal"><span>${unit}</span></span></div>`;
   const plain = (id, label) => `<div class="dl-field"><label class="dl-label" for="${id}">${label}</label><span class="cw-unit"><input class="dl-input dl-num" id="${id}" type="number" step="any" inputmode="decimal" placeholder="100"><span>mm</span></span></div>`;
   return `<div class="cw-group" role="group" aria-labelledby="g-centre"><h2 class="dl-kicker" id="g-centre">Centre and scale</h2>
-    <p class="dl-meta">Move the nib to where the middle of every drawing should be (the sliders, or Move on the board), then press Centre here.</p>
-    <div class="cw-fields">${num("drawing.x", "Middle, across", "mm")}${num("drawing.reach", "Middle, up from the base", "mm")}</div>
-    <div class="cw-actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="centre-here">Centre here</button><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="centre-mark">Mark the centre</button></div>
-    <p class="dl-meta">Then the eraser: put it on the same spot (Eraser to the centre, then the Base and Elbow sliders, lifting it a little with Pen while you line it up) and press Eraser is on the centre. Its offset from the forearm's tip is worked out from where the arm is.</p>
+    <p class="dl-meta">Marker: put the nib on the middle of the board (Marker to the centre, then the Base and Elbow sliders) and press Marker is on the centre. Drawings centre there; the eraser's setting stays as it is.</p>
+    <div class="cw-fields">${num("drawing.x", "Marker centre, across", "mm")}${num("drawing.reach", "Marker centre, up from the base", "mm")}</div>
+    <div class="cw-actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="marker-to-centre">Marker to the centre</button><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="centre-here">Marker is on the centre</button><button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" id="centre-mark">Mark the centre</button></div>
+    <p class="dl-meta">Eraser: put it on the same spot (Eraser to the centre, then the sliders, lifting it a little with Pen while you line it up) and press Eraser is on the centre. Its own offset is worked out from where the arm is; the marker's centre stays as it is.</p>
+    <div class="cw-fields">${num("tool.eraser.along", "Eraser past the tip", "mm")}${num("tool.eraser.side", "Eraser across, + left", "mm")}</div>
     <div class="cw-actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="eraser-to-centre">Eraser to the centre</button><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" id="eraser-centre">Eraser is on the centre</button></div>
     <p class="dl-meta">Then draw a 100 mm circle, measure it across and up, and type what you measured: the scales are worked out so the next one comes out round.</p>
     <div class="cw-fields">${plain("circle-w", "It measures across")}${plain("circle-h", "It measures up")}${num("correct.sx", "Width scale", "×")}${num("correct.sy", "Height scale", "×")}</div>
@@ -1014,6 +1017,7 @@ function nibNow() { const gg = geomFrom(readSetup()), j = jointsNow(gg), D = Mat
 // carries the forearm's end there, along the forearm and across it (+ left). The middle is where the scale
 // correction leaves points as they are, so the model's own geometry answers it.
 async function centreEraser() {
+  if (endDown() === "draw") return toast("The marker is down: put the eraser on the centre to set the eraser's offset", "circle-alert");
   const gg = geomFrom(readSetup()), j = jointsNow(gg), D = Math.PI / 180;
   const t1 = j.base * D, t12 = (j.base + j.elbow) * D, ux = Math.cos(t12), uy = Math.sin(t12);
   const dx = gg.cx - gg.L1 * Math.cos(t1), dy = gg.cy - gg.L1 * Math.sin(t1);
@@ -1024,7 +1028,14 @@ async function centreEraser() {
   $("#setup").dispatchEvent(new Event("input")); renderEraserCheck();
   await saveParts(["tool"], () => `Eraser offset: ${(Math.round(along * 2) / 2)} mm past the tip, ${Math.abs(Math.round(side * 2) / 2)} mm ${side >= 0 ? "left" : "right"} of the forearm's line`);
 }
+// which end of the pen is down: the pen servo's angle last sent (or the sim's), nearer write, rest or erase
+function endDown() {
+  const ps = readSetup().penServo, gg = geomFrom(readSetup());
+  const v = arm.connected() && arm.state()?.sent ? arm.state().sent[2] : servoAngle("tilt", (setupSim.manual || setupSim.j).tilt, gg);
+  return [["draw", ps.draw], ["lift", ps.lift], ["erase", ps.erase]].sort((a, b) => Math.abs(a[1] - v) - Math.abs(b[1] - v))[0][0];
+}
 async function centreHere() {
+  if (endDown() === "erase") return toast("The eraser is down: put the marker on the centre to set the marker's centre", "circle-alert");
   const c = readSetup(), p = nibNow(), set = (path, v) => { $(`[data-path="${path}"]`).value = Math.round(v * 2) / 2; };
   set("drawing.x", p.x);
   if (c.board.base === "corner") set("drawing.reach", p.y); else set("board.standoff", p.y - c.board.height / 2);
@@ -1046,6 +1057,12 @@ async function fixScale() {
   $("#circle-w").value = $("#circle-h").value = "";
   $("#setup").dispatchEvent(new Event("input"));
   await saveParts(["correct"], () => `Width scale ${sx.toFixed(3)}, height scale ${sy.toFixed(3)}: draw the circle again to check`);
+}
+async function markerToCentre() {
+  const { cx, cy } = geomFrom(readSetup()), a = poseAt({ x: cx, y: cy }, "draw");
+  if (!a) return toast("The marker can't reach the centre", "circle-alert");
+  setupSim.manual = { ...a, tilt: setupSim.g.tilt.lift }; lowerAt = "draw"; kickSetup();
+  if (arm.connected()) { try { await arm.pointNow(cx, cy, "draw", true, readSetup().penServo); } catch (e) { toast(e.message, "circle-alert"); } }
 }
 function crossStrokes() { const { cx, cy } = geomFrom(readSetup()); return [[{ x: cx - 12, y: cy }, { x: cx + 12, y: cy }], [{ x: cx, y: cy - 12 }, { x: cx, y: cy + 12 }]]; }
 async function eraserCheck(what) {
@@ -1108,6 +1125,7 @@ function wireLive() {
   $("#setup").addEventListener("click", (e) => {
     if (e.target.closest("#centre-here")) centreHere();
     if (e.target.closest("#eraser-to-centre")) eraserCheck("place");
+    if (e.target.closest("#marker-to-centre")) markerToCentre();
     if (e.target.closest("#eraser-centre")) centreEraser();
     if (e.target.closest("#centre-mark")) drawShape(crossStrokes(), "a cross on the centre");
     if (e.target.closest("#circle-draw")) drawShape(circleStrokes(), "a 100 mm circle");
