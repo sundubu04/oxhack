@@ -60,13 +60,17 @@ function wiped(strokes, erasePaths, reach) {
   return { pts, hit };
 }
 
+// how far either side of its path the felt surely wipes: half its width, less half a line and a margin; never under
+// 1.5 mm, so a narrow eraser still sweeps rows a little apart
+const coverOf = (g) => Math.max(1.5, g.eraserWidth / 2 - LINE / 2 - 1.5);
+
 // ---------- ways to wipe ----------
 // Each returns erase paths (polylines the eraser's felt follows while down); between paths it lifts.
 const strategies = {
   // follow each stroke to be wiped, with corners cut by as much as the felt allows; skip strokes an earlier pass
   // already covered
   trace(remove, g, from) {
-    const cover = g.eraserWidth / 2 - LINE / 2 - 1.5;
+    const cover = coverOf(g);
     const done = [], paths = [];
     for (const s of remove.slice().sort((a, b) => len(b) - len(a))) {
       const pts = resample(s, SAMPLE);
@@ -77,7 +81,7 @@ const strategies = {
   },
   // the felt sweeps rows across only the cells that hold ink to wipe, one row per felt width
   cells(remove, g, from) {
-    const cover = g.eraserWidth / 2 - LINE / 2 - 1.5, c = 2 * cover;
+    const cover = coverOf(g), c = 2 * cover;
     const rows = new Map();
     for (const p of samples(remove)) { const r = Math.floor(p.y / c), k = Math.floor(p.x / c); if (!rows.has(r)) rows.set(r, new Set()); rows.get(r).add(k); }
     const runs = [];
@@ -91,7 +95,7 @@ const strategies = {
   },
   // one zigzag over the box round everything to wipe, never lifting
   box(remove, g) {
-    const cover = g.eraserWidth / 2 - LINE / 2 - 1.5, bb = bbox(remove), pad = LINE;
+    const cover = coverOf(g), bb = bbox(remove), pad = LINE;
     const x0 = bb.minx - pad, x1 = bb.maxx + pad, path = [];
     for (let y = bb.miny + cover * 0.9, r = 0; y < bb.maxy + cover; y += 2 * cover, r++) {
       if (r % 2) path.push({ x: x1, y }, { x: x0, y }); else path.push({ x: x0, y }, { x: x1, y });
@@ -111,6 +115,21 @@ function simplify(pts, eps) {
   for (let i = 1; i < pts.length - 1; i++) { const d = toLine(pts[i], [a, b]); if (d > dmax) { dmax = d; idx = i; } }
   if (dmax <= eps) return [a, b];
   return simplify(pts.slice(0, idx + 1), eps).slice(0, -1).concat(simplify(pts.slice(idx), eps));
+}
+
+// The eraser goes over each wipe `passes` times without lifting, each pass shifted sideways by `apart` mm (0, +apart,
+// -apart, +2 apart...) and run the other way, so a line the first pass misses by a little (the build's error adds
+// up), the next catches. A traced line shifts across itself; rows shift up and down, so they stay evenly spaced.
+function overAgain(path, n, apart, rows) {
+  if (!(n > 1) || !(apart > 0) || path.length < 2) return path;
+  const shift = (d) => path.map((q, i) => {
+    if (rows) return { x: q.x, y: q.y + d };
+    const a = path[Math.max(0, i - 1)], b = path[Math.min(path.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: q.x - ((b.y - a.y) / L) * d, y: q.y + ((b.x - a.x) / L) * d };
+  });
+  const out = path.slice();
+  for (let k = 1; k < n; k++) { const p = shift(Math.ceil(k / 2) * apart * (k % 2 ? 1 : -1)); out.push(...(k % 2 ? p.reverse() : p)); }
+  return out;
 }
 
 // Erase paths -> toolpath points: lift to each path's start (the eraser side of the lift), wipe along it.
@@ -134,7 +153,8 @@ export function planChange(oldS, newS, g, { from = null, tol = 1.5, only = null 
   const how = g.erase?.how, ways = how === "area" ? ["box"] : how === "lines" ? ["trace"] : Object.keys(strategies);
   const names = remove.length ? (only ? [only] : ways) : ["none"];
   for (const name of names) {
-    const paths = name === "none" ? [] : strategies[name](remove, g, from).map((p) => scrub(p, g.erase?.zigzag, g.erase?.period));
+    const z = g.erase || {}, rows = name !== "trace";
+    const paths = name === "none" ? [] : strategies[name](remove, g, from).map((p) => scrub(overAgain(p, z.passes, z.apart, rows), z.zigzag, z.period));
     // what the wipe also takes off strokes that stay
     const touched = [];
     if (paths.length && keep.length) {

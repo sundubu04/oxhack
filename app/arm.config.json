@@ -1,5 +1,5 @@
 {
-  "rev": 37,
+  "rev": 42,
   "name": "Clockedin arm",
   "measured": true,
   "links": {
@@ -15,8 +15,8 @@
   },
   "drawing": {
     "size": 160,
-    "reach": 183.5,
-    "x": 39
+    "reach": 194.5,
+    "x": 36
   },
   "correct": {
     "sx": 0.769,
@@ -30,7 +30,7 @@
   "penServo": {
     "draw": 30,
     "lift": 60,
-    "erase": 180
+    "erase": 170
   },
   "tool": {
     "nib": {
@@ -38,14 +38,16 @@
       "side": 3
     },
     "eraser": {
-      "along": -25,
-      "side": -82
+      "along": -19,
+      "side": -73.5
     }
   },
   "erase": {
     "how": "lines",
     "zigzag": 6,
-    "period": 8
+    "period": 8,
+    "passes": 3,
+    "apart": 3
   },
   "pen": {
     "length": 165,
