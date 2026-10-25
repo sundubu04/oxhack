@@ -49,7 +49,7 @@ export function makeJob(toolpath, angles, g) {
     tTilt[i] = prev; tLand[i] = prev + ease; tGo[i] = prev + (ease && ease + SETTLE); tCmd[i] = tGo[i] + move;
     before = tilt[i];
   }
-  return { toolpath, path, cmd: compensate(path, g), tCmd, tGo, tTilt, tLand, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
+  return { toolpath, path, cmd: compensate(path, g, toolpath), tCmd, tGo, tTilt, tLand, n, total: n ? tCmd[n - 1] + 0.3 : 0 };
 }
 
 // Split every move longer than STEP; the joints for the new points come from the IK, so a long move is a straight
@@ -91,12 +91,16 @@ export const ease = (u) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, u))))
 
 // What to command so the link lands where the plan wants it. A hobby servo stops half its dead band short of a
 // command, and gear play leaves the link half the play behind the motor, both on the side it came from; so
-// each base and elbow command is pushed that far ahead in the direction the joint is moving, and the push
-// flips when the joint reverses. Off when the config says so, or with nothing to make up.
-export function compensate(path, g) {
+// each base and elbow command is pushed that far ahead in the direction the joint is moving, and the push flips the
+// moment the joint truly reverses (a jump of the whole dead band: the servo then moves at once instead of standing
+// in its dead band while the line goes on). Wiping gets no push: a scrub reverses many times a second, so the push
+// flipped a degree back and forth 7 times a second and the arm jiggled, and a wipe needn't be exact. Off when the
+// config says so.
+export function compensate(path, g, toolpath) {
   const s = g.servo || {}, on = s.compensate !== false;
   const out = path.map((a) => ({ ...a }));
   if (!on) return out;
+  const wiping = (i) => toolpath && toolpath[i]?.tool === "erase";
   for (const k of ["base", "elbow"]) {
     const ratio = +(s[k]?.ratio) || 1, push = ((+s.resolution || 0) / 2 + (+s.backlash || 0) / 2) / ratio;
     if (!push) continue;
@@ -104,8 +108,8 @@ export function compensate(path, g) {
     for (let i = 0; i < out.length; i++) {
       if (out[i].out_of_reach) continue;
       const v = path[i][k];
-      if (prev != null && Math.abs(v - prev) > 1e-4) dir = Math.sign(v - prev);
-      out[i][k] = v + dir * push; prev = v;
+      if (prev != null && Math.abs(v - prev) > 0.01) dir = Math.sign(v - prev);   // less is the IK's rounding, not a turn
+      out[i][k] = wiping(i) ? v : v + dir * push; prev = v;
     }
   }
   return out;
