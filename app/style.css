@@ -184,7 +184,7 @@ button.dl-nav__item { width: 100%; border: 0; background: none; font: inherit; c
 .cw-face canvas { display: block; width: 100%; height: auto; transform: scaleX(-1); }
 .cw-face figcaption { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: var(--dl-r-tag); background: var(--dl-raised); font-size: var(--dl-fs-sm); }
 .cw-face figcaption:empty { display: none; }
-/* draw your own: the pad fills the screen (the tablet maps to the whole screen), the square is the board's drawing area */
+/* draw your own: live drawing; the pad fills the screen (the tablet maps to the whole screen), the square is the board's drawing area */
 .cw-pad { position: fixed; inset: 0; z-index: 55; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); background: var(--dl-surface-2); }
 .cw-pad__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .cw-pad__title { font-weight: 600; }
