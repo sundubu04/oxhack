@@ -30,9 +30,11 @@ export function nibHeight(pg, tilt) { return pg.height + pg.half * Math.sin(tilt
 
 // The marker as built and measured (config penServo and tool): the nib touches the board where the forearm's
 // nib point is with the pen servo at its nib-down angle, the eraser at the eraser point at its eraser-down angle,
-// and the pen turns with its servo. So it swings about a shaft above the middle of those two points, meeting the
-// board at beta, which the gap between them and the pen's half length fix.
-export function measuredPen(length, gap) {
+// and the pen turns with its servo. So it swings about a shaft above the middle of those two points: at the
+// measured pivot height when there is one (each end then reaches hypot(pivot, gap / 2) from it), or else as high
+// as the pen's half length allows. beta is the angle each end meets the board at.
+export function measuredPen(length, gap, pivot) {
+  if (pivot > 0) { const beta = Math.atan2(pivot, gap / 2); return { half: Math.hypot(pivot, gap / 2), beta: beta / D2R, height: pivot, gap }; }
   const half = length / 2, beta = Math.acos(Math.min(1, gap / (2 * half)));
   return { half, beta: beta / D2R, height: half * Math.sin(beta), gap };
 }

@@ -4,13 +4,14 @@ import { penGeometry, measuredPen } from "./pen.js";
 // edits that file through the dev server; everything else reads the flat geometry that geomFrom() makes.
 // Lengths in mm, angles in degrees, speeds in mm/s (pen) and deg/s (servo).
 export const DEFAULT_CONFIG = {
+  rev: 0,   // which saved version this is: the server refuses a save from a page that loaded an older one
   name: "Clockedin arm",
   measured: false,
-  links: { L1: 160, L2: 200 },   // the build: upper arm 16 cm, forearm 20 cm
-  // base "corner": the board hangs as a diamond with the base shaft at its bottom corner, and the arm reaches
-  // straight up through it, the drawing's middle `drawing.reach` mm above the base (the build, 25 Oct; the jog
-  // sketch's frame). base "below": centred `standoff` mm below a square board's bottom edge, the drawing in its middle.
-  board: { width: 350, height: 350, standoff: 40, base: "corner" },
+  links: { L1: 157, L2: 190 },   // the build, measured 25 Oct: upper arm 157 mm, forearm 190 mm (elbow to nib)
+  // base "corner": the board hangs as a diamond with the base shaft `inset` mm in from its bottom corner, and the arm
+  // reaches straight up through it, the drawing's middle `drawing.reach` mm above the base (the build, 25 Oct; the
+  // jog sketch's frame). base "below": centred `standoff` mm below a square board's bottom edge, the drawing in its middle.
+  board: { width: 350, height: 350, standoff: 40, base: "corner", inset: 20 },
   drawing: { size: 160, reach: 220 },
   elbow: "down",   // the build's elbow sits to the left of the line from base to pen ("up" would put it on the right)
   // Measured on the build with the team's jog sketch (firmware/jog), in servo degrees: home, and the pen servo with
@@ -22,7 +23,8 @@ export const DEFAULT_CONFIG = {
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
   // far the barrel's edge must stay off the board; press and lift are how far the nib goes in and comes away.
-  pen: { length: 165, barrel: 17, nib: 12, angle: 0, margin: 5, press: 1, lift: 3, pressure: 60, eraserWidth: 20 },
+  // pivot: how high the pen servo's shaft is above the board (70 mm on the build)
+  pen: { length: 165, barrel: 17, nib: 12, angle: 0, margin: 5, press: 1, lift: 3, pressure: 60, eraserWidth: 20, pivot: 70 },
   // leadIn: mm of pen-up glide onto each stroke. Draw speed is the jog sketch's (1 mm per 25 ms). A hobby servo
   // told to stop dead overshoots, so the pen speeds up and slows down at accel (mm/s²) and takes a right-angle
   // corner at cornerSpeed (mm/s; sharper corners slower). Lower accel if lines end in a hook.
@@ -71,15 +73,15 @@ export function geomFrom(cfg) {
   return {
     L1: +c.links.L1, L2: +c.links.L2,
     standoff: +c.board.standoff, board: H, boardW: W, corner,
-    bo: corner ? { x: 0, y: 0 } : { x: -W / 2, y: +c.board.standoff }, bang: corner ? Math.PI / 4 : 0,
+    bo: corner ? { x: 0, y: -(+c.board.inset || 0) } : { x: -W / 2, y: +c.board.standoff }, bang: corner ? Math.PI / 4 : 0,
     cx: 0, cy: corner ? reach : +c.board.standoff + H / 2,
     half: +c.drawing.size / 2, elbowUp: c.elbow !== "down",
     ...penFields(c.pen),
     // what was measured on the arm wins over what pen.js works out from the marker's size
     tilt: { draw: joint("tilt", c.penServo.draw), lift: joint("tilt", c.penServo.lift), erase: joint("tilt", c.penServo.erase), liftErase: joint("tilt", c.penServo.lift) },
     nibAlong: +c.tool.nib.along, nibSide: +c.tool.nib.side, eraserAlong: +c.tool.eraser.along, eraserSide: +c.tool.eraser.side,
-    // the marker's shaft height and swing, from where its two ends were measured to touch (for the 3D view)
-    pen: { ...penGeometry(c.pen), ...measuredPen(+c.pen.length, Math.hypot(+c.tool.eraser.along - +c.tool.nib.along, +c.tool.eraser.side - +c.tool.nib.side)) },
+    // the marker's pivot height and swing, from where its two ends were measured to touch (for the 3D view)
+    pen: { ...penGeometry(c.pen), ...measuredPen(+c.pen.length, Math.hypot(+c.tool.eraser.along - +c.tool.nib.along, +c.tool.eraser.side - +c.tool.nib.side), +c.pen.pivot) },
     park: { base: joint("base", c.park.base), elbow: joint("elbow", c.park.elbow) },
     pressure: +c.pen.pressure, eraserWidth: +c.pen.eraserWidth,
     drawSpeed: +c.motion.drawSpeed, travelSpeed: +c.motion.travelSpeed, leadIn: +c.motion.leadIn, accel: +c.motion.accel, cornerSpeed: +c.motion.cornerSpeed,

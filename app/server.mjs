@@ -137,6 +137,10 @@ async function api(req, res, path) {
   }
   if (path === "/api/config" && req.method === "POST") {
     const cfg = await body(req);
+    // a page that loaded an older version would put back whatever changed since (another tab, the team's edits)
+    const now = JSON.parse(await readFile(join(root, "arm.config.json"), "utf8").catch(() => "{}"));
+    if ((+cfg.rev || 0) !== (+now.rev || 0)) return send(res, 409, { error: "Arm setup was changed somewhere else since this page loaded: reload the page, then change it again" });
+    cfg.rev = (+now.rev || 0) + 1;
     const bad = [];
     (function walk(o, at) { for (const [k, v] of Object.entries(o)) { if (v && typeof v === "object") walk(v, `${at}${k}.`); else if (typeof v === "number" && !Number.isFinite(v)) bad.push(at + k); } })(cfg, "");
     if (bad.length || !cfg.links || !(cfg.links.L1 > 0 && cfg.links.L2 > 0)) return send(res, 400, { error: `Check ${bad[0] || "the link lengths"}` });
@@ -157,7 +161,8 @@ async function api(req, res, path) {
 //                                          square: ordered for least travel, solved, timed with ramps, streamed
 //   POST /api/arm/run {keys}               keyframes the app planned
 //   POST /api/arm/tune {interval, minStep, speed, accel}   live moves: ms apart, smallest step, glide deg/s, deg/s²
-//   POST /api/arm/park | stop | disconnect
+//   POST /api/arm/park                     lift the pen where it is, then glide to the saved home pose
+//   POST /api/arm/stop | disconnect
 async function arm(req, sub) {
   if (req.method === "GET") return armLink.status();
   const b = await body(req, 4e6), g = geomFrom(withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8"))));
@@ -168,7 +173,8 @@ async function arm(req, sub) {
     case "/servos": return armLink.servos(b);
     case "/point": return armLink.point(+b.x, +b.y, ["draw", "lift", "erase"].includes(b.tool) ? b.tool : "draw", g, servosAt(g, b), !!b.start);
     case "/tune": return armLink.tune(b);
-    case "/park": return armLink.park();
+    case "/park": { const c = withDefaults(JSON.parse(await readFile(join(root, "arm.config.json"), "utf8")));
+      return armLink.home([+c.park.base, +c.park.elbow, +c.penServo.lift]); }   // home and the rest angle as saved now
     case "/stop": return armLink.stop();
     case "/run": return armLink.run(b.keys);
     case "/draw": {

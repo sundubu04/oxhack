@@ -1,15 +1,17 @@
 {
+  "rev": 3,
   "name": "Clockedin arm",
   "measured": true,
   "links": {
-    "L1": 160,
-    "L2": 200
+    "L1": 157,
+    "L2": 190
   },
   "board": {
     "width": 350,
     "height": 350,
     "standoff": 40,
-    "base": "corner"
+    "base": "corner",
+    "inset": 20
   },
   "drawing": {
     "size": 160,
@@ -21,8 +23,8 @@
     "elbow": 10
   },
   "penServo": {
-    "draw": 4,
-    "lift": 40,
+    "draw": 30,
+    "lift": 60,
     "erase": 180
   },
   "tool": {
@@ -44,7 +46,8 @@
     "press": 1,
     "lift": 3,
     "pressure": 60,
-    "eraserWidth": 20
+    "eraserWidth": 20,
+    "pivot": 70
   },
   "motion": {
     "drawSpeed": 40,

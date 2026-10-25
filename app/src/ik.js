@@ -36,9 +36,9 @@ export function toolPoint(t1, t2, g, tool = "draw") {
   return { x: f.px, y: f.py };
 }
 
-// Default geometry — the build (160 mm upper arm, 200 mm forearm, elbow on the left, base 40 mm below a 350 mm board, clock centred).
+// Default geometry — the build (157 mm upper arm, 190 mm forearm, elbow on the left, base 40 mm below a 350 mm board, clock centred).
 export const GEOM = {
-  L1: 160, L2: 200, standoff: 40, board: 350, elbowUp: false, pressure: 60,
+  L1: 157, L2: 190, standoff: 40, board: 350, elbowUp: false, pressure: 60,
   tilt: { draw: -14, lift: -2, erase: 16 },
 };
 // The board in the arm's frame: u along its bottom edge from its corner `bo`, v up its side (config.js sets bo and

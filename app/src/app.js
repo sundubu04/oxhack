@@ -623,8 +623,8 @@ function showPage(page) {
 // ---------- arm setup ----------
 const FIELDS = [
   ["Links", [["links.L1", "Upper link", "mm"], ["links.L2", "Forearm", "mm"]]],
-  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
-  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
+  ["Board", [["board.base", "The base sits", "", [["corner", "Bottom corner, diamond"], ["below", "Below, square on"]]], ["drawing.reach", "Drawing's middle from the base", "mm"], ["board.width", "Width", "mm"], ["board.height", "Height", "mm"], ["drawing.size", "Drawing size", "mm"], ["board.inset", "Base in from the corner", "mm"], ["board.standoff", "Base below the board, if below", "mm"]]],
+  ["Measured on the arm", [["park.base", "Home, base servo", "°"], ["park.elbow", "Home, elbow servo", "°"], ["pen.pivot", "Pen pivot height", "mm"], ["pen.eraserWidth", "Eraser width", "mm"], ["tool.eraser.along", "Eraser past the tip", "mm"], ["tool.eraser.side", "Eraser across, + left", "mm"]]],
   ["Motion", [["motion.drawSpeed", "Draw speed", "mm/s"], ["motion.travelSpeed", "Travel speed", "mm/s"], ["motion.accel", "Acceleration", "mm/s²"], ["motion.cornerSpeed", "Corner speed", "mm/s"], ["motion.leadIn", "Lead-in", "mm"], ["servos.speed", "Servo speed", "°/s"], ["servos.accel", "Servo acceleration", "°/s²"]]],
   ["Live moves", [["live.interval", "Send at most every", "ms"], ["live.minStep", "Smallest move sent", "°"], ["live.speed", "Glide speed", "°/s"]]],
   ["Smoothing", [["servos.resolution", "Dead band", "°"], ["servos.backlash", "Gear play", "°"]]],
@@ -958,7 +958,7 @@ function savePens() {
   penSaveTimer = setTimeout(async () => {
     const pens = readSetup().penServo; if (JSON.stringify(pens) === JSON.stringify(cfg.penServo)) return;
     try {
-      const c = structuredClone(cfg); c.penServo = pens; cfg = await saveConfig(c); applyConfig(); renderSetup();
+      const c = await loadConfig(); c.penServo = pens; cfg = await saveConfig(c); applyConfig(); renderSetup();   // merge into what is saved now
       toast(`Pen angles saved: rest ${pens.lift}°, write ${pens.draw}°, erase ${pens.erase}°`);
     } catch (e) { toast(`Couldn't save the pen angles: ${e.message}`, "circle-alert"); }
   }, 600);

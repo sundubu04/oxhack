@@ -132,6 +132,15 @@ async function glide(a) {
 }
 
 export function park() { ready(); pending = null; write("P"); st.sent = null; return status(); }
+// Home as the config has it (servo degrees: base, elbow, pen at rest): lift the pen where it is, then glide there.
+export async function home(a) {
+  ready(); pending = null; clearTimeout(timer); timer = null;
+  const was = st.sent;
+  if (!was || st.firmware.protocol < 3) { write("P"); st.sent = null; return status(); }   // where it is isn't known: the board's own park
+  if (Math.abs(was[2] - a[2]) > 0.5) await glide([was[0], was[1], a[2]]);
+  await glide(a);
+  return status();
+}
 
 // Stop: a job eases to a halt along its path; a glide stops where it can.
 export function stop() { if (child) write("S"); pending = null; return status(); }
