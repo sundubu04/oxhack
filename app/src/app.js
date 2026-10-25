@@ -160,7 +160,7 @@ function renderThread() {
   }
   t.innerHTML = messages.map((m) => m.role === "user"
     ? `<p class="dl-msg dl-msg--user">${esc(m.text)}</p>`
-    : `<div class="dl-msg dl-msg--assistant"><p class="${m.error ? "cw-msg-fail" : ""}">${m.error ? icon("circle-alert") + " " : ""}${esc(m.text)}</p>${m.note ? `<p class="dl-msg__note">${esc(m.note)}</p>` : ""}${m.error && m.retry ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-retry>Try again</button></div>` : ""}${m.offer === "keep-time" && !clockHook() ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-keep-time>${icon("refresh-cw")}Keep it on time</button></div>` : ""}</div>`).join("")
+    : `<div class="dl-msg dl-msg--assistant"><p class="${m.error ? "cw-msg-fail" : ""}">${m.error ? icon("circle-alert") + " " : ""}${esc(m.text)}</p>${m.error && m.retry ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-retry>Try again</button></div>` : ""}${m.offer === "keep-time" && !clockHook() ? `<div class="dl-msg__actions"><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-keep-time>${icon("refresh-cw")}Keep it on time</button></div>` : ""}</div>`).join("")
     + (thinking ? `<p class="dl-msg dl-msg--assistant cw-thinking"><span class="dl-spinner" aria-hidden="true"></span>Drawing it up</p>` : "");
   t.scrollTop = t.scrollHeight;
 }
