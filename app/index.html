@@ -25,7 +25,7 @@
       <a class="dl-nav__item" href="#studio" data-page="studio" aria-current="page"><i data-icon="pencil"></i><span class="dl-nav__label">Studio</span></a>
       <a class="dl-nav__item" href="#arm" data-page="arm"><i data-icon="ruler"></i><span class="dl-nav__label">Arm setup</span></a>
       <button class="dl-nav__item" type="button" id="open-clock"><i data-icon="clock"></i><span class="dl-nav__label">Clock</span></button>
-      <button class="dl-nav__item" type="button" id="open-mood"><i data-icon="smile"></i><span class="dl-nav__label">Mood</span></button>
+      <button class="dl-nav__item" type="button" id="open-mood"><i data-icon="smile"></i><span class="dl-nav__label">Emotion</span></button>
       <p class="dl-nav__group">Simulations</p>
       <div id="sims" class="cw-navlist"></div>
       <button class="dl-btn dl-btn--secondary cw-stop" type="button" id="stop-all" hidden><i data-icon="circle-stop"></i><span>Stop</span><kbd class="dl-kbd">⌘.</kbd></button>
@@ -86,25 +86,25 @@
             <button class="dl-tabs__item" type="button" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true">Chat</button>
             <button class="dl-tabs__item" type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Plan</button>
             <button class="dl-tabs__item" type="button" role="tab" id="tab-clock" aria-controls="panel-clock" aria-selected="false" tabindex="-1" hidden>Clock</button>
-            <button class="dl-tabs__item" type="button" role="tab" id="tab-mood" aria-controls="panel-mood" aria-selected="false" tabindex="-1" hidden>Mood</button>
+            <button class="dl-tabs__item" type="button" role="tab" id="tab-mood" aria-controls="panel-mood" aria-selected="false" tabindex="-1" hidden>Emotion</button>
           </div>
-          <!-- mood mode: the camera reads your face through Presage and the arm draws the mood; only in the Mood simulation -->
+          <!-- emotion mode: the camera reads your face through Presage and the arm draws the emotion; only in the Emotion simulation -->
           <div class="cw-inspector" id="panel-mood" role="tabpanel" aria-labelledby="tab-mood" hidden>
             <section class="cw-sec">
               <div class="cw-sec__head"><h2 class="dl-kicker">Camera</h2><span class="dl-status" id="mood-status">Off</span></div>
               <video class="cw-mood__video" id="mood-video" autoplay muted playsinline hidden></video>
               <div class="cw-actions"><button class="dl-btn dl-btn--primary" type="button" id="mood-camera">Start the camera</button></div>
-              <p class="dl-meta" id="mood-hint">Presage reads your face through the Mac's camera; the arm draws your mood.</p>
+              <p class="dl-meta" id="mood-hint">Presage reads your face through the Mac's camera; the arm draws your emotion.</p>
             </section>
             <section class="cw-sec">
-              <div class="cw-sec__head"><h2 class="dl-kicker">Your mood</h2><span class="dl-status" id="mood-now">No reading</span></div>
+              <div class="cw-sec__head"><h2 class="dl-kicker">Your emotion</h2><span class="dl-status" id="mood-now">No reading</span></div>
               <div class="cw-mood__bars" id="mood-bars"></div>
-              <div class="cw-actions"><button class="dl-btn dl-btn--secondary" type="button" id="mood-draw" disabled>Draw my mood</button></div>
+              <div class="cw-actions"><button class="dl-btn dl-btn--secondary" type="button" id="mood-draw" disabled>Draw my emotion</button></div>
               <label class="dl-choice cw-choice"><span id="mood-follow-l">Follow my face</span><button class="dl-switch" type="button" role="switch" aria-checked="false" id="mood-follow" aria-labelledby="mood-follow-l"></button></label>
-              <p class="dl-meta">When on, the arm redraws the face once a new mood has held for 2 seconds and the arm is free.</p>
+              <p class="dl-meta">When on, the arm redraws the face once a new emotion has held for 2 seconds and the arm is free.</p>
             </section>
             <section class="cw-sec">
-              <h2 class="dl-kicker">Draw a mood</h2>
+              <h2 class="dl-kicker">Draw an emotion</h2>
               <div class="cw-actions" id="mood-picks"></div>
               <p class="dl-meta">Without the camera, or to try the faces.</p>
             </section>

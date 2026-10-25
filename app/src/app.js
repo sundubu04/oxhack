@@ -457,8 +457,8 @@ function wireClock() {
   $("#clock-step").addEventListener("change", () => { const v = +$("#clock-step").value; if (v > 0) saveSetting("clock.step", v, `Sweeps ${v} mm apart now`); });
 }
 
-// ---------- mood mode ----------
-// Its own simulation (the Mood entry in the rail): the camera reads your face through Presage (lib/presage.mjs, on
+// ---------- emotion mode ----------
+// Its own simulation (the Emotion entry in the rail; "mood" in the code): the camera reads your face through Presage (lib/presage.mjs, on
 // the server, with the Mac's camera) and the arm draws the mood as a face. The faces share the head and eyes, so a
 // new mood wipes and redraws only the brows and mouth. Follow my face draws a new mood once it has held for 2 s and
 // the arm is free; the buttons draw a mood without the camera.
@@ -476,10 +476,10 @@ function drawMood(mood) {
   renderThread(); renderMood(); saveSoon();
 }
 async function openMood() {
-  const s = sims.find((x) => x.mood) || sims.find((x) => x.title === "Mood");
+  const s = sims.find((x) => x.mood) || sims.find((x) => x.title === "Emotion");
   if (s) { await openSim(s.id); selectTab("mood"); return; }
   await leaveSim();
-  doc = { id: newId(), title: "Mood", mood: true, moodShown: null, created: Date.now(), updated: Date.now() };
+  doc = { id: newId(), title: "Emotion", mood: true, moodShown: null, created: Date.now(), updated: Date.now() };
   await enter({ ...doc, messages: [], scene: emptyScene(), ink: null });
   await saveNow(); listSims(); go("studio"); selectTab("mood");
 }
@@ -520,7 +520,7 @@ function renderMood() {
   const word = !live ? (m?.error ? "Not running" : "Off") : m.face ? "Reading your face" : m.hint || "Starting";
   status($("#mood-status"), word, { mark: live && m.face ? "dot" : "", tone: m?.error && !live ? "warn" : "" });
   $("#mood-camera").textContent = moodCam ? "Stop the camera" : "Start the camera";
-  $("#mood-hint").textContent = m?.error ? m.error : m && !m.ready ? "Presage needs its key: PRESAGE_API_KEY in app/.env, then restart the server." : live && !m.face && m.hint ? m.hint : "Presage reads your face through the Mac's camera; the arm draws your mood.";
+  $("#mood-hint").textContent = m?.error ? m.error : m && !m.ready ? "Presage needs its key: PRESAGE_API_KEY in app/.env, then restart the server." : live && !m.face && m.hint ? m.hint : "Presage reads your face through the Mac's camera; the arm draws your emotion.";
   const scores = Object.fromEntries((live && m.scores || []).map((s) => [s.mood, s.confidence])), top = live && m.age < 1500 ? m.mood : null;
   status($("#mood-now"), top ? MOOD_WORD[top] : "No reading", { mark: top ? "dot" : "" });
   $("#mood-bars").innerHTML = MOODS.map((k) => `<span${k === top ? " data-top" : ""}>${MOOD_WORD[k]}</span><div class="dl-meter" role="meter" aria-label="${MOOD_WORD[k]}" aria-valuenow="${scores[k] || 0}" aria-valuemin="0" aria-valuemax="100" style="--dl-p:${((scores[k] || 0) / 100).toFixed(2)}"></div><b>${scores[k] != null ? `${scores[k]}%` : ""}</b>`).join("");

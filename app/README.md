@@ -108,8 +108,8 @@ the protocol, bring-up and where a Raspberry Pi fits: [`docs/hardware-link.md`](
 | `tools/compare-servos.mjs` | the clock under each servo model, side by side |
 | `tools/optimize-test.mjs`, `tools/verify-motors.mjs` | planner optimality and correctness; sim against the firmware |
 
-## Mood mode (Presage)
+## Emotion mode (Presage)
 
-Mood in the rail opens the Mood simulation. Start the camera and [Presage SmartSpectra](https://github.com/Presage-Security/SmartSpectra) (the MLH sponsor's SDK, `@smartspectra/node-sdk`) reads your face through the Mac's camera, on this machine, in the server (`lib/presage.mjs`, `/api/mood`). Its eight expressions fold into five moods (happy; sad; surprised, with fear; angry, with disgust and contempt; neutral), shown as bars. Draw my mood draws the face for the mood now; Follow my face redraws it by itself once a new mood has held for 2 s and the arm is free. The faces share the head and eyes, so a new mood wipes and redraws only the brows and mouth (18 to 52 s). The mood buttons draw a face without the camera.
+Emotion in the rail opens the Emotion simulation. Start the camera and [Presage SmartSpectra](https://github.com/Presage-Security/SmartSpectra) (the MLH sponsor's SDK, `@smartspectra/node-sdk`) reads your face through the Mac's camera, on this machine, in the server (`lib/presage.mjs`, `/api/mood`). Its eight expressions fold into five moods (happy; sad; surprised, with fear; angry, with disgust and contempt; neutral), shown as bars. Draw my emotion draws the face for the emotion now; Follow my face redraws it by itself once a new mood has held for 2 s and the arm is free. The faces share the head and eyes, so a new mood wipes and redraws only the brows and mouth (18 to 52 s). The mood buttons draw a face without the camera.
 
 It needs `PRESAGE_API_KEY` in `app/.env` (from [physiology.presagetech.com](https://physiology.presagetech.com)), then a server restart. The first start asks macOS for camera access for the app the server runs in. The SDK is Presage's, used under their terms of service.
