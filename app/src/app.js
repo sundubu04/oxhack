@@ -632,7 +632,8 @@ const FIELDS = [
 const get = (o, path) => path.split(".").reduce((a, k) => a?.[k], o);
 const put = (o, path, v) => { const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k) => { a = a[k] ??= {}; }); a[ks.at(-1)] = v; };
 // The pen servo's three angles, to play with: each slider moves the pen there as it slides (the real one too, when
-// connected), and pressing on the board uses them at once, saved or not. Defaults are the jog sketch's.
+// connected), and a change saves itself to arm.config.json straight away, so presses, drawings and the server all
+// use it without a separate Save.
 const PENS = [["lift", "Rest", "lifted"], ["draw", "Write", "nib down"], ["erase", "Erase", "eraser down"]];
 function penGroup() {
   const d = DEFAULT_CONFIG.penServo;
@@ -905,7 +906,7 @@ function calibrate(what) {
   if (what === "base") set("servos.base.offset", b - +s.base.dir * (+s.base.ratio || 1) * 90);   // the upper arm at 90 deg, up the board
   if (what === "elbow") set("servos.elbow.offset", e);                                          // links in line: elbow joint 0
   if (what === "home") { set("park.base", b); set("park.elbow", e); }
-  if (what === "draw" || what === "lift" || what === "erase") set(`penServo.${what}`, p);
+  if (what === "draw" || what === "lift" || what === "erase") { set(`penServo.${what}`, p); syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); savePens(); return; }
   syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); toast("Copied: Save to keep it");
 }
 // Pressing on the board, flat or in 3D, uses the tool chosen above it. Write puts the nib down (the pen servo's
@@ -949,6 +950,18 @@ function lowerIfThere() {
   if (lowerAt && m && Math.abs(setupSim.j.base - m.base) < 0.6 && Math.abs(setupSim.j.elbow - m.elbow) < 0.6) {
     const T = setupSim.g.tilt; setupSim.manual = { ...m, tilt: lowerAt === "erase" ? T.erase : T.draw }; lowerAt = null;
   }
+}
+// save just the pen angles, a moment after the last change; any other unsaved edits on the form stay unsaved
+let penSaveTimer = 0;
+function savePens() {
+  clearTimeout(penSaveTimer);
+  penSaveTimer = setTimeout(async () => {
+    const pens = readSetup().penServo; if (JSON.stringify(pens) === JSON.stringify(cfg.penServo)) return;
+    try {
+      const c = structuredClone(cfg); c.penServo = pens; cfg = await saveConfig(c); applyConfig(); renderSetup();
+      toast(`Pen angles saved: rest ${pens.lift}°, write ${pens.draw}°, erase ${pens.erase}°`);
+    } catch (e) { toast(`Couldn't save the pen angles: ${e.message}`, "circle-alert"); }
+  }, 600);
 }
 function syncPenRanges() { for (const [k] of PENS) { const r = $(`[data-pen-range="${k}"]`), n = $(`[data-path="penServo.${k}"]`); if (r && n && document.activeElement !== r) r.value = n.value; } }
 // put the pen at one of its angles where the arm is now: the sim, and the real servo when connected
@@ -998,14 +1011,15 @@ function wireLive() {
   $$("[data-cal]").forEach((b) => b.addEventListener("click", () => calibrate(b.dataset.cal)));
   // pen angles: a slider moves its number and the pen; Try sends it there; Defaults puts back the jog sketch's
   $("#setup").addEventListener("input", (e) => {
-    const k = e.target.dataset.penRange; if (k) { $(`[data-path="penServo.${k}"]`).value = e.target.value; $("#setup").dispatchEvent(new Event("input")); tryPen(k); return; }
+    const k = e.target.dataset.penRange; if (k) { $(`[data-path="penServo.${k}"]`).value = e.target.value; $("#setup").dispatchEvent(new Event("input")); tryPen(k); savePens(); return; }
     if (/^penServo\./.test(e.target.dataset.path || "")) syncPenRanges();
   });
-  // a typed angle moves the pen once it is finished, not on every keystroke (typing 150 would pass through 1 and 15)
-  $("#setup").addEventListener("change", (e) => { const m = /^penServo\.(\w+)$/.exec(e.target.dataset.path || ""); if (m) tryPen(m[1]); });
+  // a typed angle moves the pen and saves once it is finished, not on every keystroke (typing 150 would pass
+  // through 1 and 15)
+  $("#setup").addEventListener("change", (e) => { const m = /^penServo\.(\w+)$/.exec(e.target.dataset.path || ""); if (m) { tryPen(m[1]); savePens(); } });
   $("#setup").addEventListener("click", (e) => {
     const t = e.target.closest("[data-pen-try]"); if (t) tryPen(t.dataset.penTry);
-    if (e.target.closest("#pen-defaults")) { for (const [k] of PENS) $(`[data-path="penServo.${k}"]`).value = DEFAULT_CONFIG.penServo[k]; syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); tryPen("lift"); toast("Pen angles back to the defaults: Save to keep them"); }
+    if (e.target.closest("#pen-defaults")) { for (const [k] of PENS) $(`[data-path="penServo.${k}"]`).value = DEFAULT_CONFIG.penServo[k]; syncPenRanges(); $("#setup").dispatchEvent(new Event("input")); tryPen("lift"); savePens(); }
   });
   // live settings change on the board as they are typed, saved or not
   $("#setup").addEventListener("input", (e) => {

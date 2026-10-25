@@ -23,7 +23,7 @@
   "penServo": {
     "draw": 4,
     "lift": 40,
-    "erase": 150
+    "erase": 180
   },
   "tool": {
     "nib": {

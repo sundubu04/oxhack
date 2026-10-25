@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = {
   // the nib on the board, lifted, and the eraser on the board. Where each end of the marker touches, in mm from
   // the forearm's tip: along the forearm (+ further out) and across it (+ to the left, looking from the elbow).
   park: { base: 160, elbow: 10 },
-  penServo: { draw: 4, lift: 40, erase: 150 },
+  penServo: { draw: 4, lift: 40, erase: 180 },   // erase 180 from the team on 25 Oct (the jog sketch had 150)
   tool: { nib: { along: 0, side: 0 }, eraser: { along: 14, side: -42 } },
   // The marker, measured with its caps on: 165 mm long (the team's pen); barrel width and how far the nib sticks
   // out are placeholders until measured. angle 0 means the best angle for this pen (see pen.js); margin is how
