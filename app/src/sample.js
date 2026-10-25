@@ -7,6 +7,24 @@ export const SAMPLES = {
 };
 
 // A clock face at the current time, as an SVG (the project's own subject).
+// Mood mode's faces, one per mood the camera reads (lib/presage.mjs). They share the head and the eyes, so going
+// from one mood to another wipes and redraws only the brows and the mouth.
+export const MOODS = ["happy", "sad", "surprised", "angry", "neutral"];
+export function moodFace(mood) {
+  const brows = {
+    sad: '<path d="M27 33 L42 28"/><path d="M73 33 L58 28"/>',
+    angry: '<path d="M27 27 L43 34"/><path d="M73 27 L57 34"/>',
+    surprised: '<path d="M27 30 Q35 22 43 29"/><path d="M57 29 Q65 22 73 30"/>',
+  }[mood] || "";
+  const mouth = {
+    happy: '<path d="M31 59 Q50 81 69 59"/>',
+    sad: '<path d="M33 75 Q50 59 67 75"/>',
+    surprised: '<circle cx="50" cy="68" r="8"/>',
+    angry: '<path d="M33 71 Q50 62 67 71"/>',
+  }[mood] || '<path d="M35 67 L65 67"/>';
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="black"><circle cx="50" cy="50" r="42"/><circle cx="36" cy="41" r="3.5"/><circle cx="64" cy="41" r="3.5"/>${brows}${mouth}</svg>`;
+}
+
 // The clock for clock mode: the same face (radius 44 of the 100-unit box), the numbers 1 to 12 in the pen's own
 // lettering in place of the ticks, and single-line hands kept short of the numbers. Returns the face and hands as SVG
 // and the numbers as texts, the way a scene item holds them.

@@ -8,7 +8,7 @@ import { plan } from "./pathplan.js";
 import { planChange } from "./optimize.js";
 import * as voice from "./voice.js";
 import * as arm from "./arm.js";
-import { SAMPLES, clockSVG, numberedClock } from "./sample.js";
+import { SAMPLES, clockSVG, numberedClock, moodFace, MOODS } from "./sample.js";
 import { loadConfig, saveConfig, geomFrom, withDefaults, servoAngle, DEFAULT_CONFIG } from "./config.js";
 import { makeJob, Sim, homePose } from "./sim.js";
 import { bestZeros, boardShare } from "./zeros.js";
@@ -102,6 +102,7 @@ function markCurrent() {
   $$(".cw-rail [data-page], #sims [data-sim], #open-clock").forEach((a) => a.removeAttribute("aria-current"));
   (row || $(`.cw-rail [data-page="${pageNow}"]`))?.setAttribute("aria-current", "page");
   if (pageNow === "studio" && doc?.clock) $("#open-clock").setAttribute("aria-current", "page");   // the clock is open
+  $("#open-mood").removeAttribute("aria-current"); if (pageNow === "studio" && doc?.mood) $("#open-mood").setAttribute("aria-current", "page");
   row?.scrollIntoView({ block: "nearest" });
 }
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -119,7 +120,7 @@ async function openSim(id) {
   await enter(s); renderSims(); go("studio");
 }
 async function enter(s) {
-  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}) };
+  doc = { id: s.id, title: s.title || "New simulation", created: s.created || Date.now(), updated: s.updated || Date.now(), ...(s.clock ? { clock: true, clockAt: s.clockAt || null } : {}), ...(s.mood ? { mood: true, moodShown: s.moodShown || null } : {}) };
   messages = s.messages || []; scene = s.scene || emptyScene(); hooks = s.hooks || [];
   pause(); active = null; planned = null; inkBefore = null;
   await board.setInk(s.ink); inkDirty = true;
@@ -320,7 +321,7 @@ setInterval(() => {
   if (due) runHook(due);
 }, 1000);
 function renderHooks() {
-  renderClock();
+  renderClock(); renderMood();
   const el = $("#repeats"); el.hidden = !hooks.length;
   el.innerHTML = (hooksPaused && hooks.length ? `<div class="cw-repeat">${icon("pause")}<div class="cw-repeat__text"><span class="cw-repeat__what">Repeats paused</span><span class="cw-repeat__when">Stopped by you</span></div><button class="dl-btn dl-btn--secondary dl-btn--sm" type="button" data-resume>Resume</button></div>` : "") + hooks.map((h) => `<div class="cw-repeat">${icon(isClock(h.prompt) ? "clock" : "refresh-cw")}<div class="cw-repeat__text"><span class="cw-repeat__what">${esc(isClock(h.prompt) ? "Keep the clock on time" : cap(h.prompt))}</span>`
     + `<span class="cw-repeat__when${h.error ? " cw-msg-fail" : ""}">${h.error ? esc(h.error) : `Every ${everyWords(h.every)}${h.last ? `, last at ${hhmm(new Date(h.last))}` : ""}`}</span></div>`
@@ -454,6 +455,87 @@ function wireClock() {
   $("#clock-every").addEventListener("change", () => { const h = clockHook(), n = Math.max(1, Math.round(+$("#clock-every").value || 5)); if (h) { addHook("draw the time", n); toast(`Every ${everyWords(n)} now`); } renderClock(); });
   $("#clock-sweep").addEventListener("change", () => { const v = +$("#clock-sweep").value; if (v > 0) saveSetting("clock.sweep", v, `The eraser now sweeps ${v} mm across each hand`); });
   $("#clock-step").addEventListener("change", () => { const v = +$("#clock-step").value; if (v > 0) saveSetting("clock.step", v, `Sweeps ${v} mm apart now`); });
+}
+
+// ---------- mood mode ----------
+// Its own simulation (the Mood entry in the rail): the camera reads your face through Presage (lib/presage.mjs, on
+// the server, with the Mac's camera) and the arm draws the mood as a face. The faces share the head and eyes, so a
+// new mood wipes and redraws only the brows and mouth. Follow my face draws a new mood once it has held for 2 s and
+// the arm is free; the buttons draw a mood without the camera.
+const MOOD_WORD = { happy: "Happy", sad: "Sad", surprised: "Surprised", angry: "Angry", neutral: "Neutral" };
+let moodRead = null, moodTimer = 0, moodCam = false, moodFollow = false, moodSeen = null, moodSince = 0, moodStream = null;
+function drawMood(mood) {
+  if (!MOODS.includes(mood)) return;
+  if (thinking) return toast("Wait for the answer first", "circle-alert");
+  quietReply = false;
+  const svg = moodFace(mood), has = scene.items.some((i) => i.id === "face");
+  const actions = has ? [{ type: "edit", id: "face", svg }] : [...(scene.items.length ? [{ type: "clear" }] : []), { type: "draw", id: "face", name: `${mood} face`, box: FULL, svg }];
+  change(applyActions(scene, actions).scene);
+  doc.moodShown = mood;
+  messages.push({ role: "assistant", text: `Drawing a ${mood} face.` });
+  renderThread(); renderMood(); saveSoon();
+}
+async function openMood() {
+  const s = sims.find((x) => x.mood) || sims.find((x) => x.title === "Mood");
+  if (s) { await openSim(s.id); selectTab("mood"); return; }
+  await leaveSim();
+  doc = { id: newId(), title: "Mood", mood: true, moodShown: null, created: Date.now(), updated: Date.now() };
+  await enter({ ...doc, messages: [], scene: emptyScene(), ink: null });
+  await saveNow(); listSims(); go("studio"); selectTab("mood");
+}
+async function moodCall(path) {
+  const r = await fetch(`./api/mood${path}`, path ? { method: "POST" } : { cache: "no-store" });
+  const s = await r.json().catch(() => ({})); moodRead = s;
+  if (!r.ok) throw new Error(s.error || `The server answered ${r.status}`);
+  return s;
+}
+async function cameraOn() {
+  $("#mood-camera").disabled = true;
+  try {
+    await moodCall("/start"); moodCam = true;
+    // your own picture beside the reading (the browser's view of the same camera; Presage reads it on the server)
+    try { moodStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); $("#mood-video").srcObject = moodStream; $("#mood-video").hidden = false; } catch (e) {}
+    clearInterval(moodTimer); moodTimer = setInterval(moodTick, 300);
+  } catch (e) { toast(e.message, "circle-alert"); }
+  finally { $("#mood-camera").disabled = false; renderMood(); }
+}
+async function cameraOff() {
+  clearInterval(moodTimer); moodTimer = 0; moodCam = false;
+  moodStream?.getTracks().forEach((t) => t.stop()); moodStream = null; $("#mood-video").hidden = true;
+  try { await moodCall("/stop"); } catch (e) {}
+  renderMood();
+}
+// the latest reading; with Follow my face on, a new mood that has held for 2 s is drawn once the arm is free
+async function moodTick() {
+  try { await moodCall(""); } catch (e) {}
+  const m = moodRead, fresh = m?.mood && m.age != null && m.age < 1500 && (m.stable || (m.scores?.[0]?.confidence || 0) >= 50);
+  if (fresh && m.mood !== moodSeen) { moodSeen = m.mood; moodSince = Date.now(); }
+  if (moodFollow && fresh && moodSeen !== doc?.moodShown && Date.now() - moodSince >= 2000 && !playing && !sending && !thinking && !armBusy) drawMood(moodSeen);
+  renderMood();
+}
+function renderMood() {
+  const on = !!doc?.mood; $("#tab-mood").hidden = !on;
+  if (!on) { if ($("#tab-mood").getAttribute("aria-selected") === "true") selectTab("chat"); if (moodCam) cameraOff(); return; }
+  const m = moodRead, live = moodCam && m?.on;
+  const word = !live ? (m?.error ? "Not running" : "Off") : m.face ? "Reading your face" : m.hint || "Starting";
+  status($("#mood-status"), word, { mark: live && m.face ? "dot" : "", tone: m?.error && !live ? "warn" : "" });
+  $("#mood-camera").textContent = moodCam ? "Stop the camera" : "Start the camera";
+  $("#mood-hint").textContent = m?.error ? m.error : m && !m.ready ? "Presage needs its key: PRESAGE_API_KEY in app/.env, then restart the server." : live && !m.face && m.hint ? m.hint : "Presage reads your face through the Mac's camera; the arm draws your mood.";
+  const scores = Object.fromEntries((live && m.scores || []).map((s) => [s.mood, s.confidence])), top = live && m.age < 1500 ? m.mood : null;
+  status($("#mood-now"), top ? MOOD_WORD[top] : "No reading", { mark: top ? "dot" : "" });
+  $("#mood-bars").innerHTML = MOODS.map((k) => `<span${k === top ? " data-top" : ""}>${MOOD_WORD[k]}</span><div class="dl-meter" role="meter" aria-label="${MOOD_WORD[k]}" aria-valuenow="${scores[k] || 0}" aria-valuemin="0" aria-valuemax="100" style="--dl-p:${((scores[k] || 0) / 100).toFixed(2)}"></div><b>${scores[k] != null ? `${scores[k]}%` : ""}</b>`).join("");
+  $("#mood-draw").disabled = !top;
+  $("#mood-follow").setAttribute("aria-checked", String(moodFollow));
+  if (!$("#mood-picks").children.length) $("#mood-picks").innerHTML = MOODS.map((k) => `<button class="dl-btn dl-btn--ghost dl-btn--sm" type="button" data-mood="${k}">${MOOD_WORD[k]}</button>`).join("");
+}
+function wireMood() {
+  $("#open-mood").addEventListener("click", openMood);
+  $("#tab-mood").addEventListener("click", () => selectTab("mood"));
+  $("#mood-camera").addEventListener("click", () => (moodCam ? cameraOff() : cameraOn()));
+  $("#mood-draw").addEventListener("click", () => { const m = moodRead?.mood; if (m) drawMood(m); });
+  $("#mood-follow").addEventListener("click", () => { moodFollow = !moodFollow; renderMood(); toast(moodFollow ? "The arm follows your face" : "The arm stays as it is"); });
+  $("#mood-picks").addEventListener("click", (e) => { const b = e.target.closest("[data-mood]"); if (b) drawMood(b.dataset.mood); });
+  window.addEventListener("pagehide", () => { if (moodCam) navigator.sendBeacon?.("./api/mood/stop"); });
 }
 
 // ---------- stop ----------
@@ -689,8 +771,8 @@ function setView(v) {
   if (v === "angles") { lastRow = -1; syncLive(true); }
 }
 function selectTab(which) {
-  if (which === "clock" && !doc?.clock) which = "chat";
-  for (const t of ["chat", "plan", "clock"]) {
+  if ((which === "clock" && !doc?.clock) || (which === "mood" && !doc?.mood)) which = "chat";
+  for (const t of ["chat", "plan", "clock", "mood"]) {
     const on = t === which; $(`#tab-${t}`).setAttribute("aria-selected", String(on)); $(`#tab-${t}`).tabIndex = on ? 0 : -1; $(`#panel-${t}`).hidden = !on;
   }
 }
@@ -1356,7 +1438,7 @@ async function start() {
   buildJoints(); buildSetup();
   $("#sw-physics").setAttribute("aria-checked", String(S.physics)); $("#sw-reach").setAttribute("aria-checked", String(S.reach)); $("#sw-follow").setAttribute("aria-checked", String(S.follow));
   if (S.narrate) { S.narrate = false; toggleNarrate(); }
-  wire(); wireLive(); wireClock(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
+  wire(); wireLive(); wireClock(); wireMood(); renderServices(); refreshStatus(); arm.refresh().then(() => setArm(arm.connected())).catch(() => {}); setInterval(refreshStatus, 60000); window.addEventListener("focus", refreshStatus);
   await listSims();
   let want = params.get("sim"); try { want ||= localStorage.getItem("clockedin.open"); } catch (e) {}
   const pick = sims.find((s) => s.id === want) || sims[0];

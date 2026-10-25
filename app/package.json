@@ -13,5 +13,8 @@
     "impeccable": "^3.6.1",
     "playwright": "^1.56.1",
     "three": "^0.170.0"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.4.0"
   }
 }

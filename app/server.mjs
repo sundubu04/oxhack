@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import * as gemini from "./lib/gemini.mjs";
 import * as gpt from "./lib/openai.mjs";
 import * as armLink from "./lib/arm.mjs";
+import * as presage from "./lib/presage.mjs";
 import { geomFrom, withDefaults, servoAngle } from "./src/config.js";
 import { toAngles, toolPoint } from "./src/ik.js";
 import { drawPath, plan } from "./src/pathplan.js";
@@ -29,7 +30,7 @@ const PRIVATE = /(^|\/)(\.env[^/]*|lib\/|node_modules\/|server\.mjs|package-lock
 const spoken = new Map();
 function remember(k, v) { spoken.set(k, v); if (spoken.size > 60) spoken.delete(spoken.keys().next().value); return v; }
 
-const keys = () => ({ openai: env("OPENAI_API_KEY"), gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY") });
+const keys = () => ({ openai: env("OPENAI_API_KEY"), gemini: env("GEMINI_API_KEY"), eleven: env("ELEVENLABS_API_KEY"), presage: env("PRESAGE_API_KEY") });
 // best drawings first (10 to 18 s); then the fast one (5 to 10 s); see app/README.md for how they were picked
 const gptModels = () => env("OPENAI_MODELS", "gpt-6.1-sol:low,gpt-5.6-sol:low,gpt-6-luna:low").split(",").map((s) => s.trim()).filter(Boolean);
 // best first: the pro model answers once the project has billing (its free quota is zero, so until then it is
@@ -93,7 +94,7 @@ async function api(req, res, path) {
     await mkdir(SIMS, { recursive: true });
     const list = [];
     for (const f of (await readdir(SIMS)).filter((f) => f.endsWith(".json"))) {
-      try { const s = JSON.parse(await readFile(join(SIMS, f), "utf8")); list.push({ id: s.id, title: s.title, updated: s.updated, ...(s.clock ? { clock: true } : {}) }); } catch (e) {}
+      try { const s = JSON.parse(await readFile(join(SIMS, f), "utf8")); list.push({ id: s.id, title: s.title, updated: s.updated, ...(s.clock ? { clock: true } : {}), ...(s.mood ? { mood: true } : {}) }); } catch (e) {}
     }
     return send(res, 200, list.sort((a, b) => b.updated - a.updated));
   }
@@ -130,6 +131,15 @@ async function api(req, res, path) {
       res.writeHead(204).end();
     } catch (e) { return send(res, 502, { error: e.message }); }
     return;
+  }
+  // Mood mode: the camera through Presage (lib/presage.mjs). GET: the latest mood; POST start | stop.
+  if (path === "/api/mood" || path.startsWith("/api/mood/")) {
+    try {
+      if (req.method === "GET") return send(res, 200, presage.status(keys().presage));
+      if (path === "/api/mood/start") return send(res, 200, await presage.start(keys().presage));
+      if (path === "/api/mood/stop") return send(res, 200, await presage.stop());
+      return send(res, 404, { error: "no such mood call" });
+    } catch (e) { return send(res, 400, { ...presage.status(keys().presage), error: e.message }); }
   }
   if (path === "/api/arm" || path.startsWith("/api/arm/")) {
     try { return send(res, 200, await arm(req, path.slice(8))); }
